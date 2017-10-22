@@ -30,7 +30,7 @@ static inline void hex_dump(const unsigned char *buf, size_t len)
 
 	for (i = 0; i < len; i++) {
 		if (!(i % 16))
-			cbn_info("\n%d\t:", i);
+			cbn_info("\n%lu\t:", i);
 		cbn_info("%02x ", *(buf + i));
 	}
 	cbn_info("\n");
@@ -61,7 +61,7 @@ static inline const char *proto_string(u8 protocol)
 
 #define dump_iph(iphdr) 	idx += sprintf(&store[idx],"\t\tmark %d secmark %d\n\t\t"  \
 		 "ihl %d ver %d tos %d total len %d\n\t\t"							\
-		 "id %05d frag_off %05d [%s]\n\t\t"								\
+		 "id %05d frag_off %05lu [%s]\n\t\t"								\
 		 "ttl %d proto %s[%d] csum 0x%x\n\t\t"								\
 		 "saddr %pI4n \n\t\t"										\
 		 "daddr %pI4n \n"										\
@@ -80,12 +80,10 @@ static inline void trace_iph(struct sk_buff *skb, const char *str)
 	int idx = 0;
 	char store[512] = {0};
 
-	if (iphdr->protocol == 6) {
-		//idx += sprintf(store[idx],"TCP pack\n");
-		dump_iph(iphdr);
-	}
+	dump_iph(iphdr);
+	trace_printk(store);
 	return;
-
+/*
 	idx += sprintf(&store[idx],"\n\t\t>>>>>>>>>>>>>%s>>>>>>>>>>>>>>>>\n",str);
 	if (skb->mark == 166)
 		idx += sprintf(&store[idx],"\n\t\tMARK SET\n");
@@ -107,5 +105,6 @@ static inline void trace_iph(struct sk_buff *skb, const char *str)
 	}
 	idx += sprintf(&store[idx],"\n\t\t=================\n");
 	trace_printk(store);
+	*/
 }
 #endif /*__CBN_COMMON_H__*/

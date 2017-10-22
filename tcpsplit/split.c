@@ -8,6 +8,7 @@
 #include <linux/netfilter_ipv4.h>
 #include <net/sock.h>  //sock->to
 #include "tcp_split.h"
+#include "pool.h"
 #include "cbn_common.h"
 
 MODULE_LICENSE("GPL");
@@ -44,59 +45,34 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 #define SERVER_PORT (9 << 10) // 9K // _1oo1
 #define BACKLOG     512
 
+static struct kthread_pool cbn_pool = {.pool_size = DEF_CBN_POOL_SIZE};
+
 static struct task_struct *server_task;
 static struct list_head task_list;
-static struct kmem_cache *task_slab;
 static struct kmem_cache *qp_slab;
-
-struct cbn_task {
-	struct list_head list;
-	struct task_struct *task;
-	//TODO: consider removing sock
-	struct socket *sock;
-};
 
 struct cbn_qp {
 	struct socket *tx;
 	struct socket *rx;
 };
-//static struct workqueue_struct *proxy_wq;
-
-// fs/file.c
-//fcntl(fd, F_SETFL, O_NONBLOCK);
-//yield:
-//	set_current_state(TASK_INTERRUPTIBLE);
-//	if (!kthread_should_stop())
-//		schedule();
-//	__set_current_state(TASK_RUNNING);
-
-static inline void add_task(struct task_struct *task,struct socket *sock)
-{
-	struct cbn_task *slab = kmem_cache_alloc(task_slab, GFP_KERNEL);
-
-	//TODO: check ZERO_OR_NULL_PTR for gracefull failure
-	slab->task = task;
-	slab->sock = sock;
-	list_add_tail(&slab->list, &task_list);
-}
 
 static inline void stop_proxies(void)
 {
-	struct list_head *itr, *tmp;
 
-	list_for_each_safe(itr, tmp, &task_list) {
-		struct cbn_task *task = container_of(itr, struct cbn_task, list);
-		list_del(itr);
-		kthread_stop(task->task);
-		kmem_cache_free(task_slab, task);
-	}
+		//kernel_sock_shutdown(sock, SHUT_RDWR);
+		//sock_release(sock);
+	cbn_kthread_pool_clean(&cbn_pool);
 }
 
 #define INIT_TRACE	char ___buff[512] = {0}; int ___idx = 0;
 
 #define TRACE_LINE {	 pr_err("%d:%s\n", __LINE__, current->comm);___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d", __FUNCTION__, __LINE__); }
-#define TRACE_PRINT(fmt, ...) {	 pr_err("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); \
+#define TRACE_PRINT(fmt, ...)
+#ifndef TRACE_PRINT
+#define TRACE_PRINT(fmt, ...) { trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ );\
+				/*pr_err("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); */\
 				/* ___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d:"fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__); */}
+#endif
 #define DUMP_TRACE	 if (___idx) {___buff[___idx] = '\n'; trace_printk(___buff);} ___buff[0] = ___idx = 0;
 
 static int half_duplex(void *arg)
@@ -118,17 +94,19 @@ static int half_duplex(void *arg)
 			goto err;
 		TRACE_PRINT("Received %d bytes", rc);
 		//use kern_sendpage if flags needed.
-		if ((rc = kernel_sendmsg(qp->tx, &msg, &kvec, 1, PAGE_SIZE)) < 0)
+		if ((rc = kernel_sendmsg(qp->tx, &msg, &kvec, 1, rc)) <= 0)
 				goto err;
+		TRACE_PRINT("Sent %d bytes", rc);
 	} while (!kthread_should_stop());
 	goto out;
 err:
-
+	TRACE_PRINT("%s sleeping on error (%d)\n", __FUNCTION__, rc);
 	set_current_state(TASK_INTERRUPTIBLE);
 	if (!kthread_should_stop())
 		schedule();
 	__set_current_state(TASK_RUNNING);
 out:
+	TRACE_PRINT("%s going out\n", __FUNCTION__);
 	free_page((unsigned long)(kvec.iov_base));
 	DUMP_TRACE
 	return rc;
@@ -136,15 +114,15 @@ out:
 
 static int start_new_connection(void *arg)
 {
-	int rc, size, line, T = 1;
+	int rc, size, line;
+//	int T = 1;
 	struct socket *rx = arg;
 	struct sockaddr_in cli_addr;
 	struct socket *tx;
 	struct sockaddr_in addr;
 	struct cbn_qp *qp;
 	struct cbn_qp lqp;
-	struct task_struct *task;
-	char name[128];
+	struct pool_elem *elem;
 
 	INIT_TRACE
 
@@ -160,7 +138,7 @@ static int start_new_connection(void *arg)
 	line = __LINE__;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
 		goto create_fail;
-
+/*
 	line = __LINE__;
 	if ((rc = kernel_setsockopt(tx, SOL_IP, IP_TRANSPARENT, (char *)&T, sizeof(int))))
 		goto connect_fail;
@@ -169,7 +147,7 @@ static int start_new_connection(void *arg)
 	line = __LINE__;
 	if ((rc = kernel_bind(tx, (struct sockaddr *)&cli_addr, sizeof(cli_addr))))
 		goto connect_fail;
-
+*/
 	TRACE_PRINT("connecting remote port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
 	line = __LINE__;
 	if ((rc = kernel_connect(tx, (struct sockaddr *)&addr, sizeof(addr), 0)))
@@ -181,20 +159,18 @@ static int start_new_connection(void *arg)
 	TRACE_PRINT("connected local port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
 
 	qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
-	qp->rx = lqp.tx = rx;
-	qp->tx = lqp.rx = tx;
+	qp->rx = lqp.tx = tx;
+	qp->tx = lqp.rx = rx;
 
-	// Strating tcp split
-	sprintf(name, "cbn_proxy_%u", ntohs(addr.sin_port));
-	task = kthread_run(half_duplex, qp, name);
+	elem = kthread_pool_run(&cbn_pool, half_duplex, qp);
 	DUMP_TRACE
 	half_duplex(&lqp);
 
 	TRACE_PRINT("closing port %d IP %pI4n", ntohs(addr.sin_port), &addr.sin_addr);
 	/* Teardown */
-	kthread_stop(task);
+	kthread_stop(elem->task); //TODO: dont like the elem-> ..., fix teh API when paralel connect is on
 
-	/* TX partnet stopped - free qp*/
+	/* TX partner stopped - free qp*/
 	kmem_cache_free(qp_slab, qp);
 
 	/* free both sockets*/
@@ -211,7 +187,6 @@ create_fail:
 static int split_server(void *unused)
 {
 	int rc = 0;
-	u32 count = 0;
 	struct socket *sock;
 	struct sockaddr_in srv_addr;
 	INIT_TRACE
@@ -229,23 +204,21 @@ static int split_server(void *unused)
 
 	if ((rc = kernel_listen(sock, BACKLOG)))
 		goto listen_failed;
-
-	allow_signal(SIGSTOP);
+	TRACE_PRINT("waiting for a connection...\n");
+loop:
 	do {
 		struct socket *nsock;
-		struct task_struct *task;
-		char name[128];
+		//struct pool_elem *elem; TODO: nothing to do with elem right now - will need on para-connect
 
-		TRACE_PRINT("waiting for a connection...\n");
-		//TODO: Break wait and wake thread on teardown!
-		sock->sk->sk_rcvtimeo = 7 * HZ;
-		if ((rc = kernel_accept(sock, &nsock, 0))) //O_NONBLOCK for non blocking new socket
+		sock->sk->sk_rcvtimeo = 1 * HZ;
+		rc = kernel_accept(sock, &nsock, 0); //O_NONBLOCK for non blocking new socket
+		if (rc == -EAGAIN)
+			goto loop;
+		if (unlikely(rc))
 			goto accept_failed;
 
 		TRACE_PRINT("starting new connection...\n");
-		sprintf(name, "cbn_proxy_rx_%u", count++);
-		task = kthread_run(start_new_connection, nsock, name);
-		add_task(task, nsock);
+		kthread_pool_run(&cbn_pool, start_new_connection, nsock);
 
 	} while (!kthread_should_stop());
 
@@ -259,27 +232,26 @@ out:
 	return rc;
 }
 
-static int __init cbn_datapath_init(void)
+int __init cbn_datapath_init(void)
 {
 	server_task = kthread_run(split_server, NULL, "cbn_tcp_split_server");
 	INIT_LIST_HEAD(&task_list);
-	task_slab = kmem_cache_create("cbn_task_mdata",
-					sizeof(struct cbn_task), 0, 0, NULL);
 	qp_slab = kmem_cache_create("cbn_qp_mdata",
 					sizeof(struct cbn_qp), 0, 0, NULL);
 
-	nf_register_hooks(cbn_nf_hooks, ARRAY_SIZE(cbn_nf_hooks));
+	cbn_kthread_pool_init(&cbn_pool);
+	//nf_register_hooks(cbn_nf_hooks, ARRAY_SIZE(cbn_nf_hooks));
 	return 0;
 }
 
-static void __exit cbn_datapath_clean(void)
+void __exit cbn_datapath_clean(void)
 {
 	pr_err("stopping server_task\n");
 	kthread_stop(server_task);
 	pr_err("server_task stopped stopping stop_proxies\n");
 	stop_proxies();
 	pr_err("proxies stopped\n");
-	nf_unregister_hooks(cbn_nf_hooks,  ARRAY_SIZE(cbn_nf_hooks));
+	//nf_unregister_hooks(cbn_nf_hooks,  ARRAY_SIZE(cbn_nf_hooks));
 }
 
 module_init(cbn_datapath_init);
