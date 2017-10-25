@@ -5,6 +5,7 @@
 #include <linux/printk.h>
 #include <uapi/linux/ip.h>
 #include <uapi/linux/udp.h>
+#include <uapi/linux/tcp.h>
 #include <linux/ip.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
@@ -73,7 +74,16 @@ static inline const char *proto_string(u8 protocol)
 			iphdr->ttl, proto_string(iphdr->protocol), iphdr->protocol,				\
 			iphdr->check, &iphdr->saddr, &iphdr->daddr						\
 			);
-
+#define dump_tcph(tcphdr)	idx += sprintf(&store[idx], "\n %d => %d "					\
+						"%s %s %s\n"								\
+						"seq %d ack %d window %d\n"							\
+						,ntohs(tcphdr->source), ntohs(tcphdr->dest)			\
+						, tcphdr->syn ? "SYN" : ""					\
+						, tcphdr->ack ? "ACK" : ""					\
+						, tcphdr->ack ? "FIN" : ""					\
+						,ntohl(tcphdr->seq), ntohl(tcphdr->ack_seq)			\
+						,ntohs(tcphdr->window)						\
+						);
 static inline void trace_iph(struct sk_buff *skb, const char *str)
 {
 	struct iphdr *iphdr = ip_hdr(skb);
@@ -81,6 +91,10 @@ static inline void trace_iph(struct sk_buff *skb, const char *str)
 	char store[512] = {0};
 
 	dump_iph(iphdr);
+	if (iphdr->protocol == 6) {
+		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
+		dump_tcph(tcphdr);
+	}
 	trace_printk(store);
 	return;
 /*

@@ -234,24 +234,25 @@ out:
 
 int __init cbn_datapath_init(void)
 {
-	server_task = kthread_run(split_server, NULL, "cbn_tcp_split_server");
-	INIT_LIST_HEAD(&task_list);
-	qp_slab = kmem_cache_create("cbn_qp_mdata",
-					sizeof(struct cbn_qp), 0, 0, NULL);
-
-	cbn_kthread_pool_init(&cbn_pool);
-	//nf_register_hooks(cbn_nf_hooks, ARRAY_SIZE(cbn_nf_hooks));
+//server_task = kthread_run(split_server, NULL, "cbn_tcp_split_server");
+//INIT_LIST_HEAD(&task_list);
+//qp_slab = kmem_cache_create("cbn_qp_mdata",
+//				sizeof(struct cbn_qp), 0, 0, NULL);
+//
+//cbn_kthread_pool_init(&cbn_pool);
+	nf_register_hooks(cbn_nf_hooks, ARRAY_SIZE(cbn_nf_hooks));
 	return 0;
 }
 
 void __exit cbn_datapath_clean(void)
 {
-	pr_err("stopping server_task\n");
-	kthread_stop(server_task);
-	pr_err("server_task stopped stopping stop_proxies\n");
-	stop_proxies();
-	pr_err("proxies stopped\n");
-	//nf_unregister_hooks(cbn_nf_hooks,  ARRAY_SIZE(cbn_nf_hooks));
+//pr_err("stopping server_task\n");
+//kthread_stop(server_task);
+//pr_err("server_task stopped stopping stop_proxies\n");
+//stop_proxies();
+//pr_err("proxies stopped\n");
+	kmem_cache_destroy(qp_slab);
+	nf_unregister_hooks(cbn_nf_hooks,  ARRAY_SIZE(cbn_nf_hooks));
 }
 
 module_init(cbn_datapath_init);
