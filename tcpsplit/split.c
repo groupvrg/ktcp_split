@@ -184,6 +184,25 @@ create_fail:
 	return rc;
 }
 
+struct tennat_ctx {
+	struct socket *sock;
+};
+
+static struct tennat_ctx tennats[1] = {0};
+static inline void register_server_sock(uint32_t tid, struct socket *sock)
+{
+	tennats[tid].sock = sock;
+}
+
+static inline void stop_sockets(void)
+{
+	TRACE_PRINT("%s\n", __FUNCTION__);
+	kernel_sock_shutdown(tennats[0].sock, SHUT_RDWR);
+	sock_release(tennats[0].sock);
+
+}
+
+
 static int split_server(void *unused)
 {
 	int rc = 0;
@@ -205,17 +224,18 @@ static int split_server(void *unused)
 	if ((rc = kernel_listen(sock, BACKLOG)))
 		goto listen_failed;
 	TRACE_PRINT("waiting for a connection...\n");
+	register_server_sock(0, sock);
 loop:
 	do {
 		struct socket *nsock;
 		//struct pool_elem *elem; TODO: nothing to do with elem right now - will need on para-connect
 
 		sock->sk->sk_rcvtimeo = 1 * HZ;
-		rc = kernel_accept(sock, &nsock, 0); //O_NONBLOCK for non blocking new socket
+		rc = kernel_accept(sock, &nsock, 0);
 		if (rc == -EAGAIN)
 			goto loop;
 		if (unlikely(rc))
-			goto accept_failed;
+			goto out;
 
 		TRACE_PRINT("starting new connection...\n");
 		kthread_pool_run(&cbn_pool, start_new_connection, nsock);
@@ -225,7 +245,7 @@ loop:
 accept_failed:
 listen_failed:
 bind_failed:
-	TRACE_PRINT("Exiting");
+	TRACE_PRINT("Exiting %d\n", rc);
 	sock_release(sock);
 out:
 	DUMP_TRACE
@@ -234,23 +254,24 @@ out:
 
 int __init cbn_datapath_init(void)
 {
-//server_task = kthread_run(split_server, NULL, "cbn_tcp_split_server");
-//INIT_LIST_HEAD(&task_list);
-//qp_slab = kmem_cache_create("cbn_qp_mdata",
-//				sizeof(struct cbn_qp), 0, 0, NULL);
-//
-//cbn_kthread_pool_init(&cbn_pool);
+	server_task = kthread_run(split_server, NULL, "cbn_tcp_split_server");
+	INIT_LIST_HEAD(&task_list);
+	qp_slab = kmem_cache_create("cbn_qp_mdata",
+					sizeof(struct cbn_qp), 0, 0, NULL);
+
+	cbn_kthread_pool_init(&cbn_pool);
 	nf_register_hooks(cbn_nf_hooks, ARRAY_SIZE(cbn_nf_hooks));
 	return 0;
 }
 
 void __exit cbn_datapath_clean(void)
 {
-//pr_err("stopping server_task\n");
-//kthread_stop(server_task);
-//pr_err("server_task stopped stopping stop_proxies\n");
-//stop_proxies();
-//pr_err("proxies stopped\n");
+	pr_err("stopping server_task\n");
+	stop_sockets();
+	kthread_stop(server_task);
+	pr_err("server_task stopped stopping stop_proxies\n");
+	stop_proxies();
+	pr_err("proxies stopped\n");
 	kmem_cache_destroy(qp_slab);
 	nf_unregister_hooks(cbn_nf_hooks,  ARRAY_SIZE(cbn_nf_hooks));
 }
