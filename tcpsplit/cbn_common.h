@@ -13,6 +13,18 @@
 #define cbn_err(fmt, ...)	__cbn_err("%s: " fmt, __FUNCTION__, ##__VA_ARGS__);	\
 				pr_err( "%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
 
+#define INIT_TRACE	char ___buff[512] = {0}; int ___idx = 0;
+
+#define TRACE_LINE {	 pr_err("%d:%s\n", __LINE__, current->comm);___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d", __FUNCTION__, __LINE__); }
+#define TRACE_PRINT(fmt, ...)
+#ifndef TRACE_PRINT
+#define TRACE_PRINT(fmt, ...) { trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ );\
+				/*pr_err("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); */\
+				/* ___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d:"fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__); */}
+#endif
+#define DUMP_TRACE	 if (___idx) {___buff[___idx] = '\n'; trace_printk(___buff);} ___buff[0] = ___idx = 0;
+
+
 static inline void __cbn_err(const char *fmt, ...)
 {
 	va_list args;
@@ -84,19 +96,23 @@ static inline const char *proto_string(u8 protocol)
 						,ntohl(tcphdr->seq), ntohl(tcphdr->ack_seq)			\
 						,ntohs(tcphdr->window)						\
 						);
-static inline void trace_iph(struct sk_buff *skb, const char *str)
+static inline int trace_iph(struct sk_buff *skb, const char *str)
 {
 	struct iphdr *iphdr = ip_hdr(skb);
+	int rc = 0;
 	int idx = 0;
 	char store[512] = {0};
 
-	dump_iph(iphdr);
 	if (iphdr->protocol == 6) {
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
+		idx += sprintf(&store[idx], "%s:\n",str);
+		dump_iph(iphdr);
 		dump_tcph(tcphdr);
+		trace_printk(store);
+		if (unlikely(tcphdr->syn && !tcphdr->ack))
+			rc = 1;
 	}
-	trace_printk(store);
-	return;
+	return rc;
 /*
 	idx += sprintf(&store[idx],"\n\t\t>>>>>>>>>>>>>%s>>>>>>>>>>>>>>>>\n",str);
 	if (skb->mark == 166)

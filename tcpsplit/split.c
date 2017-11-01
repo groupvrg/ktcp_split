@@ -3,24 +3,72 @@
 #include <linux/in.h>
 #include <linux/kthread.h>
 #include <linux/sched.h>
+#include <linux/wait.h>
 #include <linux/netdevice.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 #include <net/sock.h>  //sock->to
 #include "tcp_split.h"
 #include "pool.h"
+#include "rb_data_tree.h"
 #include "cbn_common.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Markuze Alex");
 MODULE_DESCRIPTION("CBN TCP Split Module");
 
+#define SERVER_PORT (9 << 10) // 9K // _1oo1
+#define BACKLOG     512
+
+struct sockets {
+	struct socket *rx;
+	struct socket *tx;
+};
+
+struct addresses {
+	struct sockaddr_in dest;
+	struct sockaddr_in src;
+};
+
+static struct kthread_pool cbn_pool = {.pool_size = DEF_CBN_POOL_SIZE};
+
+//per_tennat
+static struct task_struct *server_task;
+static struct rb_root qp_root = RB_ROOT;
+//per_tennat
+
+static struct list_head task_list;
+static struct kmem_cache *qp_slab;
+static struct kmem_cache *syn_slab;
+
+static int start_new_connection_syn(void *arg);
+
 static unsigned int cbn_ingress_hook(void *priv,
 					struct sk_buff *skb,
 					const struct nf_hook_state *state)
 {
-	trace_iph(skb, priv);
+	if (trace_iph(skb, priv)) {
+		struct iphdr *iphdr = ip_hdr(skb);
+		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
+		struct addresses *addresses;
 
+		pr_err("schedule connection");
+		addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
+		if (unlikely(!addresses)) {
+			pr_err("Faield to alloc mem %s\n", __FUNCTION__);
+			goto out;
+		}
+		addresses->dest.sin_addr.s_addr	= iphdr->daddr;
+		addresses->src.sin_addr.s_addr	= iphdr->saddr;
+		addresses->dest.sin_port		= tcphdr->dest;
+		addresses->src.sin_port			= tcphdr->source;
+		kthread_pool_run(&cbn_pool, start_new_connection_syn, addresses); //elem?
+		//1.alloc task + data
+		//2.rb_tree lookup
+		// sched poll on qp init - play with niceness?
+	}
+
+out:
 	return NF_ACCEPT;
 }
 
@@ -32,6 +80,15 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 			.priority	= NF_IP_PRI_FIRST,
 			.priv		= "TX"
 			},
+
+			{
+			.hook		= cbn_ingress_hook,
+			.hooknum	= NF_INET_LOCAL_IN,
+			.pf		= PF_INET,
+			.priority	= NF_IP_PRI_FIRST,
+			.priv		= "LIN"
+			},
+
 			{
 			.hook		= cbn_ingress_hook,
 			.hooknum	= NF_INET_PRE_ROUTING,
@@ -42,20 +99,6 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 //TODO: Add LOCAL_IN to mark packets with tennant_id
 };
 
-#define SERVER_PORT (9 << 10) // 9K // _1oo1
-#define BACKLOG     512
-
-static struct kthread_pool cbn_pool = {.pool_size = DEF_CBN_POOL_SIZE};
-
-static struct task_struct *server_task;
-static struct list_head task_list;
-static struct kmem_cache *qp_slab;
-
-struct cbn_qp {
-	struct socket *tx;
-	struct socket *rx;
-};
-
 static inline void stop_proxies(void)
 {
 
@@ -64,20 +107,9 @@ static inline void stop_proxies(void)
 	cbn_kthread_pool_clean(&cbn_pool);
 }
 
-#define INIT_TRACE	char ___buff[512] = {0}; int ___idx = 0;
-
-#define TRACE_LINE {	 pr_err("%d:%s\n", __LINE__, current->comm);___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d", __FUNCTION__, __LINE__); }
-#define TRACE_PRINT(fmt, ...)
-#ifndef TRACE_PRINT
-#define TRACE_PRINT(fmt, ...) { trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ );\
-				/*pr_err("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); */\
-				/* ___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d:"fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__); */}
-#endif
-#define DUMP_TRACE	 if (___idx) {___buff[___idx] = '\n'; trace_printk(___buff);} ___buff[0] = ___idx = 0;
-
 static int half_duplex(void *arg)
 {
-	struct cbn_qp *qp = arg;
+	struct sockets *qp = arg;
 	struct kvec kvec;
 	int rc = -ENOMEM;
 
@@ -112,17 +144,63 @@ out:
 	return rc;
 }
 
+static int start_new_connection_syn(void *arg)
+{
+	int rc, line;
+	struct addresses *addresses = arg;
+	struct cbn_qp *qp, *tx_qp;
+	struct sockets sockets;
+	struct socket *tx;
+
+	INIT_TRACE
+
+	line = __LINE__;
+	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
+		goto create_fail;
+
+	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0)))
+		goto connect_fail;
+
+	qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
+	qp->addr_s = addresses->dest.sin_addr;
+	qp->port_d = addresses->src.sin_port;
+	qp->port_s = addresses->dest.sin_port;
+	qp->addr_d = addresses->src.sin_addr;
+
+	qp->tx = tx;
+	qp->rx = NULL;
+
+	//TODO: add locks to this shit
+	if ((tx_qp = add_rb_data(&qp_root, qp))) { //this means the other conenction is already up
+		tx_qp->tx = tx;
+		kmem_cache_free(qp_slab, qp);
+		qp = tx_qp;
+	} else {
+		while (!qp->rx) {
+			schedule();
+		}
+	}
+	DUMP_TRACE
+	sockets.tx = qp->rx;
+	sockets.rx = qp->tx;
+	half_duplex(&sockets);
+
+connect_fail:
+	sock_release(tx);
+create_fail:
+	DUMP_TRACE
+	return rc;
+}
+
 static int start_new_connection(void *arg)
 {
 	int rc, size, line;
 //	int T = 1;
 	struct socket *rx = arg;
 	struct sockaddr_in cli_addr;
-	struct socket *tx;
 	struct sockaddr_in addr;
-	struct cbn_qp *qp;
-	struct cbn_qp lqp;
-	struct pool_elem *elem;
+	struct cbn_qp *qp, *tx_qp;
+	struct sockets sockets;
 
 	INIT_TRACE
 
@@ -135,10 +213,10 @@ static int start_new_connection(void *arg)
 	if ((rc = kernel_getpeername(rx, (struct sockaddr *)&cli_addr, &size)))
 		goto create_fail;
 
+/*
 	line = __LINE__;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
 		goto create_fail;
-/*
 	line = __LINE__;
 	if ((rc = kernel_setsockopt(tx, SOL_IP, IP_TRANSPARENT, (char *)&T, sizeof(int))))
 		goto connect_fail;
@@ -147,7 +225,6 @@ static int start_new_connection(void *arg)
 	line = __LINE__;
 	if ((rc = kernel_bind(tx, (struct sockaddr *)&cli_addr, sizeof(cli_addr))))
 		goto connect_fail;
-*/
 	TRACE_PRINT("connecting remote port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
 	line = __LINE__;
 	if ((rc = kernel_connect(tx, (struct sockaddr *)&addr, sizeof(addr), 0)))
@@ -158,25 +235,45 @@ static int start_new_connection(void *arg)
 		goto connect_fail;
 	TRACE_PRINT("connected local port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
 
+*/
 	qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
-	qp->rx = lqp.tx = tx;
-	qp->tx = lqp.rx = rx;
+	qp->addr_s = addr.sin_addr;
+	qp->port_d = cli_addr.sin_port;
+	qp->port_s = addr.sin_port;
+	qp->addr_d = cli_addr.sin_addr;
+	qp->rx = rx;
+	qp->tx = NULL;
 
-	elem = kthread_pool_run(&cbn_pool, half_duplex, qp);
+
+	//elem = kthread_pool_run(&cbn_pool, half_duplex, qp);
+	if ((tx_qp = add_rb_data(&qp_root, qp))) { //this means the other conenction is already up
+		tx_qp->rx = rx;
+		kmem_cache_free(qp_slab, qp);
+		qp = tx_qp;
+	} else {
+		while (!qp->tx) {
+			schedule();
+		}
+	}
 	DUMP_TRACE
-	half_duplex(&lqp);
+	sockets.tx = qp->tx;
+	sockets.rx = qp->rx;
+	half_duplex(&sockets);
 
 	TRACE_PRINT("closing port %d IP %pI4n", ntohs(addr.sin_port), &addr.sin_addr);
 	/* Teardown */
-	kthread_stop(elem->task); //TODO: dont like the elem-> ..., fix teh API when paralel connect is on
+	//kthread_stop(elem->task); //TODO: dont like the elem-> ..., fix teh API when paralel connect is on
 
 	/* TX partner stopped - free qp*/
-	kmem_cache_free(qp_slab, qp);
+	if (qp)
+		kmem_cache_free(qp_slab, qp);
 
 	/* free both sockets*/
 	rc = line = 0;
+/*
 connect_fail:
 	sock_release(tx);
+*/
 create_fail:
 	sock_release(rx);
 	TRACE_PRINT("out [%d - %d]", rc, ++line);
@@ -225,15 +322,13 @@ static int split_server(void *unused)
 		goto listen_failed;
 	TRACE_PRINT("waiting for a connection...\n");
 	register_server_sock(0, sock);
-loop:
+
 	do {
 		struct socket *nsock;
 		//struct pool_elem *elem; TODO: nothing to do with elem right now - will need on para-connect
+		//sock->sk->sk_rcvtimeo = 1 * HZ;
 
-		sock->sk->sk_rcvtimeo = 1 * HZ;
 		rc = kernel_accept(sock, &nsock, 0);
-		if (rc == -EAGAIN)
-			goto loop;
 		if (unlikely(rc))
 			goto out;
 
@@ -254,10 +349,13 @@ out:
 
 int __init cbn_datapath_init(void)
 {
-	server_task = kthread_run(split_server, NULL, "cbn_tcp_split_server");
+	server_task = kthread_run(split_server, NULL, "split_server");
 	INIT_LIST_HEAD(&task_list);
 	qp_slab = kmem_cache_create("cbn_qp_mdata",
 					sizeof(struct cbn_qp), 0, 0, NULL);
+
+	syn_slab = kmem_cache_create("cbn_syn_mdata",
+					sizeof(struct addresses), 0, 0, NULL);
 
 	cbn_kthread_pool_init(&cbn_pool);
 	nf_register_hooks(cbn_nf_hooks, ARRAY_SIZE(cbn_nf_hooks));
