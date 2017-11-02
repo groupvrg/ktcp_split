@@ -16,9 +16,9 @@
 #define INIT_TRACE	char ___buff[512] = {0}; int ___idx = 0;
 
 #define TRACE_LINE {	 pr_err("%d:%s\n", __LINE__, current->comm);___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d", __FUNCTION__, __LINE__); }
-#define TRACE_PRINT(fmt, ...)
+//#define TRACE_PRINT(fmt, ...)
 #ifndef TRACE_PRINT
-#define TRACE_PRINT(fmt, ...) { trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ );\
+#define TRACE_PRINT(fmt, ...) { pr_err("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ );\
 				/*pr_err("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); */\
 				/* ___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d:"fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__); */}
 #endif
@@ -102,15 +102,21 @@ static inline int trace_iph(struct sk_buff *skb, const char *str)
 	int rc = 0;
 	int idx = 0;
 	char store[512] = {0};
+	static int stop;
+
+	if (stop)
+		return 0;
 
 	if (iphdr->protocol == 6) {
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
-		idx += sprintf(&store[idx], "%s:\n",str);
-		dump_iph(iphdr);
-		dump_tcph(tcphdr);
-		trace_printk(store);
-		if (unlikely(tcphdr->syn && !tcphdr->ack))
+		if (unlikely(tcphdr->syn && !tcphdr->ack)) {
 			rc = 1;
+			stop = 1;
+			idx += sprintf(&store[idx], "%s:\n",str);
+			dump_iph(iphdr);
+			dump_tcph(tcphdr);
+			trace_printk(store);
+		}
 	}
 	return rc;
 /*

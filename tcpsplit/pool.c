@@ -29,7 +29,7 @@ static int pipe_loop_task(void *data)
 	struct kthread_pool *pool = elem->pool;
 
 	while (!kthread_should_stop()) {
-		//pr_err("%s running\n", current->comm);
+		pr_err("%s running\n", current->comm);
 		if (elem->pool_task)
 			elem->pool_task(elem->data);
 		else

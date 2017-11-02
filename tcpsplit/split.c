@@ -60,8 +60,8 @@ static unsigned int cbn_ingress_hook(void *priv,
 		}
 		addresses->dest.sin_addr.s_addr	= iphdr->daddr;
 		addresses->src.sin_addr.s_addr	= iphdr->saddr;
-		addresses->dest.sin_port		= tcphdr->dest;
-		addresses->src.sin_port			= tcphdr->source;
+		addresses->dest.sin_port	= tcphdr->dest;
+		addresses->src.sin_port		= tcphdr->source;
 		kthread_pool_run(&cbn_pool, start_new_connection_syn, addresses); //elem?
 		//1.alloc task + data
 		//2.rb_tree lookup
@@ -73,29 +73,36 @@ out:
 }
 
 static struct nf_hook_ops cbn_nf_hooks[] = {
+//		{
+//		.hook		= cbn_ingress_hook,
+//		.hooknum	= NF_INET_POST_ROUTING,
+//		.pf		= PF_INET,
+//		.priority	= NF_IP_PRI_FIRST,
+//		.priv		= "TX"
+//		},
 			{
 			.hook		= cbn_ingress_hook,
-			.hooknum	= NF_INET_POST_ROUTING,
+			.hooknum	= NF_INET_LOCAL_OUT,
 			.pf		= PF_INET,
 			.priority	= NF_IP_PRI_FIRST,
-			.priv		= "TX"
+			.priv		= "NF_INET_LOCAL_OUT"
 			},
 
-			{
-			.hook		= cbn_ingress_hook,
-			.hooknum	= NF_INET_LOCAL_IN,
-			.pf		= PF_INET,
-			.priority	= NF_IP_PRI_FIRST,
-			.priv		= "LIN"
-			},
+//		{
+//		.hook		= cbn_ingress_hook,
+//		.hooknum	= NF_INET_LOCAL_IN,
+//		.pf		= PF_INET,
+//		.priority	= NF_IP_PRI_FIRST,
+//		.priv		= "LIN"
+//		},
 
-			{
-			.hook		= cbn_ingress_hook,
-			.hooknum	= NF_INET_PRE_ROUTING,
-			.pf		= PF_INET,
-			.priority	= NF_IP_PRI_FIRST,
-			.priv		= "RX"
-			},
+//		{
+//		.hook		= cbn_ingress_hook,
+//		.hooknum	= NF_INET_PRE_ROUTING,
+//		.pf		= PF_INET,
+//		.priority	= NF_IP_PRI_FIRST,
+//		.priv		= "RX"
+//		},
 //TODO: Add LOCAL_IN to mark packets with tennant_id
 };
 
@@ -155,18 +162,22 @@ static int start_new_connection_syn(void *arg)
 	INIT_TRACE
 
 	line = __LINE__;
+	TRACE_PRINT("connection to port %s [%d]", __FUNCTION__, __LINE__);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
 		goto create_fail;
 
+	TRACE_PRINT("connection to port %s [%d]", __FUNCTION__, __LINE__);
+	addresses->dest.sin_family = AF_INET;
 	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0)))
 		goto connect_fail;
 
 	qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
-	qp->addr_s = addresses->dest.sin_addr;
-	qp->port_d = addresses->src.sin_port;
-	qp->port_s = addresses->dest.sin_port;
-	qp->addr_d = addresses->src.sin_addr;
+	qp->addr_d = addresses->dest.sin_addr;
+	qp->port_s = addresses->src.sin_port;
+	qp->port_d = addresses->dest.sin_port;
+	qp->addr_s = addresses->src.sin_addr;
 
+	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	qp->tx = tx;
 	qp->rx = NULL;
 
@@ -186,8 +197,10 @@ static int start_new_connection_syn(void *arg)
 	half_duplex(&sockets);
 
 connect_fail:
+	TRACE_PRINT("connection to port %s [%d]", __FUNCTION__, __LINE__);
 	sock_release(tx);
 create_fail:
+	TRACE_PRINT("connection to port %s [%d]", __FUNCTION__, __LINE__);
 	DUMP_TRACE
 	return rc;
 }
@@ -213,6 +226,7 @@ static int start_new_connection(void *arg)
 	if ((rc = kernel_getpeername(rx, (struct sockaddr *)&cli_addr, &size)))
 		goto create_fail;
 
+	TRACE_PRINT("connection from port %d IP %pI4n (%d)", ntohs(cli_addr.sin_port), &cli_addr.sin_addr, cli_addr.sin_family);
 /*
 	line = __LINE__;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
