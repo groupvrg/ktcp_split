@@ -52,7 +52,7 @@ static unsigned int cbn_ingress_hook(void *priv,
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
 		struct addresses *addresses;
 
-		if (!strcmp(priv, "LIN"))
+		//if (!strcmp(priv, "LIN"))
 			goto out;
 		pr_err("schedule connection %d\n", skb->mark);
 		addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
@@ -77,13 +77,13 @@ out:
 #define CBN_PRIO_OFFSET 50
 
 static struct nf_hook_ops cbn_nf_hooks[] = {
-//		{
-//		.hook		= cbn_ingress_hook,
-//		.hooknum	= NF_INET_POST_ROUTING,
-//		.pf		= PF_INET,
-//		.priority	= NF_IP_PRI_FIRST,
-//		.priv		= "TX"
-//		},
+		{
+		.hook		= cbn_ingress_hook,
+		.hooknum	= NF_INET_POST_ROUTING,
+		.pf		= PF_INET,
+		.priority	= NF_IP_PRI_FIRST,
+		.priv		= "TX"
+		},
 //		{
 //		.hook		= cbn_ingress_hook,
 //		.hooknum	= NF_INET_LOCAL_OUT,
@@ -94,12 +94,18 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 //
 		{
 		.hook		= cbn_ingress_hook,
+		.hooknum	= NF_INET_FORWARD,
+		.pf		= PF_INET,
+		.priority	= NF_IP_PRI_FIRST,
+		.priv		= "NF_INET_LOCAL_OUT"
+		},
+		{
+		.hook		= cbn_ingress_hook,
 		.hooknum	= NF_INET_LOCAL_IN,
 		.pf		= PF_INET,
 		.priority	= NF_IP_PRI_FIRST,
 		.priv		= "LIN"
 		},
-
 		{
 		.hook		= cbn_ingress_hook,
 		.hooknum	= NF_INET_PRE_ROUTING,
