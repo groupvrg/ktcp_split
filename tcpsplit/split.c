@@ -52,6 +52,8 @@ static unsigned int cbn_ingress_hook(void *priv,
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
 		struct addresses *addresses;
 
+		if (!strcmp(priv, "LIN"))
+			goto out;
 		pr_err("schedule connection %d\n", skb->mark);
 		addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
 		if (unlikely(!addresses)) {
@@ -90,13 +92,13 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 //		.priv		= "NF_INET_LOCAL_OUT"
 //		},
 //
-//		{
-//		.hook		= cbn_ingress_hook,
-//		.hooknum	= NF_INET_LOCAL_IN,
-//		.pf		= PF_INET,
-//		.priority	= NF_IP_PRI_FIRST,
-//		.priv		= "LIN"
-//		},
+		{
+		.hook		= cbn_ingress_hook,
+		.hooknum	= NF_INET_LOCAL_IN,
+		.pf		= PF_INET,
+		.priority	= NF_IP_PRI_FIRST,
+		.priv		= "LIN"
+		},
 
 		{
 		.hook		= cbn_ingress_hook,
