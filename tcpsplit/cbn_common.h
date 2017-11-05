@@ -118,7 +118,7 @@ static inline int trace_iph(struct sk_buff *skb, const char *str)
 			trace_printk(store);
 		}
 	}
-	return rc;
+	return rc && skb->mark;
 /*
 	idx += sprintf(&store[idx],"\n\t\t>>>>>>>>>>>>>%s>>>>>>>>>>>>>>>>\n",str);
 	if (skb->mark == 166)

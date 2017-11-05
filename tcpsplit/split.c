@@ -52,7 +52,7 @@ static unsigned int cbn_ingress_hook(void *priv,
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
 		struct addresses *addresses;
 
-		pr_err("schedule connection");
+		pr_err("schedule connection %d\n", skb->mark);
 		addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
 		if (unlikely(!addresses)) {
 			pr_err("Faield to alloc mem %s\n", __FUNCTION__);
@@ -72,6 +72,8 @@ out:
 	return NF_ACCEPT;
 }
 
+#define CBN_PRIO_OFFSET 50
+
 static struct nf_hook_ops cbn_nf_hooks[] = {
 //		{
 //		.hook		= cbn_ingress_hook,
@@ -80,14 +82,14 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 //		.priority	= NF_IP_PRI_FIRST,
 //		.priv		= "TX"
 //		},
-			{
-			.hook		= cbn_ingress_hook,
-			.hooknum	= NF_INET_LOCAL_OUT,
-			.pf		= PF_INET,
-			.priority	= NF_IP_PRI_FIRST,
-			.priv		= "NF_INET_LOCAL_OUT"
-			},
-
+//		{
+//		.hook		= cbn_ingress_hook,
+//		.hooknum	= NF_INET_LOCAL_OUT,
+//		.pf		= PF_INET,
+//		.priority	= NF_IP_PRI_FIRST,
+//		.priv		= "NF_INET_LOCAL_OUT"
+//		},
+//
 //		{
 //		.hook		= cbn_ingress_hook,
 //		.hooknum	= NF_INET_LOCAL_IN,
@@ -96,13 +98,13 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 //		.priv		= "LIN"
 //		},
 
-//		{
-//		.hook		= cbn_ingress_hook,
-//		.hooknum	= NF_INET_PRE_ROUTING,
-//		.pf		= PF_INET,
-//		.priority	= NF_IP_PRI_FIRST,
-//		.priv		= "RX"
-//		},
+		{
+		.hook		= cbn_ingress_hook,
+		.hooknum	= NF_INET_PRE_ROUTING,
+		.pf		= PF_INET,
+		.priority	= NF_IP_PRI_RAW + CBN_PRIO_OFFSET,
+		.priv		= "RX"
+		},
 //TODO: Add LOCAL_IN to mark packets with tennant_id
 };
 
