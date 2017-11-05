@@ -115,6 +115,17 @@ static inline void stop_proxies(void)
 
 		//kernel_sock_shutdown(sock, SHUT_RDWR);
 		//sock_release(sock);
+	struct cbn_qp *pos, *tmp;
+	rbtree_postorder_for_each_entry_safe(pos, tmp, &qp_root, node){
+		if (pos->tx) {
+			pr_err("releasing %p\n", pos->tx);
+			sock_release(pos->tx);
+		}
+		if (pos->rx) {
+			pr_err("releasing %p\n", pos->rx);
+			sock_release(pos->rx);
+		}
+	}
 	cbn_kthread_pool_clean(&cbn_pool);
 }
 
@@ -192,19 +203,24 @@ static int start_new_connection_syn(void *arg)
 		qp = tx_qp;
 	} else {
 		while (!qp->rx) {
+			if (kthread_should_stop())
+				goto create_fail;
 			schedule();
 		}
 	}
 	DUMP_TRACE
 	sockets.tx = qp->rx;
 	sockets.rx = qp->tx;
+	TRACE_PRINT("starting half duplex");
 	half_duplex(&sockets);
+	goto create_fail;
+
 
 connect_fail:
-	TRACE_PRINT("connection to port %s [%d]", __FUNCTION__, __LINE__);
+	TRACE_PRINT("OUT: connection to port %s ", __FUNCTION__);
 	sock_release(tx);
 create_fail:
-	TRACE_PRINT("connection to port %s [%d]", __FUNCTION__, __LINE__);
+	TRACE_PRINT("OUT: connection to port %s ", __FUNCTION__);
 	DUMP_TRACE
 	return rc;
 }

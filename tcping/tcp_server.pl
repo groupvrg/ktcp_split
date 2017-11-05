@@ -14,7 +14,8 @@ sub get_params {
 	}
 }
 
-my $serverport = 5556;
+#my $serverport = 5556;
+my $serverport = 9216;
 my $size = (64 * 1024) - 28;
 get_params();
 
