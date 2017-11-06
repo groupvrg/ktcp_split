@@ -102,16 +102,11 @@ static inline int trace_iph(struct sk_buff *skb, const char *str)
 	int rc = 0;
 	int idx = 0;
 	char store[512] = {0};
-	static int stop;
-
-	if (stop)
-		return 0;
 
 	if (iphdr->protocol == 6) {
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
 		if (unlikely(tcphdr->syn && !tcphdr->ack)) {
 			rc = 1;
-			stop = 1;
 			idx += sprintf(&store[idx], "%s:\n",str);
 			dump_iph(iphdr);
 			dump_tcph(tcphdr);

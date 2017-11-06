@@ -47,12 +47,14 @@ static unsigned int cbn_ingress_hook(void *priv,
 					struct sk_buff *skb,
 					const struct nf_hook_state *state)
 {
+	if (!skb->mark)
+		goto out;
 	if (trace_iph(skb, priv)) {
 		struct iphdr *iphdr = ip_hdr(skb);
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
 		struct addresses *addresses;
 
-		//if (!strcmp(priv, "LIN"))
+		if (strcmp(priv, "RX"))
 			goto out;
 		pr_err("schedule connection %d\n", skb->mark);
 		addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
@@ -182,21 +184,21 @@ static int start_new_connection_syn(void *arg)
 
 	INIT_TRACE
 
-	line = __LINE__;
-	TRACE_PRINT("connection to port %s [%d]", __FUNCTION__, __LINE__);
-	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
-		goto create_fail;
-
-	TRACE_PRINT("connection to port %s [%d]", __FUNCTION__, __LINE__);
-	addresses->dest.sin_family = AF_INET;
-	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0)))
-		goto connect_fail;
-
 	qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
 	qp->addr_d = addresses->dest.sin_addr;
 	qp->port_s = addresses->src.sin_port;
 	qp->port_d = addresses->dest.sin_port;
 	qp->addr_s = addresses->src.sin_addr;
+
+
+	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
+	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
+		goto create_fail;
+
+	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
+	addresses->dest.sin_family = AF_INET;
+	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0)))
+		goto connect_fail;
 
 	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	qp->tx = tx;
@@ -292,6 +294,8 @@ static int start_new_connection(void *arg)
 		qp = tx_qp;
 	} else {
 		while (!qp->tx) {
+			if (kthread_should_stop())
+				goto create_fail;
 			schedule();
 		}
 	}

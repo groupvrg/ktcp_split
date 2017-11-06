@@ -18,7 +18,7 @@ sub get_params {
 
 my $serverip = '35.189.112.223';	#VMA
 $serverip='35.189.77.30';
-#my $serverip = '10.154.0.6';
+$serverip = '10.154.0.8';
 #my $serverip = 'localhost';
 my $serverport = 5556;
 my $size = (64 * 1024) - 28;
