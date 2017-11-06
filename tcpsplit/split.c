@@ -279,10 +279,10 @@ static int start_new_connection(void *arg)
 
 */
 	qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
-	qp->addr_s = addr.sin_addr;
-	qp->port_d = cli_addr.sin_port;
-	qp->port_s = addr.sin_port;
-	qp->addr_d = cli_addr.sin_addr;
+	qp->addr_d = addr.sin_addr;
+	qp->port_s = cli_addr.sin_port;
+	qp->port_d = addr.sin_port;
+	qp->addr_s = cli_addr.sin_addr;
 	qp->rx = rx;
 	qp->tx = NULL;
 
