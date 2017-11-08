@@ -205,17 +205,21 @@ static int start_new_connection_syn(void *arg)
 	qp->rx = NULL;
 
 	//TODO: add locks to this shit
+	TRACE_LINE();
 	if ((tx_qp = add_rb_data(&qp_root, qp))) { //this means the other conenction is already up
 		tx_qp->tx = tx;
 		kmem_cache_free(qp_slab, qp);
 		qp = tx_qp;
+		TRACE_PRINT("QP exists");
 	} else {
+		TRACE_PRINT("QP created...");
 		while (!qp->rx) {
 			if (kthread_should_stop())
 				goto create_fail;
 			schedule();
 		}
 	}
+	TRACE_LINE();
 	DUMP_TRACE
 	sockets.tx = qp->rx;
 	sockets.rx = qp->tx;
@@ -288,17 +292,21 @@ static int start_new_connection(void *arg)
 
 
 	//elem = kthread_pool_run(&cbn_pool, half_duplex, qp);
+	TRACE_LINE();
 	if ((tx_qp = add_rb_data(&qp_root, qp))) { //this means the other conenction is already up
+		TRACE_LINE();
 		tx_qp->rx = rx;
 		kmem_cache_free(qp_slab, qp);
 		qp = tx_qp;
 	} else {
+		TRACE_LINE();
 		while (!qp->tx) {
 			if (kthread_should_stop())
 				goto create_fail;
 			schedule();
 		}
 	}
+	TRACE_LINE();
 	DUMP_TRACE
 	sockets.tx = qp->tx;
 	sockets.rx = qp->rx;

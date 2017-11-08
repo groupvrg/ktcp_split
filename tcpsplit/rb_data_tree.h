@@ -1,4 +1,5 @@
 #include <linux/rbtree.h>
+#include "cbn_common.h"
 
 #define RB_KEY_LENGTH 12
 
@@ -17,13 +18,13 @@ struct cbn_qp {
 	volatile struct socket *rx;
 };
 
-static inline show_key(char *key)
+static inline void show_key(char *key)
 {
-	char chars[RB_KEY_LENGTH << 1] = {0};
+	char chars[(RB_KEY_LENGTH << 1) + 1] = {0};
 	int i;
 	for (i = 0; i < RB_KEY_LENGTH; ++i)
 		sprintf(&chars[i<<1], "%-2x", key[i]);
-	pr_err("%s\n", chars);
+	pr_err("%s%s\n", __FUNCTION__, chars);
 }
 
 static inline struct cbn_qp *search_rb_data(struct rb_root *root, char *string)
@@ -50,8 +51,9 @@ static inline struct cbn_qp *search_rb_data(struct rb_root *root, char *string)
 static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *data)
 {
 	struct rb_node **new = &(root->rb_node), *parent = NULL;
-
+	TRACE_PRINT("%p\n", data);
 	show_key(data->key);
+	TRACE_LINE();
 	/* Figure out where to put new node */
 	while (*new) {
 		struct cbn_qp *this = container_of(*new, struct cbn_qp, node);
@@ -66,6 +68,7 @@ static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *da
 			return this;
 	}
 
+	TRACE_LINE();
 	/* Add new node and rebalance tree. */
 	rb_link_node(&data->node, parent, new);
 	rb_insert_color(&data->node, root);
