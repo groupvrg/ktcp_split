@@ -2,6 +2,7 @@
 #include "cbn_common.h"
 
 #define RB_KEY_LENGTH 12
+static char chars[(RB_KEY_LENGTH << 3)] = {0};
 
 struct cbn_qp {
 	struct rb_node node;
@@ -20,11 +21,10 @@ struct cbn_qp {
 
 static inline void show_key(char *key)
 {
-	char chars[(RB_KEY_LENGTH << 1) + 1] = {0};
 	int i;
 	for (i = 0; i < RB_KEY_LENGTH; ++i)
-		sprintf(&chars[i<<1], "%-2x", key[i]);
-	pr_err("%s%s\n", __FUNCTION__, chars);
+		sprintf(&chars[i * 3], "%03x", key[i]);
+	pr_err("%s: \"%s\"\n", __FUNCTION__, chars);
 }
 
 static inline struct cbn_qp *search_rb_data(struct rb_root *root, char *string)
@@ -51,7 +51,7 @@ static inline struct cbn_qp *search_rb_data(struct rb_root *root, char *string)
 static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *data)
 {
 	struct rb_node **new = &(root->rb_node), *parent = NULL;
-	TRACE_PRINT("%p\n", data);
+	TRACE_PRINT("data %p new %p root %p\n", data, *new, root);
 	show_key(data->key);
 	TRACE_LINE();
 	/* Figure out where to put new node */
