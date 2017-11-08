@@ -52,7 +52,7 @@ static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *da
 {
 	struct rb_node **new = &(root->rb_node), *parent = NULL;
 	TRACE_PRINT("data %p new %p root %p\n", data, *new, root);
-	show_key(data->key);
+	//show_key(data->key);
 	TRACE_LINE();
 	/* Figure out where to put new node */
 	while (*new) {
