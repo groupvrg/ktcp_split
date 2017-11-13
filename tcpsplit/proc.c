@@ -40,7 +40,7 @@ static ssize_t cbn_proc_command(struct file *file, const char __user *buf,
 
 	/* start new server */
 	kfree(kbuf);
-	return (values[0]) ? size : -EINVAL;
+	return (values[0] == 2) ? size : -EINVAL;
 }
 
 static const struct file_operations cbn_proc_fops = {

@@ -34,11 +34,9 @@ struct addresses {
 static struct kthread_pool cbn_pool = {.pool_size = DEF_CBN_POOL_SIZE};
 
 //per_tennat
-static struct task_struct *server_task;
 static struct rb_root qp_root = RB_ROOT;
 //per_tennat
 
-static struct list_head task_list;
 static struct kmem_cache *qp_slab;
 static struct kmem_cache *syn_slab;
 
@@ -349,7 +347,6 @@ static inline void stop_sockets(void)
 	TRACE_PRINT("%s\n", __FUNCTION__);
 	kernel_sock_shutdown(tennats[0].sock, SHUT_RDWR);
 	sock_release(tennats[0].sock);
-
 }
 
 
@@ -400,10 +397,14 @@ out:
 	return rc;
 }
 
+void start_new_server(u32 tid, u32 port)
+{
+	// add to server list
+	kthread_pool_run(&cbn_pool, split_server, uint2void(tid, port));
+}
+
 int __init cbn_datapath_init(void)
 {
-	server_task = kthread_run(split_server, NULL, "split_server");
-	INIT_LIST_HEAD(&task_list);
 	qp_slab = kmem_cache_create("cbn_qp_mdata",
 					sizeof(struct cbn_qp), 0, 0, NULL);
 
@@ -412,19 +413,21 @@ int __init cbn_datapath_init(void)
 
 	cbn_kthread_pool_init(&cbn_pool);
 	nf_register_hooks(cbn_nf_hooks, ARRAY_SIZE(cbn_nf_hooks));
+	cbn_proc_init();
 	return 0;
 }
 
 void __exit cbn_datapath_clean(void)
 {
-	pr_err("stopping server_task\n");
+	cbn_proc_clean();
+	nf_unregister_hooks(cbn_nf_hooks,  ARRAY_SIZE(cbn_nf_hooks));
+	pr_err("stopping server_tasks \n");
 	stop_sockets();
-	kthread_stop(server_task);
 	pr_err("server_task stopped stopping stop_proxies\n");
 	stop_proxies();
 	pr_err("proxies stopped\n");
 	kmem_cache_destroy(qp_slab);
-	nf_unregister_hooks(cbn_nf_hooks,  ARRAY_SIZE(cbn_nf_hooks));
+	kmem_cache_destroy(syn_slab);
 }
 
 module_init(cbn_datapath_init);
