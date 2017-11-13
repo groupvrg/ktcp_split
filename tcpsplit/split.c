@@ -128,11 +128,11 @@ static inline void stop_proxies(void)
 	rbtree_postorder_for_each_entry_safe(pos, tmp, &qp_root, node){
 		if (pos->tx) {
 			pr_err("releasing %p\n", pos->tx);
-			sock_release(pos->tx);
+			sock_release((struct socket *)pos->tx);
 		}
 		if (pos->rx) {
 			pr_err("releasing %p\n", pos->rx);
-			sock_release(pos->rx);
+			sock_release((struct socket *)pos->rx);
 		}
 	}
 	cbn_kthread_pool_clean(&cbn_pool);
@@ -177,7 +177,7 @@ out:
 
 static int start_new_connection_syn(void *arg)
 {
-	int rc, line;
+	int rc;
 	struct addresses *addresses = arg;
 	struct cbn_qp *qp, *tx_qp;
 	struct sockets sockets;
@@ -222,8 +222,8 @@ static int start_new_connection_syn(void *arg)
 	}
 	TRACE_LINE();
 	DUMP_TRACE
-	sockets.tx = qp->rx;
-	sockets.rx = qp->tx;
+	sockets.tx = (struct socket *)qp->rx;
+	sockets.rx = (struct socket *)qp->tx;
 	TRACE_PRINT("starting half duplex");
 	half_duplex(&sockets);
 	goto create_fail;
@@ -309,8 +309,8 @@ static int start_new_connection(void *arg)
 	}
 	TRACE_LINE();
 	DUMP_TRACE
-	sockets.tx = qp->tx;
-	sockets.rx = qp->rx;
+	sockets.tx = (struct socket *)qp->tx;
+	sockets.rx = (struct socket *)qp->rx;
 	half_duplex(&sockets);
 
 	TRACE_PRINT("closing port %d IP %pI4n", ntohs(addr.sin_port), &addr.sin_addr);
@@ -390,7 +390,7 @@ static int split_server(void *unused)
 
 	} while (!kthread_should_stop());
 
-accept_failed:
+//accept_failed:
 listen_failed:
 bind_failed:
 	TRACE_PRINT("Exiting %d\n", rc);

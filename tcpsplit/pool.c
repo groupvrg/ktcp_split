@@ -8,12 +8,13 @@
 
 #include <linux/printk.h>
 
-//TODO: Consider how to reuse the
+/* TODO: Consider how to reuse the pool threads
 static void kthread_pool_free(struct kthread_pool *cbn_pool, struct pool_elem *elem)
 {
 	//struct pool_elem *elem = container_of(kthread_data(task), struct pool_elem, _unspec);
 	kmem_cache_free(cbn_pool->pool_slab, elem);
 }
+*/
 
 static void kthread_pool_reuse(struct kthread_pool *cbn_pool, struct pool_elem *elem)
 {
@@ -86,7 +87,6 @@ static int refil_thread(void *data)
 			schedule();
 		__set_current_state(TASK_RUNNING);
 	}
-	pr_err("c ya...\n");
 	return 0;
 }
 
