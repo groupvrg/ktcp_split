@@ -14,10 +14,27 @@ struct cbn_qp {
 			struct in_addr	addr_s;	/* Internet address		*/
 			struct in_addr	addr_d;	/* Internet address		*/
 		};
+		struct {
+			int tid;
+			struct rb_root *root;;
+
+		};
 	};
 	volatile struct socket *tx;
 	volatile struct socket *rx;
 };
+
+struct cbn_listner {
+	struct rb_node 	node;
+	struct rb_root  connections_root;
+	int32_t		key; //tid
+	struct socket	*sock;
+};
+/*
+ * Multiple listner support:
+ * 1. listner_root
+ * 2. unpaird qp root - the syn(tx) side doesnt know which listner is "his" but the "rx" does - move after qp bind
+ * */
 
 static inline void show_key(char *key)
 {
@@ -32,17 +49,17 @@ static inline struct cbn_qp *search_rb_data(struct rb_root *root, char *string)
 	struct rb_node *node = root->rb_node;
 
 	while (node) {
-		struct cbn_qp *data = container_of(node, struct cbn_qp, node);
+		struct cbn_qp *this = container_of(node, struct cbn_qp, node);
 		int result;
 
-		result = strncmp(string, data->key, RB_KEY_LENGTH);
+		result = strncmp(string, this->key, RB_KEY_LENGTH);
 
 		if (result < 0)
 			node = node->rb_left;
 		else if (result > 0)
 			node = node->rb_right;
 		else
-			return data;
+			return this;
 	}
 
 	return NULL;
@@ -66,6 +83,51 @@ static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *da
 			new = &((*new)->rb_right);
 		else
 			return this;
+	}
+
+	TRACE_LINE();
+	/* Add new node and rebalance tree. */
+	rb_link_node(&data->node, parent, new);
+	rb_insert_color(&data->node, root);
+
+	return NULL;
+}
+
+static inline struct cbn_listner *search_rb_listner(struct rb_root *root, int32_t key)
+{
+	struct rb_node *node = root->rb_node;
+
+	while (node) {
+		struct cbn_listner *this = container_of(node, struct cbn_listner, node);
+
+		int32_t result = key - this->key;
+
+		if (result < 0)
+			node = node->rb_left;
+		else if (result > 0)
+			node = node->rb_right;
+		else
+			return this;
+	}
+
+	return NULL;
+}
+
+static inline struct cbn_listner *add_rb_listner(struct rb_root *root, struct cbn_listner *data)
+{
+	struct rb_node **new = &(root->rb_node), *parent = NULL;
+
+	while (*new) {
+		struct cbn_listner *this = container_of(*new, struct cbn_listner, node);
+		int32_t result = data->key - this->key;
+
+		parent = *new;
+		if (result < 0)
+			new = &((*new)->rb_left);
+		else if (result > 0)
+			new = &((*new)->rb_right);
+		else
+			return this; //Return the duplicat
 	}
 
 	TRACE_LINE();

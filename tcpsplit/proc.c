@@ -7,6 +7,8 @@
 #include <linux/string.h>
 #include "proc.h"
 
+extern void proc_write_cb(int tid, int port);
+
 static int cbn_proc_show(struct seq_file *m, void *v)
 {
 	seq_printf(m, "Hello proc!\n");
@@ -40,7 +42,11 @@ static ssize_t cbn_proc_command(struct file *file, const char __user *buf,
 
 	/* start new server */
 	kfree(kbuf);
-	return (values[0] == 2) ? size : -EINVAL;
+	if (values[0] == PROC_CSV_NUM)
+		proc_write_cb(values[1], values[2]);
+	else
+		size = -EINVAL;
+	return -EINVAL;
 }
 
 static const struct file_operations cbn_proc_fops = {

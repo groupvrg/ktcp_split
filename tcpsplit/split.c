@@ -18,28 +18,17 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Markuze Alex");
 MODULE_DESCRIPTION("CBN TCP Split Module");
 
-#define SERVER_PORT (9 << 10) // 9K // _1oo1
-#define BACKLOG     512
-
-struct sockets {
-	struct socket *rx;
-	struct socket *tx;
-};
-
-struct addresses {
-	struct sockaddr_in dest;
-	struct sockaddr_in src;
-};
+#define BACKLOG     64
 
 static struct kthread_pool cbn_pool = {.pool_size = DEF_CBN_POOL_SIZE};
 
-//per_tennat
-static struct rb_root qp_root = RB_ROOT;
-//per_tennat
+static struct rb_root listner_root = RB_ROOT;
 
 static struct kmem_cache *qp_slab;
+static struct kmem_cache *listner_slab;
 static struct kmem_cache *syn_slab;
 
+static int ip_transparent = 1;
 static int start_new_connection_syn(void *arg);
 
 static unsigned int cbn_ingress_hook(void *priv,
@@ -117,15 +106,14 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 //TODO: Add LOCAL_IN to mark packets with tennant_id
 };
 
-static inline void stop_proxies(void)
+static inline void stop_tennat_proxies(struct rb_root *root)
 {
 
-		//kernel_sock_shutdown(sock, SHUT_RDWR);
-		//sock_release(sock);
 	struct cbn_qp *pos, *tmp;
-	rbtree_postorder_for_each_entry_safe(pos, tmp, &qp_root, node){
+	rbtree_postorder_for_each_entry_safe(pos, tmp, root, node) {
 		if (pos->tx) {
 			pr_err("releasing %p\n", pos->tx);
+			// TODO: kernel_sock_shutdown(sock, SHUT_RDWR); - maybe release in thread?
 			sock_release((struct socket *)pos->tx);
 		}
 		if (pos->rx) {
@@ -133,7 +121,16 @@ static inline void stop_proxies(void)
 			sock_release((struct socket *)pos->rx);
 		}
 	}
-	cbn_kthread_pool_clean(&cbn_pool);
+}
+
+static inline void stop_sockets(void)
+{
+	struct cbn_listner *pos, *tmp;
+
+	rbtree_postorder_for_each_entry_safe(pos, tmp, &listner_root, node) {
+		sock_release(pos->sock); //TODO: again maybe just shut down?
+		stop_tennat_proxies(&pos->connections_root);
+	}
 }
 
 static int half_duplex(void *arg)
@@ -175,8 +172,9 @@ out:
 
 static int start_new_connection_syn(void *arg)
 {
-	int rc;
+	int rc, T = 1;
 	struct addresses *addresses = arg;
+	struct cbn_listner *listner;
 	struct cbn_qp *qp, *tx_qp;
 	struct sockets sockets;
 	struct socket *tx;
@@ -194,6 +192,16 @@ static int start_new_connection_syn(void *arg)
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
 		goto create_fail;
 
+	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
+		goto connect_fail;
+
+	if (ip_transparent) {
+		if ((rc = kernel_setsockopt(tx, SOL_IP, IP_TRANSPARENT, (char *)&T, sizeof(int))))
+			goto connect_fail;
+
+		if ((rc = kernel_bind(tx, (struct sockaddr *)&addresses->src, sizeof(struct sockaddr))))
+			goto connect_fail;
+	}
 	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	addresses->dest.sin_family = AF_INET;
 	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0)))
@@ -203,9 +211,11 @@ static int start_new_connection_syn(void *arg)
 	qp->tx = tx;
 	qp->rx = NULL;
 
+	listner = search_rb_listner(&listner_root, addresses->mark);
+	kmem_cache_free(syn_slab, addresses);
 	//TODO: add locks to this shit
 	TRACE_LINE();
-	if ((tx_qp = add_rb_data(&qp_root, qp))) { //this means the other conenction is already up
+	if ((tx_qp = add_rb_data(&listner->connections_root, qp))) { //this means the other conenction is already up
 		tx_qp->tx = tx;
 		kmem_cache_free(qp_slab, qp);
 		qp = tx_qp;
@@ -238,61 +248,49 @@ create_fail:
 
 static int start_new_connection(void *arg)
 {
-	int rc, size, line;
-//	int T = 1;
-	struct socket *rx = arg;
+	int rc, size, line, mark;
+	struct socket *rx;
 	struct sockaddr_in cli_addr;
 	struct sockaddr_in addr;
 	struct cbn_qp *qp, *tx_qp;
+	struct rb_root *root;
 	struct sockets sockets;
 
 	INIT_TRACE
+
+	qp = arg;
+	rx 	= (struct socket *)qp->rx;
+	mark 	= qp->tid;
+	root 	= qp->root;
 
 	size = sizeof(addr);
 	line = __LINE__;
 	if ((rc = kernel_getsockopt(rx, SOL_IP, SO_ORIGINAL_DST, (char *)&addr, &size)))
 		goto create_fail;
 
+	if ((rc = kernel_setsockopt(rx, SOL_SOCKET, SO_MARK, (char *)&mark, sizeof(u32))) < 0)
+		goto create_fail;
+
 	line = __LINE__;
 	if ((rc = kernel_getpeername(rx, (struct sockaddr *)&cli_addr, &size)))
 		goto create_fail;
 
-	TRACE_PRINT("connection from port %d IP %pI4n (%d)", ntohs(cli_addr.sin_port), &cli_addr.sin_addr, cli_addr.sin_family);
 /*
-	line = __LINE__;
-	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
-		goto create_fail;
-	line = __LINE__;
-	if ((rc = kernel_setsockopt(tx, SOL_IP, IP_TRANSPARENT, (char *)&T, sizeof(int))))
-		goto connect_fail;
-
-	TRACE_PRINT("connection from port %d IP %pI4n (%d)", ntohs(cli_addr.sin_port), &cli_addr.sin_addr, cli_addr.sin_family);
-	line = __LINE__;
-	if ((rc = kernel_bind(tx, (struct sockaddr *)&cli_addr, sizeof(cli_addr))))
-		goto connect_fail;
-	TRACE_PRINT("connecting remote port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
-	line = __LINE__;
-	if ((rc = kernel_connect(tx, (struct sockaddr *)&addr, sizeof(addr), 0)))
-		goto connect_fail;
-
 	line = __LINE__;
 	if ((rc = kernel_getsockname(tx, (struct sockaddr *)&addr, &size)))
 		goto connect_fail;
 	TRACE_PRINT("connected local port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
 
 */
-	qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
 	qp->addr_d = addr.sin_addr;
 	qp->port_s = cli_addr.sin_port;
 	qp->port_d = addr.sin_port;
 	qp->addr_s = cli_addr.sin_addr;
-	qp->rx = rx;
+	/*rp->root/qp->mark no longer valid, qp is a union*/
 	qp->tx = NULL;
 
-
-	//elem = kthread_pool_run(&cbn_pool, half_duplex, qp);
 	TRACE_LINE();
-	if ((tx_qp = add_rb_data(&qp_root, qp))) { //this means the other conenction is already up
+	if ((tx_qp = add_rb_data(root, qp))) { //this means the other conenction is already up
 		TRACE_LINE();
 		tx_qp->rx = rx;
 		kmem_cache_free(qp_slab, qp);
@@ -305,6 +303,7 @@ static int start_new_connection(void *arg)
 			schedule();
 		}
 	}
+
 	TRACE_LINE();
 	DUMP_TRACE
 	sockets.tx = (struct socket *)qp->tx;
@@ -313,7 +312,6 @@ static int start_new_connection(void *arg)
 
 	TRACE_PRINT("closing port %d IP %pI4n", ntohs(addr.sin_port), &addr.sin_addr);
 	/* Teardown */
-	//kthread_stop(elem->task); //TODO: dont like the elem-> ..., fix teh API when paralel connect is on
 
 	/* TX partner stopped - free qp*/
 	if (qp)
@@ -321,10 +319,7 @@ static int start_new_connection(void *arg)
 
 	/* free both sockets*/
 	rc = line = 0;
-/*
-connect_fail:
-	sock_release(tx);
-*/
+
 create_fail:
 	sock_release(rx);
 	TRACE_PRINT("out [%d - %d]", rc, ++line);
@@ -332,62 +327,65 @@ create_fail:
 	return rc;
 }
 
-struct tennat_ctx {
-	struct socket *sock;
-};
-
-static struct tennat_ctx tennats[1] = {0};
-static inline void register_server_sock(uint32_t tid, struct socket *sock)
+static inline struct cbn_listner *register_server_sock(uint32_t tid, struct socket *sock)
 {
-	tennats[tid].sock = sock;
+	struct cbn_listner *server = kmem_cache_alloc(listner_slab, GFP_KERNEL);
+
+	server->key			= tid;
+	server->sock 			= sock;
+	server->connections_root 	= RB_ROOT;
+
+	add_rb_listner(&listner_root, server);
+	return server;
 }
 
-static inline void stop_sockets(void)
-{
-	TRACE_PRINT("%s\n", __FUNCTION__);
-	kernel_sock_shutdown(tennats[0].sock, SHUT_RDWR);
-	sock_release(tennats[0].sock);
-}
-
-
-static int split_server(void *unused)
+static int split_server(void *mark_port)
 {
 	int rc = 0;
 	struct socket *sock;
 	struct sockaddr_in srv_addr;
+	struct cbn_listner *server;
+	u32 mark, port;
+
 	INIT_TRACE
 
+	void2uint(mark_port, &mark, &port);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
 		goto out;
 
-	//kernel_sock_ioctl(, FIONBIO,)
+	if ((rc = kernel_setsockopt(sock, SOL_SOCKET, SO_MARK, (char *)&mark, sizeof(u32))) < 0)
+		goto bind_failed;
+
 	srv_addr.sin_family 		= AF_INET;
 	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
-	srv_addr.sin_port 		= htons(SERVER_PORT);
+	srv_addr.sin_port 		= htons(port);
 
 	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
 		goto bind_failed;
 
 	if ((rc = kernel_listen(sock, BACKLOG)))
 		goto listen_failed;
+
 	TRACE_PRINT("waiting for a connection...\n");
-	register_server_sock(0, sock);
+	server = register_server_sock(mark, sock);
 
 	do {
 		struct socket *nsock;
-		//struct pool_elem *elem; TODO: nothing to do with elem right now - will need on para-connect
-		//sock->sk->sk_rcvtimeo = 1 * HZ;
+		struct cbn_qp *qp;
 
 		rc = kernel_accept(sock, &nsock, 0);
 		if (unlikely(rc))
 			goto out;
 
 		TRACE_PRINT("starting new connection...\n");
-		kthread_pool_run(&cbn_pool, start_new_connection, nsock);
+		qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
+		qp->rx 		= nsock;
+		qp->tid 	= mark;
+		qp->root 	= &server->connections_root;
+		kthread_pool_run(&cbn_pool, start_new_connection, qp);
 
 	} while (!kthread_should_stop());
 
-//accept_failed:
 listen_failed:
 bind_failed:
 	TRACE_PRINT("Exiting %d\n", rc);
@@ -397,9 +395,8 @@ out:
 	return rc;
 }
 
-void start_new_server(u32 tid, u32 port)
+void proc_write_cb(int tid, int port)
 {
-	// add to server list
 	kthread_pool_run(&cbn_pool, split_server, uint2void(tid, port));
 }
 
@@ -407,6 +404,9 @@ int __init cbn_datapath_init(void)
 {
 	qp_slab = kmem_cache_create("cbn_qp_mdata",
 					sizeof(struct cbn_qp), 0, 0, NULL);
+
+	listner_slab = kmem_cache_create("cbn_listner",
+					 sizeof(struct cbn_listner), 0, 0, NULL);
 
 	syn_slab = kmem_cache_create("cbn_syn_mdata",
 					sizeof(struct addresses), 0, 0, NULL);
@@ -421,13 +421,13 @@ void __exit cbn_datapath_clean(void)
 {
 	cbn_proc_clean();
 	nf_unregister_hooks(cbn_nf_hooks,  ARRAY_SIZE(cbn_nf_hooks));
-	pr_err("stopping server_tasks \n");
 	stop_sockets();
-	pr_err("server_task stopped stopping stop_proxies\n");
-	stop_proxies();
+	pr_err("sockets stopped\n");
+	cbn_kthread_pool_clean(&cbn_pool);
 	pr_err("proxies stopped\n");
 	kmem_cache_destroy(qp_slab);
 	kmem_cache_destroy(syn_slab);
+	kmem_cache_destroy(listner_slab);
 }
 
 module_init(cbn_datapath_init);

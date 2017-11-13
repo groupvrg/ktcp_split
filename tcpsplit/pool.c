@@ -146,7 +146,7 @@ int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool)
 
 	cbn_pool->refil_needed = cbn_pool->pool_size;
 	cbn_pool->refil = kthread_run(refil_thread, cbn_pool, "pool-cache-refill");
-	//check for failure?
+	//TODO: check for failure?
 	test();
 	return 0;
 }
@@ -155,6 +155,8 @@ void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool)
 {
 	struct list_head *itr, *tmp;
 	pr_err("stopping server_task\n");
+
+	kthread_stop(cbn_pool->refil);
 
 	list_for_each_safe(itr, tmp, &cbn_pool->kthread_pool) {
 		struct pool_elem *task = container_of(itr, struct pool_elem, list);
@@ -170,6 +172,5 @@ void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool)
 		kmem_cache_free(cbn_pool->pool_slab, task);
 	}
 	kmem_cache_destroy(cbn_pool->pool_slab);
-	kthread_stop(cbn_pool->refil);
 }
 
