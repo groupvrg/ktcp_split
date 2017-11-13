@@ -10,6 +10,7 @@
 #include <net/sock.h>  //sock->to
 #include "tcp_split.h"
 #include "pool.h"
+#include "proc.h"
 #include "rb_data_tree.h"
 #include "cbn_common.h"
 
