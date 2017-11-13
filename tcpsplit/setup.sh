@@ -7,3 +7,4 @@ sudo iptables -I PREROUTING -t nat  -p tcp -m mark --mark 10 -j REDIRECT --to-po
 #sudo iptables -I PREROUTING -i pipe -t nat  -p tcp -j REDIRECT --to-port 9216
 #sudo iptables -I PREROUTING -t nat  -p tcp -j REDIRECT --to-port 9216
 sudo sysctl -w net.ipv4.ip_forward=1
+sudo sh -c "echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter"
