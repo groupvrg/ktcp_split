@@ -365,13 +365,12 @@ static int split_server(void *mark_port)
 	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
 		goto error;
 
-	TRACE_PRINT("new listner on port %d\n", port);
+	pr_info("tennat %d: new listner on port %d", mark, port);
 	if ((rc = kernel_listen(sock, BACKLOG)))
 		goto error;
 
 	server = register_server_sock(mark, sock);
 
-	TRACE_PRINT("waiting for a connection...\n");
 	do {
 		struct socket *nsock;
 		struct cbn_qp *qp;
@@ -380,7 +379,7 @@ static int split_server(void *mark_port)
 		if (unlikely(rc))
 			goto out;
 
-		TRACE_PRINT("new connection [%d]...\n", mark);
+		TRACE_PRINT("new connection [%d]...", mark);
 		qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
 		qp->rx 		= nsock;
 		qp->tid 	= mark;
@@ -399,7 +398,7 @@ out:
 
 void proc_write_cb(int tid, int port)
 {
-	TRACE_LINE();
+	pr_info("new tennat %d on port %d\n", tid, port);
 	kthread_pool_run(&cbn_pool, split_server, uint2void(tid, port));
 }
 
@@ -425,9 +424,9 @@ void __exit cbn_datapath_clean(void)
 	cbn_proc_clean();
 	nf_unregister_hooks(cbn_nf_hooks,  ARRAY_SIZE(cbn_nf_hooks));
 	stop_sockets();
-	pr_err("sockets stopped\n");
+	pr_info("sockets stopped\n");
 	cbn_kthread_pool_clean(&cbn_pool);
-	pr_err("proxies stopped\n");
+	pr_info("proxies stopped\n");
 	kmem_cache_destroy(qp_slab);
 	kmem_cache_destroy(syn_slab);
 	kmem_cache_destroy(listner_slab);

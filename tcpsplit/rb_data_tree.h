@@ -68,9 +68,7 @@ static inline struct cbn_qp *search_rb_data(struct rb_root *root, char *string)
 static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *data)
 {
 	struct rb_node **new = &(root->rb_node), *parent = NULL;
-	TRACE_PRINT("data %p new %p root %p\n", data, *new, root);
-	//show_key(data->key);
-	TRACE_LINE();
+
 	/* Figure out where to put new node */
 	while (*new) {
 		struct cbn_qp *this = container_of(*new, struct cbn_qp, node);
@@ -130,7 +128,6 @@ static inline struct cbn_listner *add_rb_listner(struct rb_root *root, struct cb
 			return this; //Return the duplicat
 	}
 
-	TRACE_LINE();
 	/* Add new node and rebalance tree. */
 	rb_link_node(&data->node, parent, new);
 	rb_insert_color(&data->node, root);

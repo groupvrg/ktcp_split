@@ -19,7 +19,7 @@ struct pool_elem {
 	void *data;
 
 	union {
-		uint64_t _unspec[2];		// TODO:can be variable size, just need to tellcache_init
+		uint64_t _unspec[2];		// TODO:can be variable size, just need to tell cache_init
 	};
 };
 
@@ -28,6 +28,6 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool);
 void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool);
 
-#define DEF_CBN_POOL_SIZE 64
+#define DEF_CBN_POOL_SIZE 8
 
 #endif /* __CBN_KTHREAD_POOL__ */
