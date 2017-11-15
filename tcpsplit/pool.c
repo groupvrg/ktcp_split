@@ -27,6 +27,7 @@ static int pipe_loop_task(void *data)
 	struct kthread_pool *pool = elem->pool;
 
 	while (!kthread_should_stop()) {
+		pr_info("running %s\n", current->comm);
 		if (elem->pool_task)
 			elem->pool_task(elem->data);
 		else
@@ -34,6 +35,7 @@ static int pipe_loop_task(void *data)
 
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!kthread_should_stop()) {
+			pr_info("%s out to reuse\n", current->comm);
 			kthread_pool_reuse(pool, elem);
 			schedule();
 		}
@@ -114,6 +116,7 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 	elem->pool_task = func;
 	elem->data = data;
 	list_add(&elem->list, &cbn_pool->kthread_running);
+	TRACE_PRINT("staring %s\n", elem->task->comm);
 	wake_up_process(elem->task);
 	return elem;
 }
@@ -128,6 +131,8 @@ int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool)
 
 	cbn_pool->refil_needed = cbn_pool->pool_size;
 	cbn_pool->refil = kthread_run(refil_thread, cbn_pool, "pool-cache-refill");
+
+	set_user_nice(cbn_pool->refil, MAX_NICE);
 	return 0;
 }
 

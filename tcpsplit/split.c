@@ -28,7 +28,7 @@ static struct kmem_cache *qp_slab;
 static struct kmem_cache *listner_slab;
 static struct kmem_cache *syn_slab;
 
-static int ip_transparent = 1;
+uint32_t ip_transparent = 1;
 static int start_new_connection_syn(void *arg);
 
 static unsigned int cbn_ingress_hook(void *priv,
@@ -110,15 +110,18 @@ static inline void stop_tennat_proxies(struct rb_root *root)
 {
 
 	struct cbn_qp *pos, *tmp;
+	struct socket *sock;
+
 	rbtree_postorder_for_each_entry_safe(pos, tmp, root, node) {
 		if (pos->tx) {
 			pr_err("releasing %p\n", pos->tx);
-			// TODO: kernel_sock_shutdown(sock, SHUT_RDWR); - maybe release in thread?
-			sock_release((struct socket *)pos->tx);
+			sock = (struct socket *)pos->tx;
+			kernel_sock_shutdown(sock, SHUT_RDWR);
 		}
 		if (pos->rx) {
 			pr_err("releasing %p\n", pos->rx);
-			sock_release((struct socket *)pos->rx);
+			sock = (struct socket *)pos->rx;
+			kernel_sock_shutdown(sock, SHUT_RDWR);
 		}
 	}
 }
@@ -129,7 +132,6 @@ static inline void stop_sockets(void)
 
 	rbtree_postorder_for_each_entry_safe(pos, tmp, &listner_root, node) {
 		//sock_release(pos->sock); //TODO: again maybe just shut down?
-		TRACE_PRINT("stopping %d\n", pos->key);
 		kernel_sock_shutdown(pos->sock, SHUT_RDWR);
 		stop_tennat_proxies(&pos->connections_root);
 	}
@@ -226,7 +228,7 @@ static int start_new_connection_syn(void *arg)
 		TRACE_PRINT("QP created...");
 		while (!qp->rx) {
 			if (kthread_should_stop())
-				goto create_fail;
+				goto connect_fail;
 			schedule();
 		}
 	}
@@ -236,11 +238,10 @@ static int start_new_connection_syn(void *arg)
 	sockets.rx = (struct socket *)qp->tx;
 	TRACE_PRINT("starting half duplex");
 	half_duplex(&sockets);
-	goto create_fail;
+	goto connect_fail;
 
 
 connect_fail:
-	TRACE_PRINT("OUT: connection to port %s ", __FUNCTION__);
 	sock_release(tx);
 create_fail:
 	TRACE_PRINT("OUT: connection to port %s ", __FUNCTION__);
@@ -352,12 +353,25 @@ static int split_server(void *mark_port)
 	INIT_TRACE
 
 	void2uint(mark_port, &mark, &port);
+	if (search_rb_listner(&listner_root, mark)) {
+		rc = -EEXIST;
+		goto error;
+	}
+
+	server = register_server_sock(mark, sock);
+
+	server->status = 1;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
 		goto error;
+
+	server->sock = sock;
+	server->port = port;
+	server->status = 2;
 
 	if ((rc = kernel_setsockopt(sock, SOL_SOCKET, SO_MARK, (char *)&mark, sizeof(u32))) < 0)
 		goto error;
 
+	server->status = 3;
 	srv_addr.sin_family 		= AF_INET;
 	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
 	srv_addr.sin_port 		= htons(port);
@@ -365,11 +379,13 @@ static int split_server(void *mark_port)
 	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
 		goto error;
 
-	pr_info("tennat %d: new listner on port %d", mark, port);
+	server->status = 4;
+	pr_info("%s) tennat %d: new listner on port %d", current->comm, mark, port);
 	if ((rc = kernel_listen(sock, BACKLOG)))
 		goto error;
 
-	server = register_server_sock(mark, sock);
+	server->status = 5;
+	//server = register_server_sock(mark, sock);
 
 	do {
 		struct socket *nsock;
@@ -387,6 +403,7 @@ static int split_server(void *mark_port)
 		kthread_pool_run(&cbn_pool, start_new_connection, qp);
 
 	} while (!kthread_should_stop());
+	server->status = 6;
 error:
 	pr_err("Exiting %d\n", rc);
 out:
@@ -398,8 +415,24 @@ out:
 
 void proc_write_cb(int tid, int port)
 {
-	pr_info("new tennat %d on port %d\n", tid, port);
 	kthread_pool_run(&cbn_pool, split_server, uint2void(tid, port));
+}
+
+const char *proc_read_string(int *loc)
+{
+	struct cbn_listner *pos, *tmp;
+	int  idx = 0;
+	char *buffer = kzalloc(PAGE_SIZE, GFP_KERNEL);
+
+	if (!buffer)
+		return NULL;
+
+	rbtree_postorder_for_each_entry_safe(pos, tmp, &listner_root, node) {
+		idx += sprintf(&buffer[idx],"tid=%d port=%d status=%d\n",
+			       pos->key, pos->port, pos->status);
+	}
+	*loc = idx;
+	return buffer;
 }
 
 int __init cbn_datapath_init(void)

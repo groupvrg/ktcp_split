@@ -28,6 +28,8 @@ struct cbn_listner {
 	struct rb_node 	node;
 	struct rb_root  connections_root;
 	int32_t		key; //tid
+	uint16_t	port;
+	uint16_t	status;
 	struct socket	*sock;
 };
 /*
