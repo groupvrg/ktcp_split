@@ -46,7 +46,7 @@ static ssize_t cbn_proc_command(struct file *file, const char __user *buf,
 		proc_write_cb(values[1], values[2]);
 	else
 		size = -EINVAL;
-	return -EINVAL;
+	return size;
 }
 
 static const struct file_operations cbn_proc_fops = {

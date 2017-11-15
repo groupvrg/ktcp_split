@@ -18,7 +18,6 @@ static void kthread_pool_free(struct kthread_pool *cbn_pool, struct pool_elem *e
 
 static void kthread_pool_reuse(struct kthread_pool *cbn_pool, struct pool_elem *elem)
 {
-	//struct pool_elem *elem = container_of(kthread_data(task), struct pool_elem, _unspec);
 	list_del(&elem->list);
 	list_add(&elem->list, &cbn_pool->kthread_pool);
 	--cbn_pool->refil_needed;
@@ -47,7 +46,7 @@ static int pipe_loop_task(void *data)
 	//	consider adding some state? user might try freeing this struct, make sure its not running
 	//	also consider frreing yourself if you are here...
 	}
-	pr_err("%s end\n", current->comm);
+	pr_err("%s out\n", current->comm);
 	return 0;
 }
 

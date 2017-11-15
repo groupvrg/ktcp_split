@@ -128,7 +128,9 @@ static inline void stop_sockets(void)
 	struct cbn_listner *pos, *tmp;
 
 	rbtree_postorder_for_each_entry_safe(pos, tmp, &listner_root, node) {
-		sock_release(pos->sock); //TODO: again maybe just shut down?
+		//sock_release(pos->sock); //TODO: again maybe just shut down?
+		TRACE_PRINT("stopping %d\n", pos->key);
+		kernel_sock_shutdown(pos->sock, SHUT_RDWR);
 		stop_tennat_proxies(&pos->connections_root);
 	}
 }
@@ -342,7 +344,7 @@ static inline struct cbn_listner *register_server_sock(uint32_t tid, struct sock
 static int split_server(void *mark_port)
 {
 	int rc = 0;
-	struct socket *sock;
+	struct socket *sock = NULL;
 	struct sockaddr_in srv_addr;
 	struct cbn_listner *server;
 	u32 mark, port;
@@ -351,24 +353,25 @@ static int split_server(void *mark_port)
 
 	void2uint(mark_port, &mark, &port);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
-		goto out;
+		goto error;
 
 	if ((rc = kernel_setsockopt(sock, SOL_SOCKET, SO_MARK, (char *)&mark, sizeof(u32))) < 0)
-		goto bind_failed;
+		goto error;
 
 	srv_addr.sin_family 		= AF_INET;
 	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
 	srv_addr.sin_port 		= htons(port);
 
 	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
-		goto bind_failed;
+		goto error;
 
+	TRACE_PRINT("new listner on port %d\n", port);
 	if ((rc = kernel_listen(sock, BACKLOG)))
-		goto listen_failed;
+		goto error;
 
-	TRACE_PRINT("waiting for a connection...\n");
 	server = register_server_sock(mark, sock);
 
+	TRACE_PRINT("waiting for a connection...\n");
 	do {
 		struct socket *nsock;
 		struct cbn_qp *qp;
@@ -377,7 +380,7 @@ static int split_server(void *mark_port)
 		if (unlikely(rc))
 			goto out;
 
-		TRACE_PRINT("starting new connection...\n");
+		TRACE_PRINT("new connection [%d]...\n", mark);
 		qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
 		qp->rx 		= nsock;
 		qp->tid 	= mark;
@@ -385,18 +388,18 @@ static int split_server(void *mark_port)
 		kthread_pool_run(&cbn_pool, start_new_connection, qp);
 
 	} while (!kthread_should_stop());
-
-listen_failed:
-bind_failed:
-	TRACE_PRINT("Exiting %d\n", rc);
-	sock_release(sock);
+error:
+	pr_err("Exiting %d\n", rc);
 out:
+	if (sock)
+		sock_release(sock);
 	DUMP_TRACE
 	return rc;
 }
 
 void proc_write_cb(int tid, int port)
 {
+	TRACE_LINE();
 	kthread_pool_run(&cbn_pool, split_server, uint2void(tid, port));
 }
 
