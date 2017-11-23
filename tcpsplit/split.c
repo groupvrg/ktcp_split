@@ -31,6 +31,14 @@ static struct kmem_cache *syn_slab;
 uint32_t ip_transparent = 1;
 static int start_new_connection_syn(void *arg);
 
+static unsigned int cbn_trace_hook(void *priv,
+					struct sk_buff *skb,
+					const struct nf_hook_state *state)
+{
+	trace_only(skb, priv);
+	return NF_ACCEPT;
+}
+
 static unsigned int cbn_ingress_hook(void *priv,
 					struct sk_buff *skb,
 					const struct nf_hook_state *state)
@@ -89,6 +97,21 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 		.priority	= NF_IP_PRI_FIRST,
 		.priv		= "NF_INET_LOCAL_OUT"
 		},
+		{
+		.hook		= cbn_trace_hook,
+		.hooknum	= NF_INET_LOCAL_IN,
+		.pf		= PF_INET,
+		.priority	= (NF_IP_PRI_SECURITY -1),
+		.priv		= "SEC-1"
+		},
+		{
+		.hook		= cbn_trace_hook,
+		.hooknum	= NF_INET_LOCAL_IN,
+		.pf		= PF_INET,
+		.priority	= (NF_IP_PRI_SECURITY +1),
+		.priv		= "SEC+1"
+		},
+
 		{
 		.hook		= cbn_ingress_hook,
 		.hooknum	= NF_INET_LOCAL_IN,

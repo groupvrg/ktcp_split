@@ -88,9 +88,9 @@ static inline const char *proto_string(u8 protocol)
 			iphdr->ttl, proto_string(iphdr->protocol), iphdr->protocol,				\
 			iphdr->check, &iphdr->saddr, &iphdr->daddr						\
 			);
-#define dump_tcph(tcphdr)	idx += sprintf(&store[idx], "\n %d => %d "					\
-						"%s %s %s\n"								\
-						"seq %d ack %d window %d\n"							\
+#define dump_tcph(tcphdr)	idx += sprintf(&store[idx], "\n\t\t%d => %d "					\
+						"\t\t%s %s %s\n"								\
+						"\t\tseq %d ack %d window %d\n"							\
 						,ntohs(tcphdr->source), ntohs(tcphdr->dest)			\
 						, tcphdr->syn ? "SYN" : ""					\
 						, tcphdr->ack ? "ACK" : ""					\
@@ -98,6 +98,22 @@ static inline const char *proto_string(u8 protocol)
 						,ntohl(tcphdr->seq), ntohl(tcphdr->ack_seq)			\
 						,ntohs(tcphdr->window)						\
 						);
+static inline void trace_only(struct sk_buff *skb, const char *str)
+{
+	struct iphdr *iphdr = ip_hdr(skb);
+	int idx = 0;
+	char store[512] = {0};
+
+	idx += sprintf(&store[idx], "%s:\n",str);
+	dump_iph(iphdr);
+
+	if (iphdr->protocol == 6) {
+		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
+		dump_tcph(tcphdr);
+	}
+	trace_printk(store);
+}
+
 static inline int trace_iph(struct sk_buff *skb, const char *str)
 {
 	struct iphdr *iphdr = ip_hdr(skb);
