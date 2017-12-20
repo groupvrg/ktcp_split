@@ -102,7 +102,7 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 	list_del(&elem->list);
 	++cbn_pool->refil_needed;
 	//pr_err("allocated %p\n", elem);
-	//wake_up_process(cbn_pool->refil);
+	wake_up_process(cbn_pool->refil);
 	return elem;
 }
 
