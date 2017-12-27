@@ -50,7 +50,7 @@ static unsigned int cbn_ingress_hook(void *priv,
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
 		struct addresses *addresses;
 
-		if (strcmp(priv, "RX"))
+		if (strcmp(priv, "LIN"))
 			goto out;
 		pr_err("schedule connection %d\n", skb->mark);
 		addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
