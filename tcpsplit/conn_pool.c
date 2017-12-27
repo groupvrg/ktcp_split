@@ -74,9 +74,9 @@ create_fail:
 	return rc;
 }
 
-static int start_new_pending_connection(void *arg)
+static int prealloc_connection(void *arg)
 {
-	int rc, T = 1;
+	int rc, optval = 1;
 	struct addresses *addresses = arg;
 	struct cbn_listner *listner;
 	struct cbn_qp *qp, *tx_qp;
@@ -85,16 +85,69 @@ static int start_new_pending_connection(void *arg)
 
 	INIT_TRACE
 
-	/***
-	 * TODO: pending function listening to next hop info from prev connection (leave option to chain preexisting connections)
-	 *
-	 */
 	qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
 	qp->addr_d = addresses->dest.sin_addr;
-	qp->port_s = addresses->src.sin_port;
+	//qp->port_s = addresses->src.sin_port;
 	qp->port_d = addresses->dest.sin_port;
-	qp->addr_s = addresses->src.sin_addr;
+	//qp->addr_s = addresses->src.sin_addr;
 
+
+	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
+	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
+		goto create_fail;
+
+	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
+		goto connect_fail;
+
+	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_KEEPALIVE, optval, sizeof(int))) < 0)
+		goto connect_fail;
+
+	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
+	addresses->dest.sin_family = AF_INET;
+	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0)))
+		goto connect_fail;
+
+	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
+	qp->tx = tx;
+	qp->rx = NULL;
+
+	/****
+	 *
+	 * TODO:
+	 * Add to list of sockets (add new kmemcache)- maybe in rb_tree for diff connections
+	 * TODO:
+	 *  run this function in loop called by an allocated thread from proc
+	 */
+
+connect_fail:
+	sock_release(tx);
+create_fail:
+	TRACE_PRINT("OUT: connection to port %s ", __FUNCTION__);
+	DUMP_TRACE
+	return rc;
+}
+
+static void preconn_wait_for_next_hop(struct cbn_qp *qp,
+					struct addresses *addressess)
+{
+		struct msghdr msg = { 0 };
+		if ((rc = kernel_recvmsg(qp->rx, &msg, &kvec, 1, sizeof(struct addresses), MSG_WAITALL)) <= 0)
+			goto err;
+}
+
+static int start_new_pending_connection(void *arg)
+{
+	int rc, T = 1;
+	struct cbn_qp *qp = arg;
+	struct addresses addresses;
+	struct cbn_listner *listner;
+	struct cbn_qp *qp, *tx_qp;
+	struct sockets sockets;
+	struct socket *tx;
+
+	INIT_TRACE
+
+	preconn_wait_for_next_hop(qp, &address);
 
 	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
@@ -154,72 +207,24 @@ create_fail:
 }
 
 
-static int prealloc_connection(void *arg)
+static struct cbn_listner *pre_conn_listner;
+
+static void preconn_resgister_server(struct cbn_listner *server)
 {
-	int rc, optval = 1;
-	struct addresses *addresses = arg;
-	struct cbn_listner *listner;
-	struct cbn_qp *qp, *tx_qp;
-	struct sockets sockets;
-	struct socket *tx;
-
-	INIT_TRACE
-
-	qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
-	qp->addr_d = addresses->dest.sin_addr;
-	//qp->port_s = addresses->src.sin_port;
-	qp->port_d = addresses->dest.sin_port;
-	//qp->addr_s = addresses->src.sin_addr;
-
-
-	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
-	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
-		goto create_fail;
-
-	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
-		goto connect_fail;
-
-	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_KEEPALIVE, optval, sizeof(int))) < 0)
-		goto connect_fail;
-
-	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
-	addresses->dest.sin_family = AF_INET;
-	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0)))
-		goto connect_fail;
-
-	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
-	qp->tx = tx;
-	qp->rx = NULL;
-
-	/****
-	 *
-	 * TODO:
-	 * Add to list of sockets (add new kmemcache)- maybe in rb_tree for diff connections
-	 * TODO:
-	 *  run this function in loop called by an allocated thread from proc
-	 */
-
-connect_fail:
-	sock_release(tx);
-create_fail:
-	TRACE_PRINT("OUT: connection to port %s ", __FUNCTION__);
-	DUMP_TRACE
-	return rc;
+	pre_conn_listner = server;
 }
 
-//TODO: pretty up this shit
-static int listner_server(void *mark_port)
+static int prec_conn_listner_server(void *arg)
 {
 	int rc = 0;
 	struct socket *sock = NULL;
 	struct sockaddr_in srv_addr;
-	struct cbn_listner *server;
-	u32 mark, port;
+	struct cbn_listner server;
+	u32 port;
 
 	INIT_TRACE
 
-	void2uint(mark_port, &mark, &port);
-
+	port = (u32)arg;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
 		goto error;
 
@@ -236,6 +241,7 @@ static int listner_server(void *mark_port)
 	if ((rc = kernel_listen(sock, BACKLOG)))
 		goto error;
 
+	preconn_resgister_server(&server);
 	do {
 		struct socket *nsock;
 		struct cbn_qp *qp;
@@ -244,12 +250,12 @@ static int listner_server(void *mark_port)
 		if (unlikely(rc))
 			goto out;
 
-		TRACE_PRINT("new connection [%d]...", mark);
+		TRACE_PRINT("new pre connection...");
 		qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
 		qp->rx 		= nsock;
-		qp->tid 	= mark;
+		qp->tid 	= 0;
 		qp->root 	= &server->connections_root;
-		//kthread_pool_run(&cbn_pool, start_new_connection, qp); - start_new_pending_connection
+		kthread_pool_run(&cbn_pool, start_new_pending_connection, qp);
 
 	} while (!kthread_should_stop());
 error:
@@ -261,7 +267,9 @@ out:
 	return rc;
 }
 
-int __init cbn_pre_connect_init(void)
+#define PRECONN_SERVER_PORT	5111
+
+int __init cbn_pre_connect_init(static struct kthread_pool *cbn_pool)
 {
 	/*****
 	 * TODO:
@@ -270,4 +278,6 @@ int __init cbn_pre_connect_init(void)
 	 * 2. create kmemcache for local
 	 * 3. add proc iface
 	 */
+	int _port = PRECONN_SERVER_PORT;
+	kthread_pool_run(cbn_pool, prec_conn_listner_server, port);
 }
