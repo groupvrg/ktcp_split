@@ -28,14 +28,14 @@ static struct kmem_cache *qp_slab;
 static struct kmem_cache *listner_slab;
 static struct kmem_cache *syn_slab;
 
-uint32_t ip_transparent = 1;
+uint32_t ip_transparent = 0;
 static int start_new_connection_syn(void *arg);
 
 static unsigned int cbn_trace_hook(void *priv,
 					struct sk_buff *skb,
 					const struct nf_hook_state *state)
 {
-	trace_only(skb, priv);
+	trace_iph(skb, priv);
 	return NF_ACCEPT;
 }
 
@@ -50,9 +50,13 @@ static unsigned int cbn_ingress_hook(void *priv,
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
 		struct addresses *addresses;
 
-		if (strcmp(priv, "LIN"))
+		if (strcmp(priv, "RX"))
 			goto out;
-		pr_err("schedule connection %d\n", skb->mark);
+//		if (skb->mark != 10)
+//			goto out;
+
+		pr_info("schedule connection %d\n", skb->mark);
+
 		addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
 		if (unlikely(!addresses)) {
 			pr_err("Faield to alloc mem %s\n", __FUNCTION__);
@@ -62,6 +66,7 @@ static unsigned int cbn_ingress_hook(void *priv,
 		addresses->src.sin_addr.s_addr	= iphdr->saddr;
 		addresses->dest.sin_port	= tcphdr->dest;
 		addresses->src.sin_port		= tcphdr->source;
+		addresses->mark			= skb->mark;
 		kthread_pool_run(&cbn_pool, start_new_connection_syn, addresses); //elem?
 		//1.alloc task + data
 		//2.rb_tree lookup
@@ -82,21 +87,22 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 		.priority	= NF_IP_PRI_FIRST,
 		.priv		= "TX"
 		},
-//		{
-//		.hook		= cbn_ingress_hook,
-//		.hooknum	= NF_INET_LOCAL_OUT,
-//		.pf		= PF_INET,
-//		.priority	= NF_IP_PRI_FIRST,
-//		.priv		= "NF_INET_LOCAL_OUT"
-//		},
-//
+		{
+		.hook		= cbn_ingress_hook,
+		.hooknum	= NF_INET_LOCAL_OUT,
+		.pf		= PF_INET,
+		.priority	= NF_IP_PRI_FIRST,
+		.priv		= "NF_INET_LOCAL_OUT"
+		},
+
 		{
 		.hook		= cbn_ingress_hook,
 		.hooknum	= NF_INET_FORWARD,
 		.pf		= PF_INET,
 		.priority	= NF_IP_PRI_FIRST,
-		.priv		= "NF_INET_LOCAL_OUT"
+		.priv		= "NF_INET_FORWARD"
 		},
+	/*
 		{
 		.hook		= cbn_trace_hook,
 		.hooknum	= NF_INET_LOCAL_IN,
@@ -111,7 +117,7 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 		.priority	= (NF_IP_PRI_SECURITY +1),
 		.priv		= "SEC+1"
 		},
-
+*/
 		{
 		.hook		= cbn_ingress_hook,
 		.hooknum	= NF_INET_LOCAL_IN,
@@ -241,7 +247,7 @@ static int start_new_connection_syn(void *arg)
 	listner = search_rb_listner(&listner_root, addresses->mark);
 	kmem_cache_free(syn_slab, addresses);
 	//TODO: add locks to this shit
-	TRACE_LINE();
+	TRACE_PRINT("%s qp %p listner %p mark %d", __FUNCTION__, qp, listner, addresses->mark);
 	if ((tx_qp = add_rb_data(&listner->connections_root, qp))) { //this means the other conenction is already up
 		tx_qp->tx = tx;
 		kmem_cache_free(qp_slab, qp);
@@ -267,7 +273,7 @@ static int start_new_connection_syn(void *arg)
 connect_fail:
 	sock_release(tx);
 create_fail:
-	TRACE_PRINT("OUT: connection to port %s ", __FUNCTION__);
+	TRACE_PRINT("OUT: connection to port %s <%d>", __FUNCTION__, rc);
 	DUMP_TRACE
 	return rc;
 }
@@ -375,11 +381,14 @@ static int split_server(void *mark_port)
 
 	INIT_TRACE
 
+	TRACE_LINE();
+	pr_err("starting %s\n", __FUNCTION__);
 	void2uint(mark_port, &mark, &port);
 	if (search_rb_listner(&listner_root, mark)) {
 		rc = -EEXIST;
 		goto error;
 	}
+	TRACE_LINE();
 
 	server = register_server_sock(mark, sock);
 
@@ -387,10 +396,12 @@ static int split_server(void *mark_port)
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
 		goto error;
 
+	TRACE_LINE();
 	server->sock = sock;
 	server->port = port;
 	server->status = 2;
 
+	TRACE_LINE();
 	if ((rc = kernel_setsockopt(sock, SOL_SOCKET, SO_MARK, (char *)&mark, sizeof(u32))) < 0)
 		goto error;
 
@@ -399,14 +410,17 @@ static int split_server(void *mark_port)
 	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
 	srv_addr.sin_port 		= htons(port);
 
+	TRACE_LINE();
 	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
 		goto error;
 
 	server->status = 4;
-	pr_info("%s) tennat %d: new listner on port %d", current->comm, mark, port);
+	TRACE_LINE();
+	pr_info("%s) tenant %d: new listner on port %d", current->comm, mark, port);
 	if ((rc = kernel_listen(sock, BACKLOG)))
 		goto error;
 
+	TRACE_LINE();
 	server->status = 5;
 	//server = register_server_sock(mark, sock);
 

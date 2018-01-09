@@ -54,10 +54,13 @@ static ssize_t cbn_proc_command(struct file *file, const char __user *buf,
 
 	/* start new server */
 	kfree(kbuf);
-	if (values[0] == PROC_CSV_NUM)
+	if (values[0] == PROC_CSV_NUM) {
+		pr_info("starting new server %d %d\n", values[1], values[2]);
 		proc_write_cb(values[1], values[2]);
-	else
+	} else {
+		pr_err("Failed to start new server %d\n" ,values[2]);
 		size = -EINVAL;
+	}
 	ERR_LINE();
 	return size;
 }

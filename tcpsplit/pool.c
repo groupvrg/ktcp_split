@@ -33,6 +33,7 @@ static int pipe_loop_task(void *data)
 		else
 			pr_err("ERROR %s: no pool task\n", __FUNCTION__);
 
+		pr_info("sleeping %s\n", current->comm);
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!kthread_should_stop()) {
 			pr_info("%s out to reuse\n", current->comm);
