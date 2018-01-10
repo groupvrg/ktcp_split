@@ -280,6 +280,7 @@ connect_fail:
 		}
 	}
 	TRACE_LINE();
+	TRACE_PRINT("QP connected...");
 	DUMP_TRACE
 	sockets.tx = (struct socket *)qp->rx;
 	sockets.rx = (struct socket *)qp->tx;
@@ -342,13 +343,13 @@ static int start_new_connection(void *arg)
 
 	TRACE_LINE();
 	if ((tx_qp = add_rb_data(root, qp))) { //this means the other conenction is already up
-		TRACE_LINE();
+		TRACE_PRINT("QP exists");
 		tx_qp->rx = rx;
 		kmem_cache_free(qp_slab, qp);
 		qp = tx_qp;
 		atomic_inc(&qp->ref_cnt);
 	} else {
-		TRACE_LINE();
+		TRACE_PRINT("QP created...");
 		while (!qp->tx) {
 			if (kthread_should_stop())
 				goto create_fail;
@@ -356,7 +357,7 @@ static int start_new_connection(void *arg)
 		}
 	}
 
-	TRACE_LINE();
+	TRACE_PRINT("QP connected...");
 	DUMP_TRACE
 	sockets.tx = (struct socket *)qp->tx;
 	sockets.rx = (struct socket *)qp->rx;

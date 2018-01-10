@@ -17,12 +17,12 @@ struct cbn_qp {
 		};
 		struct {
 			int tid;
-			struct rb_root *root;;
 
 		};
 	};
 	atomic_t ref_cnt;
 
+	struct rb_root *root;;
 	volatile struct socket *tx;
 	volatile struct socket *rx;
 };
