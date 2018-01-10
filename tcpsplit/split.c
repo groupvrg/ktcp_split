@@ -180,24 +180,22 @@ static int half_duplex(void *arg)
 
 	do {
 		struct msghdr msg = { 0 };
-		TRACE_PRINT("waiting for bytes...");
-		if ((rc = kernel_recvmsg(qp->rx, &msg, &kvec, 1, PAGE_SIZE, 0)) <= 0)
+		if ((rc = kernel_recvmsg(qp->rx, &msg, &kvec, 1, PAGE_SIZE, 0)) <= 0) {
+			kernel_sock_shutdown(qp->tx, SHUT_RDWR);
 			goto err;
-		TRACE_PRINT("Received %d bytes", rc);
+		}
 		//use kern_sendpage if flags needed.
-		if ((rc = kernel_sendmsg(qp->tx, &msg, &kvec, 1, rc)) <= 0)
-				goto err;
-		TRACE_PRINT("Sent %d bytes", rc);
+		if ((rc = kernel_sendmsg(qp->tx, &msg, &kvec, 1, rc)) <= 0) {
+			kernel_sock_shutdown(qp->rx, SHUT_RDWR);
+			goto err;
+		}
 	} while (!kthread_should_stop());
+
 	goto out;
 err:
-	TRACE_PRINT("%s sleeping on error (%d)\n", __FUNCTION__, rc);
-	set_current_state(TASK_INTERRUPTIBLE);
-	if (!kthread_should_stop())
-		schedule();
-	__set_current_state(TASK_RUNNING);
+	TRACE_PRINT("%s stopping on error (%d)\n", __FUNCTION__, rc);
 out:
-	TRACE_PRINT("%s going out\n", __FUNCTION__);
+	TRACE_PRINT("%s going out (%d)\n", __FUNCTION__, rc);
 	free_page((unsigned long)(kvec.iov_base));
 	DUMP_TRACE
 	return rc;
@@ -210,7 +208,7 @@ static int start_new_connection_syn(void *arg)
 	struct cbn_listner *listner;
 	struct cbn_qp *qp, *tx_qp;
 	struct sockets sockets;
-	struct socket *tx;
+	struct socket *tx = NULL;
 
 	INIT_TRACE
 
@@ -220,10 +218,11 @@ static int start_new_connection_syn(void *arg)
 	qp->port_d = addresses->dest.sin_port;
 	qp->addr_s = addresses->src.sin_addr;
 
+	qp->tx = ERR_PTR(-EINVAL);
 
 	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
-		goto create_fail;
+		goto connect_fail;
 
 	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
 		goto connect_fail;
@@ -242,6 +241,7 @@ static int start_new_connection_syn(void *arg)
 
 	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	qp->tx = tx;
+connect_fail:
 	qp->rx = NULL;
 
 	listner = search_rb_listner(&listner_root, addresses->mark);
@@ -254,10 +254,11 @@ static int start_new_connection_syn(void *arg)
 		qp = tx_qp;
 		TRACE_PRINT("QP exists");
 	} else {
+		//TODO: Must ADD T/O. (accept wont signal with ERR on qp)
 		TRACE_PRINT("QP created...");
 		while (!qp->rx) {
 			if (kthread_should_stop())
-				goto connect_fail;
+				goto out;
 			schedule();
 		}
 	}
@@ -266,14 +267,15 @@ static int start_new_connection_syn(void *arg)
 	sockets.tx = (struct socket *)qp->rx;
 	sockets.rx = (struct socket *)qp->tx;
 	TRACE_PRINT("starting half duplex");
-	half_duplex(&sockets);
-	goto connect_fail;
+	if (IS_ERR_OR_NULL(qp->rx) || IS_ERR_OR_NULL(qp->tx))
+		goto out;
+	rc = half_duplex(&sockets);
 
-
-connect_fail:
-	sock_release(tx);
+out:
+	if (tx)
+		sock_release(tx);
 create_fail:
-	TRACE_PRINT("OUT: connection to port %s <%d>", __FUNCTION__, rc);
+	TRACE_PRINT("OUT: %s <%d>", __FUNCTION__, rc);
 	DUMP_TRACE
 	return rc;
 }
@@ -340,8 +342,10 @@ static int start_new_connection(void *arg)
 	DUMP_TRACE
 	sockets.tx = (struct socket *)qp->tx;
 	sockets.rx = (struct socket *)qp->rx;
+	if (IS_ERR_OR_NULL(qp->rx) || IS_ERR_OR_NULL(qp->tx))
+		goto out;
 	half_duplex(&sockets);
-
+out:
 	TRACE_PRINT("closing port %d IP %pI4n", ntohs(addr.sin_port), &addr.sin_addr);
 	/* Teardown */
 
