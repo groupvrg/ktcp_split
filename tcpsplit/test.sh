@@ -12,3 +12,4 @@ sudo insmod cbn_split.ko
 #sudo iptables -t nat -A PREROUTING -p tcp -m owner --gid-owner sox -j SOCKS
 sudo sh -c 'echo 0 > /proc/sys/kernel/hung_task_timeout_secs'
 #sudo -g sox netperf -H 10.154.0.6
+echo 10,12345 > /proc/cbn/cbn_proc

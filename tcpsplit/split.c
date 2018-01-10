@@ -181,12 +181,14 @@ static int half_duplex(void *arg)
 	do {
 		struct msghdr msg = { 0 };
 		if ((rc = kernel_recvmsg(qp->rx, &msg, &kvec, 1, PAGE_SIZE, 0)) <= 0) {
-			kernel_sock_shutdown(qp->tx, SHUT_RDWR);
+			if (qp->tx)
+				kernel_sock_shutdown(qp->tx, SHUT_RDWR);
 			goto err;
 		}
 		//use kern_sendpage if flags needed.
 		if ((rc = kernel_sendmsg(qp->tx, &msg, &kvec, 1, rc)) <= 0) {
-			kernel_sock_shutdown(qp->rx, SHUT_RDWR);
+			if (qp->rx)
+				kernel_sock_shutdown(qp->rx, SHUT_RDWR);
 			goto err;
 		}
 	} while (!kthread_should_stop());
@@ -270,6 +272,7 @@ connect_fail:
 	if (IS_ERR_OR_NULL(qp->rx) || IS_ERR_OR_NULL(qp->tx))
 		goto out;
 	rc = half_duplex(&sockets);
+	qp->tx = NULL;	
 
 out:
 	if (tx)
@@ -345,6 +348,7 @@ static int start_new_connection(void *arg)
 	if (IS_ERR_OR_NULL(qp->rx) || IS_ERR_OR_NULL(qp->tx))
 		goto out;
 	half_duplex(&sockets);
+	qp->rx = NULL;
 out:
 	TRACE_PRINT("closing port %d IP %pI4n", ntohs(addr.sin_port), &addr.sin_addr);
 	/* Teardown */
@@ -388,8 +392,10 @@ static int split_server(void *mark_port)
 	TRACE_LINE();
 	pr_err("starting %s\n", __FUNCTION__);
 	void2uint(mark_port, &mark, &port);
+	pr_info("mark=%d, port=%d", mark, port);
 	if (search_rb_listner(&listner_root, mark)) {
 		rc = -EEXIST;
+		pr_err("already found");
 		goto error;
 	}
 	TRACE_LINE();
