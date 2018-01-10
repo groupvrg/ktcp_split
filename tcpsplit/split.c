@@ -31,6 +31,17 @@ static struct kmem_cache *syn_slab;
 uint32_t ip_transparent = 0;
 static int start_new_connection_syn(void *arg);
 
+static unsigned int put_qp(struct cbn_qp *qp)
+{
+	int rc;
+	if (! (rc = atomic_dec_return(&qp->ref_cnt))) {
+		// TODO: protect with lock on MC
+		rb_erase(&qp->node, qp->root);
+		kmem_cache_free(qp_slab, qp);
+	}
+	return rc;
+}
+
 static unsigned int cbn_trace_hook(void *priv,
 					struct sk_buff *skb,
 					const struct nf_hook_state *state)
@@ -166,9 +177,9 @@ static inline void stop_sockets(void)
 	}
 }
 
-static int half_duplex(void *arg)
+static int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 {
-	struct sockets *qp = arg;
+//	struct sockets *sock = arg;
 	struct kvec kvec;
 	int rc = -ENOMEM;
 
@@ -180,15 +191,15 @@ static int half_duplex(void *arg)
 
 	do {
 		struct msghdr msg = { 0 };
-		if ((rc = kernel_recvmsg(qp->rx, &msg, &kvec, 1, PAGE_SIZE, 0)) <= 0) {
-			if (qp->tx)
-				kernel_sock_shutdown(qp->tx, SHUT_RDWR);
+		if ((rc = kernel_recvmsg(sock->rx, &msg, &kvec, 1, PAGE_SIZE, 0)) <= 0) {
+			if (put_qp(qp))
+				kernel_sock_shutdown(sock->tx, SHUT_RDWR);
 			goto err;
 		}
 		//use kern_sendpage if flags needed.
-		if ((rc = kernel_sendmsg(qp->tx, &msg, &kvec, 1, rc)) <= 0) {
-			if (qp->rx)
-				kernel_sock_shutdown(qp->rx, SHUT_RDWR);
+		if ((rc = kernel_sendmsg(sock->tx, &msg, &kvec, 1, rc)) <= 0) {
+			if (put_qp(qp))
+				kernel_sock_shutdown(sock->rx, SHUT_RDWR);
 			goto err;
 		}
 	} while (!kthread_should_stop());
@@ -219,6 +230,7 @@ static int start_new_connection_syn(void *arg)
 	qp->port_s = addresses->src.sin_port;
 	qp->port_d = addresses->dest.sin_port;
 	qp->addr_s = addresses->src.sin_addr;
+	atomic_set(&qp->ref_cnt, 1);
 
 	qp->tx = ERR_PTR(-EINVAL);
 
@@ -247,13 +259,16 @@ connect_fail:
 	qp->rx = NULL;
 
 	listner = search_rb_listner(&listner_root, addresses->mark);
+	qp->root = &listner->connections_root;
+
 	kmem_cache_free(syn_slab, addresses);
 	//TODO: add locks to this shit
 	TRACE_PRINT("%s qp %p listner %p mark %d", __FUNCTION__, qp, listner, addresses->mark);
-	if ((tx_qp = add_rb_data(&listner->connections_root, qp))) { //this means the other conenction is already up
+	if ((tx_qp = add_rb_data(qp->root, qp))) { //this means the other conenction is already up
 		tx_qp->tx = tx;
 		kmem_cache_free(qp_slab, qp);
 		qp = tx_qp;
+		atomic_inc(&qp->ref_cnt);
 		TRACE_PRINT("QP exists");
 	} else {
 		//TODO: Must ADD T/O. (accept wont signal with ERR on qp)
@@ -269,15 +284,14 @@ connect_fail:
 	sockets.tx = (struct socket *)qp->rx;
 	sockets.rx = (struct socket *)qp->tx;
 	TRACE_PRINT("starting half duplex");
-	if (IS_ERR_OR_NULL(qp->rx) || IS_ERR_OR_NULL(qp->tx))
+	if (IS_ERR_OR_NULL((struct socket *)qp->rx) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
-	rc = half_duplex(&sockets);
-	qp->tx = NULL;	
+	rc = half_duplex(&sockets, qp);
 
 out:
 	if (tx)
 		sock_release(tx);
-create_fail:
+
 	TRACE_PRINT("OUT: %s <%d>", __FUNCTION__, rc);
 	DUMP_TRACE
 	return rc;
@@ -332,6 +346,7 @@ static int start_new_connection(void *arg)
 		tx_qp->rx = rx;
 		kmem_cache_free(qp_slab, qp);
 		qp = tx_qp;
+		atomic_inc(&qp->ref_cnt);
 	} else {
 		TRACE_LINE();
 		while (!qp->tx) {
@@ -345,18 +360,12 @@ static int start_new_connection(void *arg)
 	DUMP_TRACE
 	sockets.tx = (struct socket *)qp->tx;
 	sockets.rx = (struct socket *)qp->rx;
-	if (IS_ERR_OR_NULL(qp->rx) || IS_ERR_OR_NULL(qp->tx))
+	if (IS_ERR_OR_NULL((struct socket *)(qp->rx)) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
-	half_duplex(&sockets);
-	qp->rx = NULL;
+	half_duplex(&sockets, qp);
 out:
 	TRACE_PRINT("closing port %d IP %pI4n", ntohs(addr.sin_port), &addr.sin_addr);
 	/* Teardown */
-
-	/* TX partner stopped - free qp*/
-	if (qp)
-		kmem_cache_free(qp_slab, qp);
-
 	/* free both sockets*/
 	rc = line = 0;
 
@@ -447,6 +456,7 @@ static int split_server(void *mark_port)
 		qp->rx 		= nsock;
 		qp->tid 	= mark;
 		qp->root 	= &server->connections_root;
+		atomic_set(&qp->ref_cnt, 1);
 		kthread_pool_run(&cbn_pool, start_new_connection, qp);
 
 	} while (!kthread_should_stop());

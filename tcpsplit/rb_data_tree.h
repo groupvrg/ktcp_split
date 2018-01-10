@@ -1,4 +1,5 @@
 #include <linux/rbtree.h>
+#include <linux/types.h> //atomic_t
 #include "cbn_common.h"
 
 #define RB_KEY_LENGTH 12
@@ -20,6 +21,8 @@ struct cbn_qp {
 
 		};
 	};
+	atomic_t ref_cnt;
+
 	volatile struct socket *tx;
 	volatile struct socket *rx;
 };
