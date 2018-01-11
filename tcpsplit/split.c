@@ -63,8 +63,6 @@ static unsigned int cbn_ingress_hook(void *priv,
 
 		if (strcmp(priv, "RX"))
 			goto out;
-//		if (skb->mark != 10)
-//			goto out;
 
 		TRACE_PRINT("schedule connection %d\n", skb->mark);
 
@@ -91,6 +89,7 @@ out:
 #define CBN_PRIO_OFFSET 50
 
 static struct nf_hook_ops cbn_nf_hooks[] = {
+	/*
 		{
 		.hook		= cbn_ingress_hook,
 		.hooknum	= NF_INET_POST_ROUTING,
@@ -113,7 +112,6 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 		.priority	= NF_IP_PRI_FIRST,
 		.priv		= "NF_INET_FORWARD"
 		},
-	/*
 		{
 		.hook		= cbn_trace_hook,
 		.hooknum	= NF_INET_LOCAL_IN,
@@ -128,7 +126,6 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 		.priority	= (NF_IP_PRI_SECURITY +1),
 		.priv		= "SEC+1"
 		},
-*/
 		{
 		.hook		= cbn_ingress_hook,
 		.hooknum	= NF_INET_LOCAL_IN,
@@ -136,6 +133,8 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 		.priority	= NF_IP_PRI_FIRST,
 		.priv		= "LIN"
 		},
+
+*/
 		{
 		.hook		= cbn_ingress_hook,
 		.hooknum	= NF_INET_PRE_ROUTING,
@@ -177,7 +176,7 @@ static inline void stop_sockets(void)
 	}
 }
 
-static int half_duplex(struct sockets *sock, struct cbn_qp *qp)
+static inline int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 {
 //	struct sockets *sock = arg;
 	struct kvec kvec;
@@ -206,6 +205,7 @@ static int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 
 	goto out;
 err:
+	pr_err("%s stopping on error (%d)\n", __FUNCTION__, rc);
 	TRACE_PRINT("%s stopping on error (%d)\n", __FUNCTION__, rc);
 out:
 	TRACE_PRINT("%s going out (%d)\n", __FUNCTION__, rc);
@@ -235,11 +235,15 @@ static int start_new_connection_syn(void *arg)
 	qp->tx = ERR_PTR(-EINVAL);
 
 	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
-	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
+	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
+		pr_err("%s error (%d)\n", __FUNCTION__, rc);
 		goto connect_fail;
+	}
 
-	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
+	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0) {
+		pr_err("%s error (%d)\n", __FUNCTION__, rc);
 		goto connect_fail;
+	}
 
 	if (ip_transparent) {
 		if ((rc = kernel_setsockopt(tx, SOL_IP, IP_TRANSPARENT, (char *)&T, sizeof(int))))
@@ -248,10 +252,13 @@ static int start_new_connection_syn(void *arg)
 		if ((rc = kernel_bind(tx, (struct sockaddr *)&addresses->src, sizeof(struct sockaddr))))
 			goto connect_fail;
 	}
+
 	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	addresses->dest.sin_family = AF_INET;
-	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0)))
+	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0))) {
+		pr_err("%s error (%d)\n", __FUNCTION__, rc);
 		goto connect_fail;
+	}
 
 	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	qp->tx = tx;
@@ -317,15 +324,21 @@ static int start_new_connection(void *arg)
 
 	size = sizeof(addr);
 	line = __LINE__;
-	if ((rc = kernel_getsockopt(rx, SOL_IP, SO_ORIGINAL_DST, (char *)&addr, &size)))
+	if ((rc = kernel_getsockopt(rx, SOL_IP, SO_ORIGINAL_DST, (char *)&addr, &size))) {
+		pr_err("%s error (%d)\n", __FUNCTION__, rc);
 		goto create_fail;
+	}
 
-	if ((rc = kernel_setsockopt(rx, SOL_SOCKET, SO_MARK, (char *)&mark, sizeof(u32))) < 0)
+	if ((rc = kernel_setsockopt(rx, SOL_SOCKET, SO_MARK, (char *)&mark, sizeof(u32))) < 0) {
+		pr_err("%s error (%d)\n", __FUNCTION__, rc);
 		goto create_fail;
+	}
 
 	line = __LINE__;
-	if ((rc = kernel_getpeername(rx, (struct sockaddr *)&cli_addr, &size)))
+	if ((rc = kernel_getpeername(rx, (struct sockaddr *)&cli_addr, &size))) {
+		pr_err("%s error (%d)\n", __FUNCTION__, rc);
 		goto create_fail;
+	}
 
 /*
 	line = __LINE__;
