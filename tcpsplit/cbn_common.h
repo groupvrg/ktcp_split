@@ -16,13 +16,13 @@
 #define INIT_TRACE	char ___buff[512] = {0}; int ___idx = 0;
 
 #define ERR_LINE() { pr_err("(%s): %d:%s \n", current->comm, __LINE__, __FUNCTION__);}
-#define TRACE_PRINT(fmt, ...)
-#define TRACE_LINE()
+//#define TRACE_PRINT(fmt, ...)
+//#define TRACE_LINE()
 #ifndef TRACE_PRINT
-#define TRACE_PRINT(fmt, ...) { pr_info("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ );\
-				/*pr_info("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); */\
+#define TRACE_PRINT(fmt, ...) { trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ );\
+				/*trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); */\
 				/* ___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d:"fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__); */}
-#define TRACE_LINE() {	 pr_info("%d:%s (%s)\n", __LINE__, __FUNCTION__, current->comm);/*___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d", __FUNCTION__, __LINE__);*/ }
+#define TRACE_LINE() {	 trace_printk("%d:%s (%s)\n", __LINE__, __FUNCTION__, current->comm);/*___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d", __FUNCTION__, __LINE__);*/ }
 #endif
 #define DUMP_TRACE	 if (___idx) {___buff[___idx] = '\n'; trace_printk(___buff);} ___buff[0] = ___idx = 0;
 
@@ -111,7 +111,9 @@ static inline void trace_only(struct sk_buff *skb, const char *str)
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
 		dump_tcph(tcphdr);
 	}
+#ifdef TRACE_PACKETS
 	trace_printk(store);
+#endif
 }
 
 static inline int trace_iph(struct sk_buff *skb, const char *str)
@@ -128,7 +130,9 @@ static inline int trace_iph(struct sk_buff *skb, const char *str)
 			idx += sprintf(&store[idx], "%s:\n",str);
 			dump_iph(iphdr);
 			dump_tcph(tcphdr);
+#ifdef TRACE_PACKETS
 			trace_printk(store);
+#endif
 		}
 	}
 	return rc && skb->mark;
