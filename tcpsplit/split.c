@@ -76,6 +76,7 @@ static unsigned int cbn_ingress_hook(void *priv,
 		addresses->dest.sin_port	= tcphdr->dest;
 		addresses->src.sin_port		= tcphdr->source;
 		addresses->mark			= skb->mark;
+		pr_info("%s scheduling start_new_connection_syn", __FUNCTION__);
 		kthread_pool_run(&cbn_pool, start_new_connection_syn, addresses); //elem?
 		//1.alloc task + data
 		//2.rb_tree lookup
@@ -205,7 +206,7 @@ static inline int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 
 	goto out;
 err:
-	pr_err("%s stopping on error (%d)\n", __FUNCTION__, rc);
+	pr_err("%s [%s] stopping on error (%d)\n", __FUNCTION__, (sock->dir) ? "TX" : "RX", rc);
 	TRACE_PRINT("%s stopping on error (%d)\n", __FUNCTION__, rc);
 out:
 	TRACE_PRINT("%s going out (%d)\n", __FUNCTION__, rc);
@@ -291,6 +292,7 @@ connect_fail:
 	DUMP_TRACE
 	sockets.tx = (struct socket *)qp->rx;
 	sockets.rx = (struct socket *)qp->tx;
+	sockets.dir = 1;
 	TRACE_PRINT("starting half duplex");
 	if (IS_ERR_OR_NULL((struct socket *)qp->rx) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
@@ -374,6 +376,7 @@ static int start_new_connection(void *arg)
 	DUMP_TRACE
 	sockets.tx = (struct socket *)qp->tx;
 	sockets.rx = (struct socket *)qp->rx;
+	sockets.dir = 0;
 	if (IS_ERR_OR_NULL((struct socket *)(qp->rx)) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
 	half_duplex(&sockets, qp);
@@ -471,6 +474,7 @@ static int split_server(void *mark_port)
 		qp->tid 	= mark;
 		qp->root 	= &server->connections_root;
 		atomic_set(&qp->ref_cnt, 1);
+		pr_info("%s scheduling start_new_connection", __FUNCTION__);
 		kthread_pool_run(&cbn_pool, start_new_connection, qp);
 
 	} while (!kthread_should_stop());
@@ -486,6 +490,7 @@ out:
 
 void proc_write_cb(int tid, int port)
 {
+	pr_info("%s scheduling split server", __FUNCTION__);
 	kthread_pool_run(&cbn_pool, split_server, uint2void(tid, port));
 }
 

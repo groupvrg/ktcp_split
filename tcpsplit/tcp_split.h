@@ -4,6 +4,7 @@
 struct sockets {
 	struct socket *rx;
 	struct socket *tx;
+	int 	dir;
 };
 
 struct addresses {
