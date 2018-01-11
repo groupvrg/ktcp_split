@@ -16,8 +16,8 @@
 #define INIT_TRACE	char ___buff[512] = {0}; int ___idx = 0;
 
 #define ERR_LINE() { pr_err("(%s): %d:%s \n", current->comm, __LINE__, __FUNCTION__);}
-//#define TRACE_PRINT(fmt, ...)
-//#define TRACE_LINE()
+#define TRACE_PRINT(fmt, ...)
+#define TRACE_LINE()
 #ifndef TRACE_PRINT
 #define TRACE_PRINT(fmt, ...) { pr_info("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ );\
 				/*pr_info("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); */\

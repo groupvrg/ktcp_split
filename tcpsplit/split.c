@@ -66,11 +66,11 @@ static unsigned int cbn_ingress_hook(void *priv,
 //		if (skb->mark != 10)
 //			goto out;
 
-		pr_info("schedule connection %d\n", skb->mark);
+		TRACE_PRINT("schedule connection %d\n", skb->mark);
 
 		addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
 		if (unlikely(!addresses)) {
-			pr_err("Faield to alloc mem %s\n", __FUNCTION__);
+			TRACE_PRINT("Faield to alloc mem %s\n", __FUNCTION__);
 			goto out;
 		}
 		addresses->dest.sin_addr.s_addr	= iphdr->daddr;
@@ -154,12 +154,12 @@ static inline void stop_tennat_proxies(struct rb_root *root)
 
 	rbtree_postorder_for_each_entry_safe(pos, tmp, root, node) {
 		if (pos->tx) {
-			pr_err("releasing %p\n", pos->tx);
+			TRACE_PRINT("releasing %p\n", pos->tx);
 			sock = (struct socket *)pos->tx;
 			kernel_sock_shutdown(sock, SHUT_RDWR);
 		}
 		if (pos->rx) {
-			pr_err("releasing %p\n", pos->rx);
+			TRACE_PRINT("releasing %p\n", pos->rx);
 			sock = (struct socket *)pos->rx;
 			kernel_sock_shutdown(sock, SHUT_RDWR);
 		}
@@ -400,12 +400,12 @@ static int split_server(void *mark_port)
 	INIT_TRACE
 
 	TRACE_LINE();
-	pr_err("starting %s\n", __FUNCTION__);
+	TRACE_PRINT("starting %s\n", __FUNCTION__);
 	void2uint(mark_port, &mark, &port);
-	pr_info("mark=%d, port=%d", mark, port);
+	TRACE_PRINT("mark=%d, port=%d", mark, port);
 	if (search_rb_listner(&listner_root, mark)) {
 		rc = -EEXIST;
-		pr_err("already found");
+		TRACE_PRINT("already found");
 		goto error;
 	}
 	TRACE_LINE();
@@ -436,7 +436,7 @@ static int split_server(void *mark_port)
 
 	server->status = 4;
 	TRACE_LINE();
-	pr_info("%s) tenant %d: new listner on port %d", current->comm, mark, port);
+	TRACE_PRINT("%s) tenant %d: new listner on port %d", current->comm, mark, port);
 	if ((rc = kernel_listen(sock, BACKLOG)))
 		goto error;
 
@@ -463,7 +463,7 @@ static int split_server(void *mark_port)
 	} while (!kthread_should_stop());
 	server->status = 6;
 error:
-	pr_err("Exiting %d\n", rc);
+	TRACE_PRINT("Exiting %d\n", rc);
 out:
 	if (sock)
 		sock_release(sock);
@@ -515,9 +515,9 @@ void __exit cbn_datapath_clean(void)
 	cbn_proc_clean();
 	nf_unregister_hooks(cbn_nf_hooks,  ARRAY_SIZE(cbn_nf_hooks));
 	stop_sockets();
-	pr_info("sockets stopped\n");
+	TRACE_PRINT("sockets stopped\n");
 	cbn_kthread_pool_clean(&cbn_pool);
-	pr_info("proxies stopped\n");
+	TRACE_PRINT("proxies stopped\n");
 	kmem_cache_destroy(qp_slab);
 	kmem_cache_destroy(syn_slab);
 	kmem_cache_destroy(listner_slab);

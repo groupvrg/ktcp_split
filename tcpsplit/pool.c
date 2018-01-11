@@ -7,8 +7,8 @@
 #include "cbn_common.h"
 #include "pool.h"
 
-#define cbn_list_del(x) {pr_err("list_del(%d:%s): %p {%p, %p}", __LINE__, current->comm, x, (x)->next, (x)->prev); list_del((x));}
-#define cbn_list_add(x, h) {pr_err("list_add(%d:%s): %p {%p, %p} h %p {%p, %p}", 	\
+#define cbn_list_del(x) {TRACE_PRINT("list_del(%d:%s): %p {%p, %p}", __LINE__, current->comm, x, (x)->next, (x)->prev); list_del((x));}
+#define cbn_list_add(x, h) {TRACE_PRINT("list_add(%d:%s): %p {%p, %p} h %p {%p, %p}", 	\
 					__LINE__, current->comm,			\
 					x, (x)->next, (x)->prev,			\
 					h, (h)->next, (h)->prev);			\
@@ -27,16 +27,16 @@ static int pipe_loop_task(void *data)
 	struct kthread_pool *pool = elem->pool;
 
 	while (!kthread_should_stop()) {
-		pr_info("running %s\n", current->comm);
+		TRACE_PRINT("running %s\n", current->comm);
 		if (elem->pool_task)
 			elem->pool_task(elem->data);
 		else
-			pr_err("ERROR %s: no pool task\n", __FUNCTION__);
+			TRACE_PRINT("ERROR %s: no pool task\n", __FUNCTION__);
 
-		pr_info("sleeping %s\n", current->comm);
+		TRACE_PRINT("sleeping %s\n", current->comm);
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!kthread_should_stop()) {
-			pr_info("%s out to reuse\n", current->comm);
+			TRACE_PRINT("%s out to reuse\n", current->comm);
 			kthread_pool_reuse(pool, elem);
 			schedule();
 		}
@@ -60,7 +60,7 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 		struct task_struct *k
 			= kthread_create(threadfn, elem, "pool-thread-%d", cbn_pool->top_count);
 		if (unlikely(!k)) {
-			pr_err("failed to create kthread %d\n", cbn_pool->top_count);
+			TRACE_PRINT("failed to create kthread %d\n", cbn_pool->top_count);
 			kmem_cache_free(cbn_pool->pool_slab, elem);
 			return;
 		}
@@ -68,7 +68,7 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 		elem->task = k;
 		elem->pool = cbn_pool;
 		list_add(&elem->list, &cbn_pool->kthread_pool);
-		//pr_info("pool thread %d [%p] allocated %llx\n", cbn_pool->top_count, elem, rdtsc());
+		//TRACE_PRINT("pool thread %d [%p] allocated %llx\n", cbn_pool->top_count, elem, rdtsc());
 		--cbn_pool->refil_needed;
 		++cbn_pool->top_count;
 	}
@@ -102,7 +102,7 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 	elem = list_first_entry(&cbn_pool->kthread_pool, struct pool_elem, list);
 	list_del(&elem->list);
 	++cbn_pool->refil_needed;
-	//pr_err("allocated %p\n", elem);
+	//TRACE_PRINT("allocated %p\n", elem);
 	//wake_up_process(cbn_pool->refil);
 	return elem;
 }
@@ -111,7 +111,7 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 {
 	struct pool_elem *elem = kthread_pool_alloc(cbn_pool);
 	if (unlikely(!elem)) {
-		pr_err("Failed to alloc elem\n");
+		TRACE_PRINT("Failed to alloc elem\n");
 		return ERR_PTR(-ENOMEM);
 	}
 	elem->pool_task = func;
@@ -124,7 +124,7 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 
 int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool)
 {
-	pr_info("starting: %s\n", __FUNCTION__);
+	TRACE_PRINT("starting: %s\n", __FUNCTION__);
 	INIT_LIST_HEAD(&cbn_pool->kthread_pool);
 	INIT_LIST_HEAD(&cbn_pool->kthread_running);
 	cbn_pool->pool_slab = kmem_cache_create("pool-thread-cache",
@@ -140,7 +140,7 @@ int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool)
 void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool)
 {
 	struct list_head *itr, *tmp;
-	pr_info("stopping: %s\n", __FUNCTION__);
+	TRACE_PRINT("stopping: %s\n", __FUNCTION__);
 
 	kthread_stop(cbn_pool->refil);
 
@@ -158,6 +158,6 @@ void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool)
 		kmem_cache_free(cbn_pool->pool_slab, task);
 	}
 	kmem_cache_destroy(cbn_pool->pool_slab);
-	pr_info("stopping: elements freed");
+	TRACE_PRINT("stopping: elements freed");
 }
 
