@@ -20,13 +20,14 @@ MODULE_DESCRIPTION("CBN TCP Split Module");
 
 #define BACKLOG     64
 
-static struct kthread_pool cbn_pool = {.pool_size = DEF_CBN_POOL_SIZE};
+struct kthread_pool cbn_pool = {.pool_size = DEF_CBN_POOL_SIZE};
 
-static struct rb_root listner_root = RB_ROOT;
+struct rb_root listner_root = RB_ROOT;
 
-static struct kmem_cache *qp_slab;
+struct kmem_cache *qp_slab;
+struct kmem_cache *syn_slab;
+
 static struct kmem_cache *listner_slab;
-static struct kmem_cache *syn_slab;
 
 uint32_t ip_transparent = 0;
 static int start_new_connection_syn(void *arg);
@@ -36,12 +37,17 @@ static unsigned int put_qp(struct cbn_qp *qp)
 	int rc;
 	if (! (rc = atomic_dec_return(&qp->ref_cnt))) {
 		// TODO: protect with lock on MC
-		rb_erase(&qp->node, qp->root);
+		// reusable connections may not have a root
+		if (qp->root)
+			rb_erase(&qp->node, qp->root);
+		else
+			list_del(&qp->list);
 		kmem_cache_free(qp_slab, qp);
 	}
 	return rc;
 }
 
+/*
 static unsigned int cbn_trace_hook(void *priv,
 					struct sk_buff *skb,
 					const struct nf_hook_state *state)
@@ -49,7 +55,7 @@ static unsigned int cbn_trace_hook(void *priv,
 	trace_iph(skb, priv);
 	return NF_ACCEPT;
 }
-
+*/
 static unsigned int cbn_ingress_hook(void *priv,
 					struct sk_buff *skb,
 					const struct nf_hook_state *state)
@@ -63,8 +69,6 @@ static unsigned int cbn_ingress_hook(void *priv,
 
 		if (strcmp(priv, "RX"))
 			goto out;
-
-		TRACE_PRINT("schedule connection %d\n", skb->mark);
 
 		addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
 		if (unlikely(!addresses)) {
@@ -178,11 +182,10 @@ static inline void stop_sockets(void)
 }
 
 #define VEC_SZ 4
-static inline int half_duplex(struct sockets *sock, struct cbn_qp *qp)
+int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 {
-//	struct sockets *sock = arg;
 	struct kvec kvec[VEC_SZ];
-	int id = 0, i ;
+	int id = 0, i ,dir = sock->dir;
 	int rc = -ENOMEM;
 	uint64_t bytes = 0;
 
@@ -215,8 +218,7 @@ static inline int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 	goto out;
 err:
 	pr_err("%s [%s] stopping on error (%d) at %s with %lld bytes\n", __FUNCTION__,
-		(sock->dir) ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
-	TRACE_PRINT("%s stopping on error (%d)\n", __FUNCTION__, rc);
+		dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 out:
 	TRACE_PRINT("%s going out (%d)\n", __FUNCTION__, rc);
 	for (i = 0; i < VEC_SZ; i++)
@@ -264,14 +266,12 @@ static int start_new_connection_syn(void *arg)
 			goto connect_fail;
 	}
 
-	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	addresses->dest.sin_family = AF_INET;
 	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0))) {
 		pr_err("%s error (%d)\n", __FUNCTION__, rc);
 		goto connect_fail;
 	}
 
-	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	qp->tx = tx;
 connect_fail:
 	qp->rx = NULL;
@@ -356,9 +356,9 @@ static int start_new_connection(void *arg)
 	line = __LINE__;
 	if ((rc = kernel_getsockname(tx, (struct sockaddr *)&addr, &size)))
 		goto connect_fail;
+		*/
 	TRACE_PRINT("connected local port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
 
-*/
 	qp->addr_d = addr.sin_addr;
 	qp->port_s = cli_addr.sin_port;
 	qp->port_d = addr.sin_port;

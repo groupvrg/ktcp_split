@@ -1,6 +1,8 @@
 #ifndef __CBN_DATAPATH_H__
 #define __CBN_DATAPATH_H__
 
+#include "rb_data_tree.h"
+
 struct sockets {
 	struct socket *rx;
 	struct socket *tx;
@@ -25,5 +27,7 @@ static inline void void2uint(void *ptr, uint32_t *a, uint32_t *b)
 	*b = ((concat << UINT_SHIFT) >> UINT_SHIFT);
 	*a = (concat >> UINT_SHIFT);
 }
+
+int half_duplex(struct sockets *sock, struct cbn_qp *qp);
 
 #endif /*__CBN_DATAPATH_H__*/

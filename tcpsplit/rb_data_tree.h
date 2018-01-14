@@ -1,3 +1,6 @@
+#ifndef __CBN_RB_TREE_H__
+#define __CBN_RB_TREE_H__
+
 #include <linux/rbtree.h>
 #include <linux/types.h> //atomic_t
 #include "cbn_common.h"
@@ -22,7 +25,8 @@ struct cbn_qp {
 	};
 	atomic_t ref_cnt;
 
-	struct rb_root *root;;
+	struct rb_root *root;
+	struct list_head list;
 	volatile struct socket *tx;
 	volatile struct socket *rx;
 };
@@ -139,3 +143,6 @@ static inline struct cbn_listner *add_rb_listner(struct rb_root *root, struct cb
 
 	return NULL;
 }
+
+
+#endif /*__CBN_RB_TREE_H__*/
