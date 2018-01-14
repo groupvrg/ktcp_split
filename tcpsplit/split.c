@@ -76,7 +76,7 @@ static unsigned int cbn_ingress_hook(void *priv,
 		addresses->dest.sin_port	= tcphdr->dest;
 		addresses->src.sin_port		= tcphdr->source;
 		addresses->mark			= skb->mark;
-		pr_info("%s scheduling start_new_connection_syn", __FUNCTION__);
+		TRACE_PRINT("%s scheduling start_new_connection_syn", __FUNCTION__);
 		kthread_pool_run(&cbn_pool, start_new_connection_syn, addresses); //elem?
 		//1.alloc task + data
 		//2.rb_tree lookup
@@ -194,11 +194,12 @@ static inline int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 	do {
 		struct msghdr msg = { 0 };
 		if ((rc = kernel_recvmsg(sock->rx, &msg, &kvec, 1, PAGE_SIZE, 0)) <= 0) {
+			msleep(3000);
 			if (put_qp(qp))
 				kernel_sock_shutdown(sock->tx, SHUT_RDWR);
 			goto err;
 		}
-		bytes += bytes;
+		bytes += rc;
 		id ^= 1;
 		//use kern_sendpage if flags needed.
 		if ((rc = kernel_sendmsg(sock->tx, &msg, &kvec, 1, rc)) <= 0) {
@@ -480,7 +481,7 @@ static int split_server(void *mark_port)
 		qp->tid 	= mark;
 		qp->root 	= &server->connections_root;
 		atomic_set(&qp->ref_cnt, 1);
-		pr_info("%s scheduling start_new_connection", __FUNCTION__);
+		TRACE_PRINT("%s scheduling start_new_connection", __FUNCTION__);
 		kthread_pool_run(&cbn_pool, start_new_connection, qp);
 
 	} while (!kthread_should_stop());
