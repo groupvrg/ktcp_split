@@ -177,32 +177,34 @@ static inline void stop_sockets(void)
 	}
 }
 
+#define VEC_SZ 4
 static inline int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 {
 //	struct sockets *sock = arg;
-	struct kvec kvec;
-	int id = 0;
+	struct kvec kvec[VEC_SZ];
+	int id = 0, i ;
 	int rc = -ENOMEM;
 	uint64_t bytes = 0;
 
 	INIT_TRACE
-	if (! (kvec.iov_base = page_address(alloc_page(GFP_KERNEL))))
-		goto err;
 
-	kvec.iov_len = PAGE_SIZE;
+	for (i = 0; i < VEC_SZ; i++) {
+		kvec[i].iov_len = PAGE_SIZE;
+		if (! (kvec[i].iov_base = page_address(alloc_page(GFP_KERNEL))))
+			goto err;
+	}
 
 	do {
 		struct msghdr msg = { 0 };
-		if ((rc = kernel_recvmsg(sock->rx, &msg, &kvec, 1, PAGE_SIZE, 0)) <= 0) {
-			msleep(3000);
-			if (put_qp(qp))
+		if ((rc = kernel_recvmsg(sock->rx, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
+			if (put_qp(qp) && rc < 0)
 				kernel_sock_shutdown(sock->tx, SHUT_RDWR);
 			goto err;
 		}
 		bytes += rc;
 		id ^= 1;
 		//use kern_sendpage if flags needed.
-		if ((rc = kernel_sendmsg(sock->tx, &msg, &kvec, 1, rc)) <= 0) {
+		if ((rc = kernel_sendmsg(sock->tx, &msg, kvec, VEC_SZ, rc)) <= 0) {
 			if (put_qp(qp))
 				kernel_sock_shutdown(sock->rx, SHUT_RDWR);
 			goto err;
@@ -217,7 +219,8 @@ err:
 	TRACE_PRINT("%s stopping on error (%d)\n", __FUNCTION__, rc);
 out:
 	TRACE_PRINT("%s going out (%d)\n", __FUNCTION__, rc);
-	free_page((unsigned long)(kvec.iov_base));
+	for (i = 0; i < VEC_SZ; i++)
+		free_page((unsigned long)(kvec[i].iov_base));
 	DUMP_TRACE
 	return rc;
 }
