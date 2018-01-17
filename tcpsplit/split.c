@@ -181,7 +181,7 @@ static inline void stop_sockets(void)
 	}
 }
 
-#define VEC_SZ 4
+#define VEC_SZ 16
 int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 {
 	struct kvec kvec[VEC_SZ];
