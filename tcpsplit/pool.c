@@ -114,6 +114,8 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 		TRACE_PRINT("Failed to alloc elem\n");
 		return ERR_PTR(-ENOMEM);
 	}
+	TRACE_PRINT("Allocated %p with task %p\n", elem, elem->task);
+
 	elem->pool_task = func;
 	elem->data = data;
 	list_add(&elem->list, &cbn_pool->kthread_running);

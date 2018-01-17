@@ -200,7 +200,7 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 	do {
 		struct msghdr msg = { 0 };
 		if ((rc = kernel_recvmsg(sock->rx, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
-			if (put_qp(qp) && rc < 0)
+			if (put_qp(qp))
 				kernel_sock_shutdown(sock->tx, SHUT_RDWR);
 			goto err;
 		}
