@@ -139,6 +139,7 @@ static int prealloc_connection(void *arg)
 	qp->addr_d = addresses->dest.sin_addr;
 	qp->port_d = addresses->dest.sin_port;
 
+	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	line = __LINE__;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
 		goto out;
@@ -155,7 +156,6 @@ static int prealloc_connection(void *arg)
 	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0)))
 		goto connect_fail;
 
-	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	qp->tx = tx;
 	qp->rx = NULL;
 
