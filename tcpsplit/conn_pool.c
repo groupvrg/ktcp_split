@@ -126,6 +126,7 @@ static inline void fill_preconn_address(int ip, struct addresses *addresses)
 static int prealloc_connection(void *arg)
 {
 	int rc, optval = 1;
+	int line;
 	int ip = (int) arg;
 	struct addresses addresses_s = {0};
 	struct addresses *addresses = &addresses_s;
@@ -138,15 +139,19 @@ static int prealloc_connection(void *arg)
 	qp->addr_d = addresses->dest.sin_addr;
 	qp->port_d = addresses->dest.sin_port;
 
+	line = __LINE__;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
 		goto out;
 
+	line = __LINE__;
 	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
 		goto connect_fail;
 
+	line = __LINE__;
 	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_KEEPALIVE, (char *)&optval, sizeof(int))) < 0)
 		goto connect_fail;
 
+	line = __LINE__;
 	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0)))
 		goto connect_fail;
 
@@ -156,12 +161,13 @@ static int prealloc_connection(void *arg)
 
 	//TODO: protect with lock
 	list_add(&qp->list, &pre_conn_list_client);
+	line = __LINE__;
 	goto out;
 
 connect_fail:
 	sock_release(tx);
 out:
-	TRACE_PRINT("pre-connection out %s ", __FUNCTION__);
+	TRACE_PRINT("pre-connection out %s <%d @ %d>", __FUNCTION__, rc, line);
 	DUMP_TRACE
 	return rc;
 }
