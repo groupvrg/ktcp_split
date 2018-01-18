@@ -343,7 +343,7 @@ static inline int build_ip(int *array)
 		if (array[i] > 255)
 			return 0;
 		else
-			ip = (ip << 4)|array[i];
+			ip = (ip << 8)|array[i];
 	return ip;
 }
 
