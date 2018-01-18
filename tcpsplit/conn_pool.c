@@ -111,7 +111,7 @@ connect_fail:
 	return rc;
 }
 
-#define PRECONN_SERVER_PORT	5111
+#define PRECONN_SERVER_PORT	51000
 
 static inline void fill_preconn_address(int ip, struct addresses *addresses)
 {
@@ -280,6 +280,7 @@ static int prec_conn_listner_server(void *arg)
 
 	INIT_TRACE
 
+	TRACE_PRINT("Pre conn server running");
 	port = (u32)arg;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
 		goto error;
@@ -298,6 +299,7 @@ static int prec_conn_listner_server(void *arg)
 	if ((rc = kernel_listen(sock, BACKLOG)))
 		goto error;
 
+	TRACE_PRINT("Listening to new pre connections");
 	preconn_resgister_server(server);
 	do {
 		struct socket *nsock;
@@ -344,13 +346,13 @@ void preconn_write_cb(int *array)
 	int ip;
 
 	ip = build_ip(array);
-	if (next_hop_ip != ip) {
+	if (next_hop_ip && next_hop_ip != ip) {
 		pr_err("Already have an existing next_hop_ip!!\n");
 	}
 
 
 	if (ip) {
-		pr_info("connecting to %d.%d.%d%d (%x)\n", array[0], array[1], array[2], array[3], ip);
+		pr_info("connecting to %d.%d.%d.%d (%x)\n", array[0], array[1], array[2], array[3], ip);
 		next_hop_ip = ip;
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)ip);
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)ip);
