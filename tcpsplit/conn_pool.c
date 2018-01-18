@@ -21,41 +21,70 @@ extern struct rb_root listner_root;
 
 static struct list_head pre_conn_list_server;
 static struct list_head pre_conn_list_client;
+static int next_hop_ip;
 
-static int start_new_pre_connection_syn(void *arg)
+static int prealloc_connection(void *arg);
+
+static inline struct cbn_qp *alloc_prexeisting_conn(void)
+{
+	struct cbn_qp *elem;
+	while (unlikely(list_empty(&pre_conn_list_client))) {
+		pr_err("pool is empty refill is to slow\n");
+		return NULL;
+	}
+
+	elem = list_first_entry(&pre_conn_list_client, struct cbn_qp, list);
+	list_del(&elem->list);
+	kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
+	return elem;
+}
+
+static inline int forward_conn_info(struct socket *tx, struct addresses *addressess)
+{
+	int rc;
+	struct msghdr msg = { 0 };
+	struct kvec kvec[1];
+
+	kvec[0].iov_base = addressess;
+	kvec[0].iov_len = sizeof(struct addresses);
+
+	if ((rc = kernel_sendmsg(tx, &msg, kvec, 1, sizeof(struct addresses))) <= 0) {
+		pr_err("Failed to forward info to next hop!\n");
+	}
+	return rc;
+}
+
+int start_new_pre_connection_syn(void *arg)
 {
 	int rc;
 	struct addresses *addresses = arg;
 	struct cbn_listner *listner;
 	struct cbn_qp *qp, *tx_qp;
 	struct sockets sockets;
-	struct socket *tx;
 
 	INIT_TRACE
 
-	qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
+	qp = alloc_prexeisting_conn();
+
 	qp->addr_d = addresses->dest.sin_addr;
 	qp->port_s = addresses->src.sin_port;
 	qp->port_d = addresses->dest.sin_port;
 	qp->addr_s = addresses->src.sin_addr;
 
+	if ((rc	= forward_conn_info(qp->tx, addresses)) <= 0)
+		goto connect_fail;
 	/**
 	 * TODO:
-	 *  0. alloc new existing connection
 	 *  0.1 add proc to seup connection addr and create prexisting connections.
-	 *  1. send connection info to other side
 	 *  2. add teardown for client and server
 	 * */
-
-	qp->tx = tx;
-	qp->rx = NULL;
 
 	listner = search_rb_listner(&listner_root, addresses->mark);
 	kmem_cache_free(syn_slab, addresses);
 	//TODO: add locks to this shit
 	TRACE_LINE();
 	if ((tx_qp = add_rb_data(&listner->connections_root, qp))) { //this means the other conenction is already up
-		tx_qp->tx = tx;
+		tx_qp->tx = qp->tx;
 		kmem_cache_free(qp_slab, qp);
 		qp = tx_qp;
 		TRACE_PRINT("QP exists");
@@ -76,31 +105,41 @@ static int start_new_pre_connection_syn(void *arg)
 	half_duplex(&sockets, qp);
 
 connect_fail:
-	sock_release(tx);
+	sock_release(qp->tx);
 	TRACE_PRINT("OUT: connection to port %s ", __FUNCTION__);
 	DUMP_TRACE
 	return rc;
 }
 
+#define PRECONN_SERVER_PORT	5111
+
+static inline void fill_preconn_address(int ip, struct addresses *addresses)
+{
+	struct in_addr addr;
+
+	addr.s_addr = htonl(ip);
+	addresses->dest.sin_family = AF_INET;
+	addresses->dest.sin_addr = addr;
+	addresses->dest.sin_port = htons(PRECONN_SERVER_PORT);
+}
+
 static int prealloc_connection(void *arg)
 {
 	int rc, optval = 1;
-	struct addresses *addresses = arg;
+	int ip = (int) arg;
+	struct addresses addresses_s = {0};
+	struct addresses *addresses = &addresses_s;
 	struct cbn_qp *qp;
 	struct socket *tx;
 
 	INIT_TRACE
-
+	fill_preconn_address(ip, addresses);
 	qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
 	qp->addr_d = addresses->dest.sin_addr;
-	//qp->port_s = addresses->src.sin_port;
 	qp->port_d = addresses->dest.sin_port;
-	//qp->addr_s = addresses->src.sin_addr;
 
-
-	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
-		goto create_fail;
+		goto out;
 
 	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
 		goto connect_fail;
@@ -108,8 +147,6 @@ static int prealloc_connection(void *arg)
 	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_KEEPALIVE, (char *)&optval, sizeof(int))) < 0)
 		goto connect_fail;
 
-	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
-	addresses->dest.sin_family = AF_INET;
 	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0)))
 		goto connect_fail;
 
@@ -119,11 +156,12 @@ static int prealloc_connection(void *arg)
 
 	//TODO: protect with lock
 	list_add(&qp->list, &pre_conn_list_client);
+	goto out;
 
 connect_fail:
 	sock_release(tx);
-create_fail:
-	TRACE_PRINT("OUT: connection to port %s ", __FUNCTION__);
+out:
+	TRACE_PRINT("pre-connection out %s ", __FUNCTION__);
 	DUMP_TRACE
 	return rc;
 }
@@ -165,14 +203,14 @@ static int start_new_pending_connection(void *arg)
 
 	INIT_TRACE
 
+	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
+		goto create_fail;
+
 	addresses = &addresses_s;
 	if ((rc = preconn_wait_for_next_hop(qp, addresses)) <= 0) {
 		pr_err("waiting for next hop failed %d\n", rc);
 		goto create_fail;
 	}
-
-	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
-		goto create_fail;
 
 	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
 		goto connect_fail;
@@ -290,21 +328,66 @@ static int prec_conn_listner_server(void *arg)
 	return rc;
 }
 
-#define PRECONN_SERVER_PORT	5111
+static inline int build_ip(int *array)
+{
+	int i, ip = 0;
+	for (i = 0; i < 4; i++)
+		if (array[i] > 255)
+			return 0;
+		else
+			ip = (ip << 4)|array[i];
+	return ip;
+}
+
+void preconn_write_cb(int *array)
+{
+	int ip;
+
+	ip = build_ip(array);
+	if (next_hop_ip != ip) {
+		pr_err("Already have an existing next_hop_ip!!\n");
+	}
+
+
+	if (ip) {
+		pr_info("connecting to %d.%d.%d%d (%x)\n", array[0], array[1], array[2], array[3], ip);
+		next_hop_ip = ip;
+		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)ip);
+		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)ip);
+		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)ip);
+		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)ip);
+	} else {
+		pr_err("ip is invalid %d.%d.%d.%d\n",array[0], array[1], array[2], array[3]);
+	}
+}
 
 int __init cbn_pre_connect_init(void)
 {
-	/*****
-	 * TODO:
-	 * 0. start server
-	 * 1. get pool ctx + proc/debugfs dir
-	 * 2. create kmemcache for local
-	 * 3. add proc iface
-	 */
 	int port = PRECONN_SERVER_PORT;
 	INIT_LIST_HEAD(&pre_conn_list_client);
 	INIT_LIST_HEAD(&pre_conn_list_server);
 	kthread_pool_run(&cbn_pool, prec_conn_listner_server, &port);
+
+	return 0;
+}
+
+int __exit cbn_pre_connect_end(void)
+{
+	struct list_head *itr, *tmp;
+
+	list_for_each_safe(itr, tmp, &pre_conn_list_client) {
+		struct cbn_qp *elem = container_of(itr, struct cbn_qp, list);
+		list_del(itr);
+		sock_release(elem->tx);
+		kmem_cache_free(qp_slab, elem);
+	}
+
+	list_for_each_safe(itr, tmp, &pre_conn_list_server) {
+		struct cbn_qp *elem = container_of(itr, struct cbn_qp, list);
+		list_del(itr);
+		sock_release(elem->rx);
+		kmem_cache_free(qp_slab, elem);
+	}
 
 	return 0;
 }

@@ -30,4 +30,7 @@ static inline void void2uint(void *ptr, uint32_t *a, uint32_t *b)
 
 int half_duplex(struct sockets *sock, struct cbn_qp *qp);
 
+int __init cbn_pre_connect_init(void);
+int __exit cbn_pre_connect_end(void);
+
 #endif /*__CBN_DATAPATH_H__*/

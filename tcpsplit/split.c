@@ -31,6 +31,7 @@ static struct kmem_cache *listner_slab;
 
 uint32_t ip_transparent = 0;
 static int start_new_connection_syn(void *arg);
+extern int start_new_pre_connection_syn(void *arg);
 
 static unsigned int put_qp(struct cbn_qp *qp)
 {
@@ -81,7 +82,7 @@ static unsigned int cbn_ingress_hook(void *priv,
 		addresses->src.sin_port		= tcphdr->source;
 		addresses->mark			= skb->mark;
 		TRACE_PRINT("%s scheduling start_new_connection_syn", __FUNCTION__);
-		kthread_pool_run(&cbn_pool, start_new_connection_syn, addresses); //elem?
+		kthread_pool_run(&cbn_pool, start_new_pre_connection_syn, addresses); //elem?
 		//1.alloc task + data
 		//2.rb_tree lookup
 		// sched poll on qp init - play with niceness?
@@ -534,6 +535,7 @@ int __init cbn_datapath_init(void)
 
 	cbn_kthread_pool_init(&cbn_pool);
 	nf_register_hooks(cbn_nf_hooks, ARRAY_SIZE(cbn_nf_hooks));
+	cbn_pre_connect_init();
 	cbn_proc_init();
 	return 0;
 }
@@ -541,6 +543,7 @@ int __init cbn_datapath_init(void)
 void __exit cbn_datapath_clean(void)
 {
 	cbn_proc_clean();
+	cbn_pre_connect_end();
 	nf_unregister_hooks(cbn_nf_hooks,  ARRAY_SIZE(cbn_nf_hooks));
 	stop_sockets();
 	TRACE_PRINT("sockets stopped\n");

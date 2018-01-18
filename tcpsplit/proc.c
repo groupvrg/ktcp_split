@@ -9,6 +9,7 @@
 #include "proc.h"
 
 extern void proc_write_cb(int tid, int port);
+extern void preconn_write_cb(int *);
 extern char* proc_read_string(int *);
 extern uint32_t ip_transparent;
 
@@ -65,6 +66,36 @@ static ssize_t cbn_proc_command(struct file *file, const char __user *buf,
 	return size;
 }
 
+#define IP_LEN 4
+static ssize_t preconn_proc_command(struct file *file, const char __user *buf,
+				    size_t size, loff_t *_pos)
+{
+	char *kbuf;
+	int   values[IP_LEN + 1] = {0};
+
+	/* start by dragging the command into memory */
+	if (size <= 1 || size >= PAGE_SIZE)
+		return -EINVAL;
+
+	kbuf = memdup_user_nul(buf, size);
+	if (IS_ERR(kbuf))
+		return PTR_ERR(kbuf);
+
+	get_options(kbuf, ARRAY_SIZE(values), values);
+
+	/* start new server */
+	kfree(kbuf);
+	if (values[0] == IP_LEN) {
+		pr_info("starting new server %d %d\n", values[1], values[2]);
+		preconn_write_cb(&values[1]);
+	} else {
+		pr_err("Failed to start new server %d\n" ,values[2]);
+		size = -EINVAL;
+	}
+	ERR_LINE();
+	return size;
+}
+
 static int cbn_transparent_show(struct seq_file *m, void *v)
 {
 	pr_info("%d\n", ip_transparent);
@@ -105,6 +136,15 @@ static ssize_t cbn_transparent_command(struct file *file, const char __user *buf
 	ERR_LINE();
 	return size;
 }
+static const struct file_operations preconn_proc_fops = {
+	.owner		= THIS_MODULE,
+	.open		= cbn_proc_open,
+	.read 		= seq_read,
+	.write		= preconn_proc_command,
+	.llseek 	= seq_lseek,
+	.release 	= single_release,
+};
+
 
 static const struct file_operations cbn_proc_fops = {
 	.owner		= THIS_MODULE,
@@ -129,6 +169,7 @@ int __init cbn_proc_init(void)
 {
 	cbn_dir = proc_mkdir_mode("cbn", 00555, NULL);
 	proc_create("cbn_proc", 00666, cbn_dir, &cbn_proc_fops);
+	proc_create("conn_pool", 00666, cbn_dir, &preconn_proc_fops);
 	proc_create("cbn_transparent", 00666, cbn_dir, &cbn_transparent_fops);
 	return 0;
 }
