@@ -86,10 +86,9 @@ static ssize_t preconn_proc_command(struct file *file, const char __user *buf,
 	/* start new server */
 	kfree(kbuf);
 	if (values[0] == IP_LEN) {
-		pr_info("starting new server %d %d\n", values[1], values[2]);
 		preconn_write_cb(&values[1]);
 	} else {
-		pr_err("Failed to start new server %d\n" ,values[2]);
+		pr_err("Failed to start new server %d\n" ,values[0]);
 		size = -EINVAL;
 	}
 	ERR_LINE();

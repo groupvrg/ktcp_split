@@ -71,13 +71,11 @@ int start_new_pre_connection_syn(void *arg)
 	qp->port_d = addresses->dest.sin_port;
 	qp->addr_s = addresses->src.sin_addr;
 
+	TRACE_PRINT("connection to port %d IP %pI4n from %d IP %pI4n",
+			ntohs(qp->port_d), &qp->addr_d, ntohs(qp->port_s), &qp->addr_s);
+
 	if ((rc	= forward_conn_info(qp->tx, addresses)) <= 0)
 		goto connect_fail;
-	/**
-	 * TODO:
-	 *  0.1 add proc to seup connection addr and create prexisting connections.
-	 *  2. add teardown for client and server
-	 * */
 
 	listner = search_rb_listner(&listner_root, addresses->mark);
 	kmem_cache_free(syn_slab, addresses);
@@ -218,6 +216,12 @@ static int start_new_pending_connection(void *arg)
 		goto create_fail;
 	}
 
+	TRACE_PRINT("connection to port %d IP %pI4n from %d IP %pI4n",
+			ntohs(addresses->dest.sin_port),
+			&addresses->dest.sin_addr,
+			ntohs(addresses->src.sin_port),
+			&addresses->src.sin_addr);
+
 	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
 		goto connect_fail;
 
@@ -243,20 +247,18 @@ static int start_new_pending_connection(void *arg)
 	sockets.rx = (struct socket *)qp->tx;
 	sockets.dir = 0;
 
-	TRACE_PRINT("starting half duplex");
-	half_duplex(&sockets, qp);
-
 	sockets_tx.rx = (struct socket *)qp->rx;
 	sockets_tx.tx = (struct socket *)qp->tx;
 	sockets_tx.dir = 1;
-
-	TRACE_PRINT("starting half duplex");
-	half_duplex(&sockets, qp);
 
 	ptr_pair[0] = &sockets_tx;
 	ptr_pair[1] = qp;
 	atomic_inc(&qp->ref_cnt);
 	kthread_pool_run(&cbn_pool, start_half_duplex, ptr_pair);
+
+	TRACE_PRINT("starting half duplex");
+	half_duplex(&sockets, qp);
+
 connect_fail:
 	sock_release(tx);
 	sock_release((struct socket *)qp->rx);
