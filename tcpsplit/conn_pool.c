@@ -280,8 +280,8 @@ static int prec_conn_listner_server(void *arg)
 
 	INIT_TRACE
 
-	TRACE_PRINT("Pre conn server running");
 	port = (u32)arg;
+	TRACE_PRINT("Pre conn server running %d", port);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
 		goto error;
 
@@ -368,7 +368,7 @@ int __init cbn_pre_connect_init(void)
 	int port = PRECONN_SERVER_PORT;
 	INIT_LIST_HEAD(&pre_conn_list_client);
 	INIT_LIST_HEAD(&pre_conn_list_server);
-	kthread_pool_run(&cbn_pool, prec_conn_listner_server, &port);
+	kthread_pool_run(&cbn_pool, prec_conn_listner_server, (void *)port);
 
 	return 0;
 }
