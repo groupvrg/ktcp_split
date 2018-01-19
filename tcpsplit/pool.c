@@ -14,6 +14,8 @@
 					h, (h)->next, (h)->prev);			\
 					list_add((x), (h));}
 
+#define POOL_PRINT(...)
+
 static void kthread_pool_reuse(struct kthread_pool *cbn_pool, struct pool_elem *elem)
 {
 	list_del(&elem->list);
@@ -27,16 +29,16 @@ static int pipe_loop_task(void *data)
 	struct kthread_pool *pool = elem->pool;
 
 	while (!kthread_should_stop()) {
-		TRACE_PRINT("running %s", current->comm);
+		POOL_PRINT("running %s", current->comm);
 		if (elem->pool_task)
 			elem->pool_task(elem->data);
 		else
-			TRACE_PRINT("ERROR %s: no pool task", __FUNCTION__);
+			POOL_PRINT("ERROR %s: no pool task", __FUNCTION__);
 
-		TRACE_PRINT("sleeping %s", current->comm);
+		POOL_PRINT("sleeping %s", current->comm);
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!kthread_should_stop()) {
-			TRACE_PRINT("%s out to reuse", current->comm);
+			POOL_PRINT("%s out to reuse", current->comm);
 			kthread_pool_reuse(pool, elem);
 			schedule();
 		}

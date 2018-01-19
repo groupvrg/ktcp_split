@@ -57,6 +57,7 @@ static unsigned int cbn_trace_hook(void *priv,
 	return NF_ACCEPT;
 }
 */
+
 static unsigned int cbn_ingress_hook(void *priv,
 					struct sk_buff *skb,
 					const struct nf_hook_state *state)
@@ -76,6 +77,7 @@ static unsigned int cbn_ingress_hook(void *priv,
 			pr_err("Faield to alloc mem %s\n", __FUNCTION__);
 			goto out;
 		}
+
 		addresses->dest.sin_addr.s_addr	= iphdr->daddr;
 		addresses->src.sin_addr.s_addr	= iphdr->saddr;
 		addresses->dest.sin_port	= tcphdr->dest;
