@@ -385,6 +385,8 @@ int __exit cbn_pre_connect_end(void)
 {
 	struct list_head *itr, *tmp;
 
+	kernel_sock_shutdown(pre_conn_listner->sock, SHUT_RDWR);
+
 	list_for_each_safe(itr, tmp, &pre_conn_list_client) {
 		struct cbn_qp *elem = container_of(itr, struct cbn_qp, list);
 		list_del(itr);

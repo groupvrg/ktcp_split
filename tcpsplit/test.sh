@@ -13,3 +13,4 @@ sudo insmod cbn_split.ko
 sudo sh -c 'echo 0 > /proc/sys/kernel/hung_task_timeout_secs'
 #sudo -g sox netperf -H 10.154.0.6
 echo 10,12345 > /proc/cbn/cbn_proc
+#echo 127,0,0,1 > /proc/cbn/conn_pool

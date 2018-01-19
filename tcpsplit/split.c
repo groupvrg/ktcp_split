@@ -73,7 +73,7 @@ static unsigned int cbn_ingress_hook(void *priv,
 
 		addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
 		if (unlikely(!addresses)) {
-			TRACE_PRINT("Faield to alloc mem %s\n", __FUNCTION__);
+			pr_err("Faield to alloc mem %s\n", __FUNCTION__);
 			goto out;
 		}
 		addresses->dest.sin_addr.s_addr	= iphdr->daddr;
@@ -159,12 +159,10 @@ static inline void stop_tennat_proxies(struct rb_root *root)
 
 	rbtree_postorder_for_each_entry_safe(pos, tmp, root, node) {
 		if (pos->tx) {
-			TRACE_PRINT("releasing %p\n", pos->tx);
 			sock = (struct socket *)pos->tx;
 			kernel_sock_shutdown(sock, SHUT_RDWR);
 		}
 		if (pos->rx) {
-			TRACE_PRINT("releasing %p\n", pos->rx);
 			sock = (struct socket *)pos->rx;
 			kernel_sock_shutdown(sock, SHUT_RDWR);
 		}
@@ -221,7 +219,7 @@ err:
 	pr_err("%s [%s] stopping on error (%d) at %s with %lld bytes\n", __FUNCTION__,
 		dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 out:
-	TRACE_PRINT("%s going out (%d)\n", __FUNCTION__, rc);
+	TRACE_PRINT("%s going out (%d)", __FUNCTION__, rc);
 	for (i = 0; i < VEC_SZ; i++)
 		free_page((unsigned long)(kvec[i].iov_base));
 	DUMP_TRACE
@@ -298,8 +296,6 @@ connect_fail:
 			schedule();
 		}
 	}
-	TRACE_LINE();
-	TRACE_PRINT("QP connected...");
 	DUMP_TRACE
 	sockets.tx = (struct socket *)qp->rx;
 	sockets.rx = (struct socket *)qp->tx;
@@ -367,7 +363,6 @@ static int start_new_connection(void *arg)
 	/*rp->root/qp->mark no longer valid, qp is a union*/
 	qp->tx = NULL;
 
-	TRACE_LINE();
 	if ((tx_qp = add_rb_data(root, qp))) { //this means the other conenction is already up
 		TRACE_PRINT("QP exists");
 		tx_qp->rx = rx;
@@ -421,21 +416,17 @@ static int split_server(void *mark_port)
 	int rc = 0;
 	struct socket *sock = NULL;
 	struct sockaddr_in srv_addr;
-	struct cbn_listner *server;
+	struct cbn_listner *server = NULL;
 	u32 mark, port;
 
 	INIT_TRACE
 
-	TRACE_LINE();
-	TRACE_PRINT("starting %s\n", __FUNCTION__);
 	void2uint(mark_port, &mark, &port);
-	TRACE_PRINT("mark=%d, port=%d", mark, port);
 	if (search_rb_listner(&listner_root, mark)) {
 		rc = -EEXIST;
-		TRACE_PRINT("already found");
+		pr_err("server exists: %d @ %d", mark, port);
 		goto error;
 	}
-	TRACE_LINE();
 
 	server = register_server_sock(mark, sock);
 
@@ -443,12 +434,10 @@ static int split_server(void *mark_port)
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
 		goto error;
 
-	TRACE_LINE();
 	server->sock = sock;
 	server->port = port;
 	server->status = 2;
 
-	TRACE_LINE();
 	if ((rc = kernel_setsockopt(sock, SOL_SOCKET, SO_MARK, (char *)&mark, sizeof(u32))) < 0)
 		goto error;
 
@@ -457,19 +446,15 @@ static int split_server(void *mark_port)
 	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
 	srv_addr.sin_port 		= htons(port);
 
-	TRACE_LINE();
 	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
 		goto error;
 
 	server->status = 4;
-	TRACE_LINE();
 	TRACE_PRINT("%s) tenant %d: new listner on port %d", current->comm, mark, port);
 	if ((rc = kernel_listen(sock, BACKLOG)))
 		goto error;
 
-	TRACE_LINE();
 	server->status = 5;
-	//server = register_server_sock(mark, sock);
 
 	do {
 		struct socket *nsock;
@@ -479,19 +464,18 @@ static int split_server(void *mark_port)
 		if (unlikely(rc))
 			goto out;
 
-		TRACE_PRINT("new connection [%d]...", mark);
 		qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
 		qp->rx 		= nsock;
 		qp->tid 	= mark;
 		qp->root 	= &server->connections_root;
 		atomic_set(&qp->ref_cnt, 1);
-		TRACE_PRINT("%s scheduling start_new_connection", __FUNCTION__);
+		TRACE_PRINT("%s scheduling start_new_connection [%d]", __FUNCTION__, mark);
 		kthread_pool_run(&cbn_pool, start_new_connection, qp);
 
 	} while (!kthread_should_stop());
 	server->status = 6;
 error:
-	TRACE_PRINT("Exiting %d\n", rc);
+	TRACE_PRINT("Exiting %d <%d>\n", rc, (server) ? server->status : -1);
 out:
 	if (sock)
 		sock_release(sock);
@@ -542,13 +526,15 @@ int __init cbn_datapath_init(void)
 
 void __exit cbn_datapath_clean(void)
 {
+	TRACE_PRINT("Removing proc");
 	cbn_proc_clean();
+	TRACE_PRINT("Removing pre-connections");
 	cbn_pre_connect_end();
 	nf_unregister_hooks(cbn_nf_hooks,  ARRAY_SIZE(cbn_nf_hooks));
 	stop_sockets();
-	TRACE_PRINT("sockets stopped\n");
+	TRACE_PRINT("sockets stopped");
 	cbn_kthread_pool_clean(&cbn_pool);
-	TRACE_PRINT("proxies stopped\n");
+	TRACE_PRINT("proxies stopped");
 	kmem_cache_destroy(qp_slab);
 	kmem_cache_destroy(syn_slab);
 	kmem_cache_destroy(listner_slab);

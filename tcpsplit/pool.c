@@ -27,16 +27,16 @@ static int pipe_loop_task(void *data)
 	struct kthread_pool *pool = elem->pool;
 
 	while (!kthread_should_stop()) {
-		TRACE_PRINT("running %s\n", current->comm);
+		TRACE_PRINT("running %s", current->comm);
 		if (elem->pool_task)
 			elem->pool_task(elem->data);
 		else
-			TRACE_PRINT("ERROR %s: no pool task\n", __FUNCTION__);
+			TRACE_PRINT("ERROR %s: no pool task", __FUNCTION__);
 
-		TRACE_PRINT("sleeping %s\n", current->comm);
+		TRACE_PRINT("sleeping %s", current->comm);
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!kthread_should_stop()) {
-			TRACE_PRINT("%s out to reuse\n", current->comm);
+			TRACE_PRINT("%s out to reuse", current->comm);
 			kthread_pool_reuse(pool, elem);
 			schedule();
 		}
@@ -45,7 +45,7 @@ static int pipe_loop_task(void *data)
 	//	consider adding some state? user might try freeing this struct, make sure its not running
 	//	also consider frreing yourself if you are here...
 	}
-	pr_warn("%s out no reuse\n", current->comm);
+	pr_warn("%s out no reuse", current->comm);
 	return 0;
 }
 
@@ -60,7 +60,7 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 		struct task_struct *k
 			= kthread_create(threadfn, elem, "pool-thread-%d", cbn_pool->top_count);
 		if (unlikely(!k)) {
-			TRACE_PRINT("failed to create kthread %d\n", cbn_pool->top_count);
+			pr_err("ERROR: failed to create kthread %d\n", cbn_pool->top_count);
 			kmem_cache_free(cbn_pool->pool_slab, elem);
 			return;
 		}
@@ -111,22 +111,21 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 {
 	struct pool_elem *elem = kthread_pool_alloc(cbn_pool);
 	if (unlikely(!elem)) {
-		TRACE_PRINT("Failed to alloc elem\n");
+		pr_err("Failed to alloc elem\n");
 		return ERR_PTR(-ENOMEM);
 	}
-	TRACE_PRINT("Allocated %p with task %p\n", elem, elem->task);
 
 	elem->pool_task = func;
 	elem->data = data;
 	list_add(&elem->list, &cbn_pool->kthread_running);
-	TRACE_PRINT("staring %s\n", elem->task->comm);
+	//TRACE_PRINT("staring %s\n", elem->task->comm);
 	wake_up_process(elem->task);
 	return elem;
 }
 
 int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool)
 {
-	TRACE_PRINT("starting: %s\n", __FUNCTION__);
+	TRACE_PRINT("starting:\n", __FUNCTION__);
 	INIT_LIST_HEAD(&cbn_pool->kthread_pool);
 	INIT_LIST_HEAD(&cbn_pool->kthread_running);
 	cbn_pool->pool_slab = kmem_cache_create("pool-thread-cache",
@@ -142,7 +141,7 @@ int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool)
 void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool)
 {
 	struct list_head *itr, *tmp;
-	TRACE_PRINT("stopping: %s\n", __FUNCTION__);
+	TRACE_PRINT("stopping: %s", __FUNCTION__);
 
 	kthread_stop(cbn_pool->refil);
 
