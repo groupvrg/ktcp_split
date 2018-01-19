@@ -125,7 +125,7 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 
 int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool)
 {
-	TRACE_PRINT("starting:\n", __FUNCTION__);
+	TRACE_PRINT("starting: %s", __FUNCTION__);
 	INIT_LIST_HEAD(&cbn_pool->kthread_pool);
 	INIT_LIST_HEAD(&cbn_pool->kthread_running);
 	cbn_pool->pool_slab = kmem_cache_create("pool-thread-cache",

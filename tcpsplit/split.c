@@ -450,7 +450,7 @@ static int split_server(void *mark_port)
 		goto error;
 
 	server->status = 4;
-	TRACE_PRINT("%s) tenant %d: new listner on port %d", current->comm, mark, port);
+	TRACE_PRINT("tenant %d: new listner on port %d", mark, port);
 	if ((rc = kernel_listen(sock, BACKLOG)))
 		goto error;
 

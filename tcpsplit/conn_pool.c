@@ -21,7 +21,7 @@ extern struct rb_root listner_root;
 
 static struct list_head pre_conn_list_server;
 static struct list_head pre_conn_list_client;
-static int next_hop_ip;
+static long next_hop_ip;
 
 static int prealloc_connection(void *arg);
 
@@ -74,7 +74,7 @@ int start_new_pre_connection_syn(void *arg)
 	TRACE_PRINT("connection to port %d IP %pI4n from %d IP %pI4n",
 			ntohs(qp->port_d), &qp->addr_d, ntohs(qp->port_s), &qp->addr_s);
 
-	if ((rc	= forward_conn_info(qp->tx, addresses)) <= 0)
+	if ((rc	= forward_conn_info((struct socket *)qp->tx, addresses)) <= 0)
 		goto connect_fail;
 
 	listner = search_rb_listner(&listner_root, addresses->mark);
@@ -103,7 +103,7 @@ int start_new_pre_connection_syn(void *arg)
 	half_duplex(&sockets, qp);
 
 connect_fail:
-	sock_release(qp->tx);
+	sock_release((struct socket *)qp->tx);
 	TRACE_PRINT("OUT: connection to port %s ", __FUNCTION__);
 	DUMP_TRACE
 	return rc;
@@ -125,7 +125,7 @@ static int prealloc_connection(void *arg)
 {
 	int rc, optval = 1;
 	int line;
-	int ip = (int) arg;
+	long ip = (long) arg;
 	struct addresses addresses_s = {0};
 	struct addresses *addresses = &addresses_s;
 	struct cbn_qp *qp;
@@ -288,7 +288,7 @@ static int prec_conn_listner_server(void *arg)
 
 	INIT_TRACE
 
-	port = (u32)arg;
+	port = (long)arg;
 	TRACE_PRINT("Pre conn server running %d", port);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
 		goto error;
@@ -351,7 +351,7 @@ static inline int build_ip(int *array)
 
 void preconn_write_cb(int *array)
 {
-	int ip;
+	long ip;
 
 	ip = build_ip(array);
 	if (next_hop_ip && next_hop_ip != ip) {
@@ -360,7 +360,7 @@ void preconn_write_cb(int *array)
 
 
 	if (ip) {
-		pr_info("connecting to %d.%d.%d.%d (%x)\n", array[0], array[1], array[2], array[3], ip);
+		pr_info("connecting to %d.%d.%d.%d (%lx)\n", array[0], array[1], array[2], array[3], ip);
 		next_hop_ip = ip;
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)ip);
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)ip);
@@ -373,7 +373,7 @@ void preconn_write_cb(int *array)
 
 int __init cbn_pre_connect_init(void)
 {
-	int port = PRECONN_SERVER_PORT;
+	long port = PRECONN_SERVER_PORT;
 	INIT_LIST_HEAD(&pre_conn_list_client);
 	INIT_LIST_HEAD(&pre_conn_list_server);
 	kthread_pool_run(&cbn_pool, prec_conn_listner_server, (void *)port);
@@ -390,14 +390,14 @@ int __exit cbn_pre_connect_end(void)
 	list_for_each_safe(itr, tmp, &pre_conn_list_client) {
 		struct cbn_qp *elem = container_of(itr, struct cbn_qp, list);
 		list_del(itr);
-		sock_release(elem->tx);
+		sock_release((struct socket *)elem->tx);
 		kmem_cache_free(qp_slab, elem);
 	}
 
 	list_for_each_safe(itr, tmp, &pre_conn_list_server) {
 		struct cbn_qp *elem = container_of(itr, struct cbn_qp, list);
 		list_del(itr);
-		sock_release(elem->rx);
+		sock_release((struct socket *)elem->rx);
 		kmem_cache_free(qp_slab, elem);
 	}
 
