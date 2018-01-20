@@ -31,6 +31,7 @@ static struct kmem_cache *listner_slab;
 
 uint32_t ip_transparent = 0;
 static int start_new_connection_syn(void *arg);
+extern long next_hop_ip;
 extern int start_new_pre_connection_syn(void *arg);
 
 static unsigned int put_qp(struct cbn_qp *qp)
@@ -83,8 +84,11 @@ static unsigned int cbn_ingress_hook(void *priv,
 		addresses->dest.sin_port	= tcphdr->dest;
 		addresses->src.sin_port		= tcphdr->source;
 		addresses->mark			= skb->mark;
-		TRACE_PRINT("%s scheduling start_new_connection_syn", __FUNCTION__);
-		kthread_pool_run(&cbn_pool, start_new_pre_connection_syn, addresses); //elem?
+		TRACE_PRINT("%s scheduling start_new_connection_syn [%lx]", __FUNCTION__, next_hop_ip);
+		if (next_hop_ip)
+			kthread_pool_run(&cbn_pool, start_new_pre_connection_syn, addresses); //elem?
+		else
+			kthread_pool_run(&cbn_pool, start_new_connection_syn, addresses); //elem?
 		//1.alloc task + data
 		//2.rb_tree lookup
 		// sched poll on qp init - play with niceness?
