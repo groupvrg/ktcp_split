@@ -35,7 +35,7 @@ static inline struct cbn_qp *alloc_prexeisting_conn(void)
 
 	elem = list_first_entry(&pre_conn_list_client, struct cbn_qp, list);
 	list_del(&elem->list);
-	kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
+	//kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 	return elem;
 }
 
@@ -258,8 +258,8 @@ static int start_new_pending_connection(void *arg)
 	atomic_inc(&qp->ref_cnt);
 	kthread_pool_run(&cbn_pool, start_half_duplex, ptr_pair);
 
-	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	atomic_inc(&qp->ref_cnt);
+	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
 
 connect_fail:

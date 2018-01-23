@@ -201,14 +201,15 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 		if (! (kvec[i].iov_base = page_address(alloc_page(GFP_KERNEL))))
 			goto err;
 	}
-
 	do {
 		struct msghdr msg = { 0 };
+		TRACE_PRINT("recvmsg...");
 		if ((rc = kernel_recvmsg(sock->rx, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
 			if (put_qp(qp))
 				kernel_sock_shutdown(sock->tx, SHUT_RDWR);
 			goto err;
 		}
+		TRACE_PRINT("received %d", rc);
 		bytes += rc;
 		id ^= 1;
 		//use kern_sendpage if flags needed.
@@ -217,12 +218,13 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 				kernel_sock_shutdown(sock->rx, SHUT_RDWR);
 			goto err;
 		}
+		TRACE_PRINT("sent %d", rc);
 		id ^= 1;
 	} while (!kthread_should_stop());
 
 	goto out;
 err:
-	pr_err("%s [%s] stopping on error (%d) at %s with %lld bytes\n", __FUNCTION__,
+	TRACE_PRINT("%s [%s] stopping on error (%d) at %s with %lld bytes\n", __FUNCTION__,
 		dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 out:
 	TRACE_PRINT("%s going out (%d)", __FUNCTION__, rc);
