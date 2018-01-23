@@ -99,7 +99,8 @@ int start_new_pre_connection_syn(void *arg)
 	sockets.tx 	= (struct socket *)qp->rx;
 	sockets.rx 	= (struct socket *)qp->tx;
 	qp->root 	= &listner->connections_root;
-	TRACE_PRINT("starting half duplex");
+	atomic_inc(&qp->ref_cnt);
+	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
 
 connect_fail:
@@ -256,7 +257,7 @@ static int start_new_pending_connection(void *arg)
 	atomic_inc(&qp->ref_cnt);
 	kthread_pool_run(&cbn_pool, start_half_duplex, ptr_pair);
 
-	TRACE_PRINT("starting half duplex");
+	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
 
 connect_fail:
