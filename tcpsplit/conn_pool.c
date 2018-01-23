@@ -44,13 +44,23 @@ static inline int forward_conn_info(struct socket *tx, struct addresses *address
 	int rc;
 	struct msghdr msg = { 0 };
 	struct kvec kvec[1];
+	struct page *page;
+
 
 	kvec[0].iov_base = addressess;
 	kvec[0].iov_len = sizeof(struct addresses);
-
+/*
+int kernel_sendpage(struct socket *sock, struct page *page, int offset,
+		    size_t size, int flags)
+		    */
+	page = alloc_page(GFP_KERNEL);
+	memcpy(page_address(page), addressess, sizeof(struct addresses));
+	rc = kernel_sendpage(tx, page, 0, sizeof(struct addresses), 0);
+	/*
 	if ((rc = kernel_sendmsg(tx, &msg, kvec, 1, sizeof(struct addresses))) <= 0) {
 		pr_err("Failed to forward info to next hop!\n");
 	}
+	*/
 	return rc;
 }
 
