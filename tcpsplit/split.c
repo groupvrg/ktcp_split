@@ -248,7 +248,7 @@ static int start_new_connection_syn(void *arg)
 	qp->port_s = addresses->src.sin_port;
 	qp->port_d = addresses->dest.sin_port;
 	qp->addr_s = addresses->src.sin_addr;
-	atomic_set(&qp->ref_cnt, 1);
+	atomic_set(&qp->ref_cnt, 0);
 
 	qp->tx = ERR_PTR(-EINVAL);
 
@@ -291,7 +291,6 @@ connect_fail:
 		tx_qp->tx = tx;
 		kmem_cache_free(qp_slab, qp);
 		qp = tx_qp;
-		atomic_inc(&qp->ref_cnt);
 		TRACE_PRINT("QP exists");
 	} else {
 		//TODO: Must ADD T/O. (accept wont signal with ERR on qp)
@@ -309,6 +308,7 @@ connect_fail:
 	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	if (IS_ERR_OR_NULL((struct socket *)qp->rx) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
+	atomic_inc(&qp->ref_cnt);
 	rc = half_duplex(&sockets, qp);
 
 out:
@@ -374,7 +374,6 @@ static int start_new_connection(void *arg)
 		tx_qp->rx = rx;
 		kmem_cache_free(qp_slab, qp);
 		qp = tx_qp;
-		atomic_inc(&qp->ref_cnt);
 	} else {
 		TRACE_PRINT("QP created...");
 		while (!qp->tx) {
@@ -391,6 +390,7 @@ static int start_new_connection(void *arg)
 	sockets.dir = 0;
 	if (IS_ERR_OR_NULL((struct socket *)(qp->rx)) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
+	atomic_inc(&qp->ref_cnt);
 	half_duplex(&sockets, qp);
 out:
 	TRACE_PRINT("closing port %d IP %pI4n", ntohs(addr.sin_port), &addr.sin_addr);
@@ -474,7 +474,7 @@ static int split_server(void *mark_port)
 		qp->rx 		= nsock;
 		qp->tid 	= mark;
 		qp->root 	= &server->connections_root;
-		atomic_set(&qp->ref_cnt, 1);
+		atomic_set(&qp->ref_cnt, 0);
 		TRACE_PRINT("%s scheduling start_new_connection [%d]", __FUNCTION__, mark);
 		kthread_pool_run(&cbn_pool, start_new_connection, qp);
 

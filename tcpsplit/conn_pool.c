@@ -36,6 +36,7 @@ static inline struct cbn_qp *alloc_prexeisting_conn(void)
 	elem = list_first_entry(&pre_conn_list_client, struct cbn_qp, list);
 	list_del(&elem->list);
 	kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
+	atomic_set(&qp->ref_cnt, 0);
 	return elem;
 }
 
@@ -135,6 +136,7 @@ static int prealloc_connection(void *arg)
 	INIT_TRACE
 	fill_preconn_address(ip, addresses);
 	qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
+	atomic_set(&qp->ref_cnt, 0);
 	qp->addr_d = addresses->dest.sin_addr;
 	qp->port_d = addresses->dest.sin_port;
 
@@ -258,6 +260,7 @@ static int start_new_pending_connection(void *arg)
 	kthread_pool_run(&cbn_pool, start_half_duplex, ptr_pair);
 
 	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
+	atomic_inc(&qp->ref_cnt);
 	half_duplex(&sockets, qp);
 
 connect_fail:
@@ -320,9 +323,9 @@ static int prec_conn_listner_server(void *arg)
 
 		TRACE_PRINT("new pre connection...");
 		qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
+		atomic_set(&qp->ref_cnt, 0);
 		qp->rx 		= nsock;
 		qp->tid 	= 0;
-		atomic_set(&qp->ref_cnt, 1);
 		qp->root 	= NULL;
 		INIT_LIST_HEAD(&qp->list);
 
