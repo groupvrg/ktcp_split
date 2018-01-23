@@ -35,7 +35,7 @@ static inline struct cbn_qp *alloc_prexeisting_conn(void)
 
 	elem = list_first_entry(&pre_conn_list_client, struct cbn_qp, list);
 	list_del(&elem->list);
-	//kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
+	kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 	return elem;
 }
 
@@ -203,7 +203,7 @@ static int start_half_duplex(void *arg)
 
 static int start_new_pending_connection(void *arg)
 {
-	int rc;
+	int rc, optval = 1;
 	struct cbn_qp *qp = arg;
 	struct addresses addresses_s;
 	struct addresses *addresses;
@@ -227,6 +227,9 @@ static int start_new_pending_connection(void *arg)
 			&addresses->dest.sin_addr,
 			ntohs(addresses->src.sin_port),
 			&addresses->src.sin_addr);
+
+	if ((rc = kernel_setsockopt(tx, SOL_TCP, TCP_NODELAY, (char *)&optval, sizeof(optval))) < 0)
+		goto connect_fail;
 
 	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
 		goto connect_fail;

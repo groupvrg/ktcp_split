@@ -260,6 +260,9 @@ static int start_new_connection_syn(void *arg)
 		goto connect_fail;
 	}
 
+	if ((rc = kernel_setsockopt(tx, SOL_TCP, TCP_NODELAY, (char *)&T, sizeof(T))) < 0)
+		goto connect_fail;
+
 	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0) {
 		pr_err("%s error (%d)\n", __FUNCTION__, rc);
 		goto connect_fail;
@@ -324,7 +327,7 @@ out:
 
 static int start_new_connection(void *arg)
 {
-	int rc, size, line, mark;
+	int rc, size, line, mark, optval = 1;
 	struct socket *rx;
 	struct sockaddr_in cli_addr;
 	struct sockaddr_in addr;
@@ -350,6 +353,9 @@ static int start_new_connection(void *arg)
 		pr_err("%s error (%d)\n", __FUNCTION__, rc);
 		goto create_fail;
 	}
+
+	if ((rc = kernel_setsockopt(rx, SOL_TCP, TCP_NODELAY, (char *)&optval, sizeof(optval))) < 0)
+		goto create_fail;
 
 	line = __LINE__;
 	if ((rc = kernel_getpeername(rx, (struct sockaddr *)&cli_addr, &size))) {
