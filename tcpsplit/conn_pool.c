@@ -36,7 +36,6 @@ static inline struct cbn_qp *alloc_prexeisting_conn(void)
 	elem = list_first_entry(&pre_conn_list_client, struct cbn_qp, list);
 	list_del(&elem->list);
 	kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
-	atomic_set(&qp->ref_cnt, 0);
 	return elem;
 }
 
