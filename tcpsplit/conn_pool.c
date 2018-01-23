@@ -153,6 +153,10 @@ static int prealloc_connection(void *arg)
 		goto connect_fail;
 
 	line = __LINE__;
+	if ((rc = kernel_setsockopt(tx, SOL_TCP, TCP_NODELAY, (char *)&optval, sizeof(optval))) < 0)
+		goto connect_fail;
+
+	line = __LINE__;
 	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0)))
 		goto connect_fail;
 
