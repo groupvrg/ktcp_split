@@ -34,6 +34,7 @@ int no_optimistic_connect = 0;
 
 static int start_new_connection_syn(void *arg);
 extern long next_hop_ip;
+extern int always_fresh;
 extern int start_new_pre_connection_syn(void *arg);
 
 static unsigned int put_qp(struct cbn_qp *qp)
@@ -531,6 +532,15 @@ out:
 		sock_release(sock);
 	DUMP_TRACE
 	return rc;
+}
+
+void nerf_command_cb(int flags)
+{
+	no_optimistic_connect = flags & OPTIMISTIC_SYN_OFF;
+	always_fresh = flags & ALWAYS_FRESH;
+	pr_info("NO OPTIMISTIC_SYN %s\nALWAYS FRESH %s\n",
+			no_optimistic_connect ? "ON" : "OFF",
+			always_fresh ? "ON" : "OFF");
 }
 
 void proc_write_cb(int tid, int port)

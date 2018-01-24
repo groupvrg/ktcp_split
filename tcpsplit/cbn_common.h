@@ -10,6 +10,9 @@
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 
+#define ALWAYS_FRESH		1
+#define OPTIMISTIC_SYN_OFF 	2
+
 #define cbn_err(fmt, ...)	__cbn_err("%s: " fmt, __FUNCTION__, ##__VA_ARGS__);	\
 				pr_err( "%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
 

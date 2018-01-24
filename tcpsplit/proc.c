@@ -8,6 +8,7 @@
 #include "cbn_common.h"
 #include "proc.h"
 
+extern int nerf_command_cb(int flags);
 extern void proc_write_cb(int tid, int port);
 extern void preconn_write_cb(int *);
 extern char* proc_read_string(int *);
@@ -34,6 +35,33 @@ static int cbn_proc_show(struct seq_file *m, void *v)
 static int cbn_proc_open(struct inode *inode, struct  file *file)
 {
 	return single_open(file, cbn_proc_show, NULL);
+}
+
+static ssize_t nerf_command(struct file *file, const char __user *buf,
+				    size_t size, loff_t *_pos)
+{
+	char *kbuf;
+	int   values[2] = {0};
+
+	/* start by dragging the command into memory */
+	if (size <= 1 || size >= PAGE_SIZE)
+		return -EINVAL;
+
+	kbuf = memdup_user_nul(buf, size);
+	if (IS_ERR(kbuf))
+		return PTR_ERR(kbuf);
+
+	get_options(kbuf, ARRAY_SIZE(values), values);
+
+	kfree(kbuf);
+	if (values[0] == 1) {
+		nerf_command_cb(values[1]);
+	} else {
+		pr_err("Failed to update nerf command\n");
+		size = -EINVAL;
+	}
+	ERR_LINE();
+	return size;
 }
 
 #define PROC_CSV_NUM 2
@@ -135,6 +163,16 @@ static ssize_t cbn_transparent_command(struct file *file, const char __user *buf
 	ERR_LINE();
 	return size;
 }
+
+static const struct file_operations nerf_proc_fops = {
+	.owner		= THIS_MODULE,
+	.open		= cbn_proc_open,
+	.read 		= seq_read,
+	.write		= nerf_command,
+	.llseek 	= seq_lseek,
+	.release 	= single_release,
+};
+
 static const struct file_operations preconn_proc_fops = {
 	.owner		= THIS_MODULE,
 	.open		= cbn_proc_open,
@@ -143,7 +181,6 @@ static const struct file_operations preconn_proc_fops = {
 	.llseek 	= seq_lseek,
 	.release 	= single_release,
 };
-
 
 static const struct file_operations cbn_proc_fops = {
 	.owner		= THIS_MODULE,
@@ -169,6 +206,7 @@ int __init cbn_proc_init(void)
 	cbn_dir = proc_mkdir_mode("cbn", 00555, NULL);
 	proc_create("cbn_proc", 00666, cbn_dir, &cbn_proc_fops);
 	proc_create("conn_pool", 00666, cbn_dir, &preconn_proc_fops);
+	proc_create("nerf", 00666, cbn_dir, &nerf_proc_fops);
 	proc_create("cbn_transparent", 00666, cbn_dir, &cbn_transparent_fops);
 	return 0;
 }
