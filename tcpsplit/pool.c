@@ -18,6 +18,8 @@
 
 #define POOL_PRINT(...)
 
+int always_fresh = 0;
+
 static void kthread_pool_reuse(struct kthread_pool *cbn_pool, struct pool_elem *elem)
 {
 	list_del(&elem->list);
@@ -36,6 +38,9 @@ static int pipe_loop_task(void *data)
 			elem->pool_task(elem->data);
 		else
 			POOL_PRINT("ERROR %s: no pool task", __FUNCTION__);
+
+		if (always_fresh)
+			return 0;
 
 		POOL_PRINT("sleeping %s", current->comm);
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -100,6 +105,9 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 
 	while (unlikely(list_empty(&cbn_pool->kthread_pool))) {
 		pr_warn("pool is empty refill is to slow\n");
+		refill_pool(cbn_pool, 1);
+	}
+	if (always_fresh) {
 		refill_pool(cbn_pool, 1);
 	}
 
