@@ -364,10 +364,15 @@ void preconn_write_cb(int *array)
 	long ip;
 
 	ip = build_ip(array);
+	if (!ip) {
+		pr_err("disabling preconn_pool\n");
+		next_hop_ip = 0;
+		return;
+
+	}
 	if (next_hop_ip && next_hop_ip != ip) {
 		pr_err("Already have an existing next_hop_ip!!\n");
 	}
-
 
 	if (ip) {
 		pr_info("connecting to %d.%d.%d.%d (%lx)\n", array[0], array[1], array[2], array[3], ip);
