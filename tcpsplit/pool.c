@@ -7,8 +7,10 @@
 #include "cbn_common.h"
 #include "pool.h"
 
-#define cbn_list_del(x) {TRACE_PRINT("list_del(%d:%s): %p {%p, %p}", __LINE__, current->comm, x, (x)->next, (x)->prev); list_del((x));}
-#define cbn_list_add(x, h) {TRACE_PRINT("list_add(%d:%s): %p {%p, %p} h %p {%p, %p}", 	\
+#define POOL_PRINT(...)
+
+#define cbn_list_del(x) {POOL_PRINT("list_del(%d:%s): %p {%p, %p}", __LINE__, current->comm, x, (x)->next, (x)->prev); list_del((x));}
+#define cbn_list_add(x, h) {POOL_PRINT("list_add(%d:%s): %p {%p, %p} h %p {%p, %p}", 	\
 					__LINE__, current->comm,			\
 					x, (x)->next, (x)->prev,			\
 					h, (h)->next, (h)->prev);			\

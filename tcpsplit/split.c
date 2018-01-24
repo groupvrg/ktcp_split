@@ -337,7 +337,7 @@ static int start_new_connection(void *arg)
 
 	INIT_TRACE
 
-	qp = arg;
+	qp 	= arg;
 	rx 	= (struct socket *)qp->rx;
 	mark 	= qp->tid;
 	root 	= qp->root;
@@ -367,7 +367,7 @@ static int start_new_connection(void *arg)
 	line = __LINE__;
 	if ((rc = kernel_getsockname(tx, (struct sockaddr *)&addr, &size)))
 		goto connect_fail;
-		*/
+*/
 	TRACE_PRINT("connected local port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
 
 	qp->addr_d = addr.sin_addr;
