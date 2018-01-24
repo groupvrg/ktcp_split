@@ -30,6 +30,8 @@ struct kmem_cache *syn_slab;
 static struct kmem_cache *listner_slab;
 
 uint32_t ip_transparent = 0;
+int no_optimistic_connect = 0;
+
 static int start_new_connection_syn(void *arg);
 extern long next_hop_ip;
 extern int start_new_pre_connection_syn(void *arg);
@@ -69,6 +71,9 @@ static unsigned int cbn_ingress_hook(void *priv,
 		struct iphdr *iphdr = ip_hdr(skb);
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
 		struct addresses *addresses;
+
+		if (no_optimistic_connect)
+			goto out;
 
 		if (strcmp(priv, "RX"))
 			goto out;
@@ -325,6 +330,31 @@ out:
 	return rc;
 }
 
+static int start_new_connection_syn_ack(int mark, struct cbn_qp *qp)
+{
+	struct addresses *addresses;
+	int rc = 0;
+	addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
+	if (unlikely(!addresses)) {
+		pr_err("Faield to alloc mem %s\n", __FUNCTION__);
+		rc = 1;
+		goto out;
+	}
+
+	addresses->dest.sin_addr 	= qp->addr_d;
+	addresses->src.sin_port 	= qp->port_s;
+	addresses->dest.sin_port 	= qp->port_d;
+	addresses->src.sin_addr 	= qp->addr_s;
+	addresses->mark			= mark;
+
+	if (next_hop_ip)
+		kthread_pool_run(&cbn_pool, start_new_pre_connection_syn, addresses);
+	else
+		kthread_pool_run(&cbn_pool, start_new_connection_syn, addresses);
+out:
+	return rc;
+}
+
 static int start_new_connection(void *arg)
 {
 	int rc, size, line, mark, optval = 1;
@@ -374,6 +404,12 @@ static int start_new_connection(void *arg)
 	qp->port_s = cli_addr.sin_port;
 	qp->port_d = addr.sin_port;
 	qp->addr_s = cli_addr.sin_addr;
+
+	if (no_optimistic_connect && start_new_connection_syn_ack(mark, qp)) {
+		kmem_cache_free(qp_slab, qp);
+		goto out;
+	}
+
 	/*rp->root/qp->mark no longer valid, qp is a union*/
 	qp->tx = NULL;
 
