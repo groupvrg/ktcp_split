@@ -92,7 +92,6 @@ static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *da
 			return this;
 	}
 
-	TRACE_LINE();
 	/* Add new node and rebalance tree. */
 	rb_link_node(&data->node, parent, new);
 	rb_insert_color(&data->node, root);

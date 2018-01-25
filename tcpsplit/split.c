@@ -209,13 +209,11 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 	}
 	do {
 		struct msghdr msg = { 0 };
-		TRACE_PRINT("recvmsg...");
 		if ((rc = kernel_recvmsg(sock->rx, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
 			if (put_qp(qp))
 				kernel_sock_shutdown(sock->tx, SHUT_RDWR);
 			goto err;
 		}
-		TRACE_PRINT("received %d", rc);
 		bytes += rc;
 		id ^= 1;
 		//use kern_sendpage if flags needed.
@@ -224,7 +222,6 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 				kernel_sock_shutdown(sock->rx, SHUT_RDWR);
 			goto err;
 		}
-		TRACE_PRINT("sent %d", rc);
 		id ^= 1;
 	} while (!kthread_should_stop());
 
