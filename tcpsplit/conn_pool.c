@@ -359,14 +359,27 @@ static inline int build_ip(int *array)
 	return ip;
 }
 
+static void clear_client_pre_connections(void)
+{
+	struct list_head *itr, *tmp;
+
+	list_for_each_safe(itr, tmp, &pre_conn_list_client) {
+		struct cbn_qp *elem = container_of(itr, struct cbn_qp, list);
+		list_del(itr);
+		sock_release((struct socket *)elem->tx);
+		kmem_cache_free(qp_slab, elem);
+	}
+}
+
 void preconn_write_cb(int *array)
 {
 	long ip;
 
 	ip = build_ip(array);
 	if (!ip) {
-		pr_err("disabling preconn_pool\n");
+		pr_err("disabling preconn_pool & freeing exisiting preconnections\n");
 		next_hop_ip = 0;
+		clear_client_pre_connections();
 		return;
 
 	}
@@ -402,12 +415,7 @@ int __exit cbn_pre_connect_end(void)
 
 	kernel_sock_shutdown(pre_conn_listner->sock, SHUT_RDWR);
 
-	list_for_each_safe(itr, tmp, &pre_conn_list_client) {
-		struct cbn_qp *elem = container_of(itr, struct cbn_qp, list);
-		list_del(itr);
-		sock_release((struct socket *)elem->tx);
-		kmem_cache_free(qp_slab, elem);
-	}
+	clear_client_pre_connections();
 
 	list_for_each_safe(itr, tmp, &pre_conn_list_server) {
 		struct cbn_qp *elem = container_of(itr, struct cbn_qp, list);
