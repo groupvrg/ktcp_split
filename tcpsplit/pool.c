@@ -65,6 +65,8 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 {
 	count = (count) ? count : cbn_pool->refil_needed;
 
+	POOL_PRINT("wheres my LINE?!?!");
+	TRACE_LINE();
 	POOL_PRINT("pool : %p count : %d", cbn_pool, count);
 	while (count--) {
 		struct task_struct *k;

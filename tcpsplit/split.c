@@ -18,6 +18,7 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Markuze Alex");
 MODULE_DESCRIPTION("CBN TCP Split Module");
 
+#define STR 	    "DIFF"
 #define BACKLOG     64
 
 struct kthread_pool cbn_pool = {.pool_size = DEF_CBN_POOL_SIZE};
@@ -542,7 +543,7 @@ void nerf_command_cb(int flags)
 
 void proc_write_cb(int tid, int port)
 {
-	pr_info("%s scheduling split server", __FUNCTION__);
+	pr_info("%s scheduling split server <%s>", __FUNCTION__, STR);
 	kthread_pool_run(&cbn_pool, split_server, uint2void(tid, port));
 }
 
