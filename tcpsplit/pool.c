@@ -37,8 +37,8 @@ static int pipe_loop_task(void *data)
 		else
 			POOL_PRINT("ERROR %s: no pool task", __FUNCTION__);
 
-	//	if (always_fresh)
-	//		goto out;
+		if (always_fresh)
+			goto out;
 
 		POOL_PRINT("sleeping %s", current->comm);
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -52,9 +52,9 @@ static int pipe_loop_task(void *data)
 	//	consider adding some state? user might try freeing this struct, make sure its not running
 	//	also consider frreing yourself if you are here...
 	}
-//out:
-	//list_del(&elem->list);
-	//kmem_cache_free(pool->pool_slab, elem);
+out:
+	list_del(&elem->list);
+	kmem_cache_free(pool->pool_slab, elem);
 	pr_warn("%s out no reuse %s", current->comm, always_fresh ? "ALWAYS_FRESH" : "");
 	return 0;
 }
