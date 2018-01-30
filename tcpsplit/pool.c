@@ -65,18 +65,20 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 {
 	count = (count) ? count : cbn_pool->refil_needed;
 
-	POOL_PRINT("%p %d", cbn_pool, count);
+	POOL_PRINT("pool : %p count : %d", cbn_pool, count);
 	while (count--) {
 		struct task_struct *k;
 		struct pool_elem *elem = kmem_cache_alloc(cbn_pool->pool_slab, GFP_ATOMIC);
 		if (unlikely(!elem)) {
-			pr_err("ERROR: elem is NULL");
+			POOL_PRINT("ERROR: elem is NULL");
+			pr_err("ERROR: elem is NULL\n");
 			return;
 		}
 
 		k = kthread_create(threadfn, elem, "pool-thread-%d", cbn_pool->top_count);
 
 		if (unlikely(!k)) {
+			POOL_PRINT("ERROR: failed to create kthread %d", cbn_pool->top_count);
 			pr_err("ERROR: failed to create kthread %d\n", cbn_pool->top_count);
 			kmem_cache_free(cbn_pool->pool_slab, elem);
 			return;
