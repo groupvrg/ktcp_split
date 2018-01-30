@@ -43,7 +43,7 @@ static int pipe_loop_task(void *data)
 		POOL_PRINT("sleeping %s", current->comm);
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!kthread_should_stop()) {
-			POOL_PRINT("%s out to reuse <%p>", current->comm);
+			POOL_PRINT("%s out to reuse <%p>", current->comm, current);
 			kthread_pool_reuse(pool, elem);
 			schedule();
 		}
