@@ -65,36 +65,26 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 {
 	count = (count) ? count : cbn_pool->refil_needed;
 
-	POOL_PRINT("wheres my LINE?!?!");
-	TRACE_LINE();
-	POOL_PRINT("pool : %p count : %d", cbn_pool, count);
 	while (count--) {
 		struct task_struct *k;
 		struct pool_elem *elem = kmem_cache_alloc(cbn_pool->pool_slab, GFP_ATOMIC);
-		TRACE_LINE();
 		if (unlikely(!elem)) {
 			POOL_PRINT("ERROR: elem is NULL");
 			pr_err("ERROR: elem is NULL\n");
 			return;
 		}
 
-		TRACE_LINE();
 		k = kthread_create(threadfn, elem, "pool-thread-%d", cbn_pool->top_count);
 
-		TRACE_LINE();
 		if (unlikely(!k)) {
 			POOL_PRINT("ERROR: failed to create kthread %d", cbn_pool->top_count);
 			pr_err("ERROR: failed to create kthread %d\n", cbn_pool->top_count);
 			kmem_cache_free(cbn_pool->pool_slab, elem);
 			return;
 		}
-		TRACE_LINE();
 		INIT_LIST_HEAD(&elem->list);
-		TRACE_LINE();
 		elem->task = k;
-		TRACE_LINE();
 		elem->pool = cbn_pool;
-		TRACE_LINE();
 		list_add(&elem->list, &cbn_pool->kthread_pool);
 		POOL_PRINT("pool thread %d [%p] allocated %llx", cbn_pool->top_count, elem, rdtsc());
 		--cbn_pool->refil_needed;
@@ -135,7 +125,7 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 	elem = list_first_entry(&cbn_pool->kthread_pool, struct pool_elem, list);
 	list_del(&elem->list);
 	++cbn_pool->refil_needed;
-	POOL_PRINT("allocated %p [%p]\n", elem, elem->task);
+	//POOL_PRINT("allocated %p [%p]\n", elem, elem->task);
 	//wake_up_process(cbn_pool->refil);
 	return elem;
 }
@@ -151,7 +141,7 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 	elem->pool_task = func;
 	elem->data = data;
 	list_add(&elem->list, &cbn_pool->kthread_running);
-	POOL_PRINT("staring %s\n", elem->task->comm);
+	//POOL_PRINT("staring %s\n", elem->task->comm);
 	wake_up_process(elem->task);
 	return elem;
 }
