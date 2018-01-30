@@ -260,7 +260,7 @@ static int start_new_connection_syn(void *arg)
 
 	qp->tx = ERR_PTR(-EINVAL);
 
-	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
+	//TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
 		pr_err("%s error (%d)\n", __FUNCTION__, rc);
 		goto connect_fail;
@@ -399,7 +399,7 @@ static int start_new_connection(void *arg)
 	if ((rc = kernel_getsockname(tx, (struct sockaddr *)&addr, &size)))
 		goto connect_fail;
 */
-	TRACE_PRINT("connected local port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
+	//TRACE_PRINT("connected local port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
 
 	qp->addr_d = addr.sin_addr;
 	qp->port_s = cli_addr.sin_port;
@@ -439,7 +439,7 @@ static int start_new_connection(void *arg)
 	atomic_inc(&qp->ref_cnt);
 	half_duplex(&sockets, qp);
 out:
-	TRACE_PRINT("closing port %d IP %pI4n", ntohs(addr.sin_port), &addr.sin_addr);
+	//TRACE_PRINT("closing port %d IP %pI4n", ntohs(addr.sin_port), &addr.sin_addr);
 	/* Teardown */
 	/* free both sockets*/
 	rc = line = 0;

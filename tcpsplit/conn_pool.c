@@ -71,8 +71,8 @@ int start_new_pre_connection_syn(void *arg)
 	qp->port_d = addresses->dest.sin_port;
 	qp->addr_s = addresses->src.sin_addr;
 
-	TRACE_PRINT("connection to port %d IP %pI4n from %d IP %pI4n",
-			ntohs(qp->port_d), &qp->addr_d, ntohs(qp->port_s), &qp->addr_s);
+	//TRACE_PRINT("connection to port %d IP %pI4n from %d IP %pI4n",
+	//		ntohs(qp->port_d), &qp->addr_d, ntohs(qp->port_s), &qp->addr_s);
 
 	if ((rc	= forward_conn_info((struct socket *)qp->tx, addresses)) <= 0)
 		goto connect_fail;
@@ -139,7 +139,7 @@ static int prealloc_connection(void *arg)
 	qp->addr_d = addresses->dest.sin_addr;
 	qp->port_d = addresses->dest.sin_port;
 
-	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
+	//TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	line = __LINE__;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
 		goto out;
@@ -222,11 +222,11 @@ static int start_new_pending_connection(void *arg)
 		goto create_fail;
 	}
 
-	TRACE_PRINT("connection to port %d IP %pI4n from %d IP %pI4n",
-			ntohs(addresses->dest.sin_port),
-			&addresses->dest.sin_addr,
-			ntohs(addresses->src.sin_port),
-			&addresses->src.sin_addr);
+//TRACE_PRINT("connection to port %d IP %pI4n from %d IP %pI4n",
+//		ntohs(addresses->dest.sin_port),
+//		&addresses->dest.sin_addr,
+//		ntohs(addresses->src.sin_port),
+//		&addresses->src.sin_addr);
 
 	if ((rc = kernel_setsockopt(tx, SOL_TCP, TCP_NODELAY, (char *)&optval, sizeof(optval))) < 0)
 		goto connect_fail;
