@@ -55,7 +55,7 @@ static int pipe_loop_task(void *data)
 out:
 	list_del(&elem->list);
 	kmem_cache_free(pool->pool_slab, elem);
-	pr_warn("%s out no reuse %s", current->comm, always_fresh ? "ALWAYS_FRESH" : "");
+	//pr_warn("%s out no reuse %s", current->comm, always_fresh ? "ALWAYS_FRESH" : "");
 	return 0;
 }
 

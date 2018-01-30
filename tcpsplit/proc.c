@@ -116,7 +116,7 @@ static ssize_t preconn_proc_command(struct file *file, const char __user *buf,
 	if (values[0] == IP_LEN) {
 		preconn_write_cb(&values[1]);
 	} else {
-		pr_err("Failed to start new server %d\n" ,values[0]);
+		pr_err("ERROR: Failed to start new pre connection %d (ip has 4 digits)\n" ,values[0]);
 		size = -EINVAL;
 	}
 	ERR_LINE();
