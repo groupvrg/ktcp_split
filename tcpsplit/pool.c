@@ -43,7 +43,7 @@ static int pipe_loop_task(void *data)
 		POOL_PRINT("sleeping %s", current->comm);
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!kthread_should_stop()) {
-			POOL_PRINT("%s out to reuse", current->comm);
+			POOL_PRINT("%s out to reuse <%p>", current->comm);
 			kthread_pool_reuse(pool, elem);
 			schedule();
 		}
@@ -78,7 +78,7 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 		elem->task = k;
 		elem->pool = cbn_pool;
 		list_add(&elem->list, &cbn_pool->kthread_pool);
-		//TRACE_PRINT("pool thread %d [%p] allocated %llx\n", cbn_pool->top_count, elem, rdtsc());
+		POOL_PRINT("pool thread %d [%p] allocated %llx\n", cbn_pool->top_count, elem, rdtsc());
 		--cbn_pool->refil_needed;
 		++cbn_pool->top_count;
 	}
@@ -116,7 +116,7 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 	elem = list_first_entry(&cbn_pool->kthread_pool, struct pool_elem, list);
 	list_del(&elem->list);
 	++cbn_pool->refil_needed;
-	//TRACE_PRINT("allocated %p\n", elem);
+	POOL_PRINT("allocated %p [%p]\n", elem, elem->task);
 	//wake_up_process(cbn_pool->refil);
 	return elem;
 }
@@ -132,7 +132,7 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 	elem->pool_task = func;
 	elem->data = data;
 	list_add(&elem->list, &cbn_pool->kthread_running);
-	//TRACE_PRINT("staring %s\n", elem->task->comm);
+	POOL_PRINT("staring %s\n", elem->task->comm);
 	wake_up_process(elem->task);
 	return elem;
 }
