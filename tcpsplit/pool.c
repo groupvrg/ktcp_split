@@ -65,6 +65,7 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 {
 	count = (count) ? count : cbn_pool->refil_needed;
 
+	POOL_PRINT("%p %d", cbn_pool, count);
 	while (count--) {
 		struct pool_elem *elem = kmem_cache_alloc(cbn_pool->pool_slab, GFP_KERNEL);
 		struct task_struct *k
@@ -74,11 +75,13 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 			kmem_cache_free(cbn_pool->pool_slab, elem);
 			return;
 		}
+		if (unlikely(!elem))
+			pr_err("ERROR: elem is NULL");
 		INIT_LIST_HEAD(&elem->list);
 		elem->task = k;
 		elem->pool = cbn_pool;
 		list_add(&elem->list, &cbn_pool->kthread_pool);
-		POOL_PRINT("pool thread %d [%p] allocated %llx\n", cbn_pool->top_count, elem, rdtsc());
+		POOL_PRINT("pool thread %d [%p] allocated %llx", cbn_pool->top_count, elem, rdtsc());
 		--cbn_pool->refil_needed;
 		++cbn_pool->top_count;
 	}
@@ -104,12 +107,13 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 {
 	struct pool_elem *elem = NULL;
 
-	while (unlikely(list_empty(&cbn_pool->kthread_pool))) {
-		pr_warn("pool is empty refill is to slow\n");
-		refill_pool(cbn_pool, 1);
-	}
 	if (always_fresh) {
 		POOL_PRINT("Always Fresh - creating new thread");
+		refill_pool(cbn_pool, 1);
+	}
+
+	while (unlikely(list_empty(&cbn_pool->kthread_pool))) {
+		pr_warn("pool is empty refill is to slow\n");
 		refill_pool(cbn_pool, 1);
 	}
 
