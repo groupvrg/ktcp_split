@@ -7,7 +7,7 @@
 #include "cbn_common.h"
 #include "pool.h"
 
-#define POOL_PRINT(...)
+#define POOL_PRINT TRACE_PRINT
 
 #define cbn_list_del(x) {POOL_PRINT("list_del(%d:%s): %p {%p, %p}", __LINE__, current->comm, x, (x)->next, (x)->prev); list_del((x));}
 #define cbn_list_add(x, h) {POOL_PRINT("list_add(%d:%s): %p {%p, %p} h %p {%p, %p}", 	\
@@ -15,8 +15,6 @@
 					x, (x)->next, (x)->prev,			\
 					h, (h)->next, (h)->prev);			\
 					list_add((x), (h));}
-
-#define POOL_PRINT(...)
 
 int always_fresh = 0;
 
@@ -40,7 +38,7 @@ static int pipe_loop_task(void *data)
 			POOL_PRINT("ERROR %s: no pool task", __FUNCTION__);
 
 		if (always_fresh)
-			return 0;
+			goto out;
 
 		POOL_PRINT("sleeping %s", current->comm);
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -54,6 +52,9 @@ static int pipe_loop_task(void *data)
 	//	consider adding some state? user might try freeing this struct, make sure its not running
 	//	also consider frreing yourself if you are here...
 	}
+out:
+	list_del(&elem->list);
+	kmem_cache_free(pool->pool_slab, elem);
 	pr_warn("%s out no reuse", current->comm);
 	return 0;
 }
@@ -108,6 +109,7 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 		refill_pool(cbn_pool, 1);
 	}
 	if (always_fresh) {
+		POOL_PRINT("Always Fresh - creating new thread");
 		refill_pool(cbn_pool, 1);
 	}
 

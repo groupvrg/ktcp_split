@@ -21,7 +21,7 @@ extern struct rb_root listner_root;
 
 static struct list_head pre_conn_list_server;
 static struct list_head pre_conn_list_client;
-long next_hop_ip;
+long next_hop_ip = 0;
 
 static int prealloc_connection(void *arg);
 
