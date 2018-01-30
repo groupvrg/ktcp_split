@@ -74,8 +74,10 @@ static unsigned int cbn_ingress_hook(void *priv,
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
 		struct addresses *addresses;
 
-		if (no_optimistic_connect)
+		if (no_optimistic_connect) {
+			TRACE_PRINT("NO Early SIN...");
 			goto out;
+		}
 
 		if (strcmp(priv, "RX"))
 			goto out;
@@ -405,6 +407,7 @@ static int start_new_connection(void *arg)
 	qp->addr_s = cli_addr.sin_addr;
 
 	if (no_optimistic_connect && start_new_connection_syn_ack(mark, qp)) {
+		TRACE_PRINT("NO EARLY SYN Scheduling peer");
 		kmem_cache_free(qp_slab, qp);
 		goto out;
 	}
