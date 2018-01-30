@@ -542,6 +542,10 @@ void nerf_command_cb(int flags)
 	pr_info("NO OPTIMISTIC_SYN %s\nALWAYS FRESH %s\n",
 			no_optimistic_connect ? "ON" : "OFF",
 			always_fresh ? "ON" : "OFF");
+	if (!flags) {
+		TRACE_PRINT("Refilling pool");
+		refill_task_start(&cbn_pool);
+	}
 }
 
 void proc_write_cb(int tid, int port)

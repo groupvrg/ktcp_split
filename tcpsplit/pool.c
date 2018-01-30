@@ -65,6 +65,7 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 {
 	count = (count) ? count : cbn_pool->refil_needed;
 
+	TRACE_PRINT("pool %p count %d", cbn_pool, count);
 	while (count--) {
 		struct task_struct *k;
 		struct pool_elem *elem = kmem_cache_alloc(cbn_pool->pool_slab, GFP_ATOMIC);
@@ -126,8 +127,12 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 	list_del(&elem->list);
 	++cbn_pool->refil_needed;
 	//POOL_PRINT("allocated %p [%p]\n", elem, elem->task);
-	//wake_up_process(cbn_pool->refil);
 	return elem;
+}
+
+void refill_task_start(struct kthread_pool *cbn_pool)
+{
+	wake_up_process(cbn_pool->refil);
 }
 
 struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(void *), void *data)
