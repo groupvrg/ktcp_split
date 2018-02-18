@@ -240,13 +240,37 @@ out:
 	DUMP_TRACE
 	return rc;
 }
+static inline struct cbn_qp *sync_qp(struct cbn_qp* qp, uint8_t dir)
+{
+	struct cbn_qp *tx_qp;
+
+	if ((tx_qp = add_rb_data(qp->root, qp))) { //this means the other conenction is already up
+		tx_qp->qp_dir[dir] = qp->qp_dir[dir ^ 1];
+		kmem_cache_free(qp_slab, qp);
+		qp = tx_qp;
+		wake_up(&qp->wait);
+		TRACE_PRINT("QP exists");
+	} else {
+		TRACE_PRINT("QP created...");
+		if (!qp->qp_dir[dir]) {
+			int error;
+			error = wait_event_interruptible_timeout(qp->wait,
+						 qp->qp_dir[dir], 3 * HZ);
+			if (error)
+				goto err;
+		}
+	}
+	return qp;
+err:
+	return NULL;
+}
 
 static int start_new_connection_syn(void *arg)
 {
 	int rc, T = 1;
 	struct addresses *addresses = arg;
 	struct cbn_listner *listner;
-	struct cbn_qp *qp, *tx_qp;
+	struct cbn_qp *qp;
 	struct sockets sockets;
 	struct socket *tx = NULL;
 
@@ -299,20 +323,8 @@ connect_fail:
 	kmem_cache_free(syn_slab, addresses);
 	//TODO: add locks to this shit
 	TRACE_PRINT("%s qp %p listner %p mark %d", __FUNCTION__, qp, listner, addresses->mark);
-	if ((tx_qp = add_rb_data(qp->root, qp))) { //this means the other conenction is already up
-		tx_qp->tx = tx;
-		kmem_cache_free(qp_slab, qp);
-		qp = tx_qp;
-		TRACE_PRINT("QP exists");
-	} else {
-		//TODO: Must ADD T/O. (accept wont signal with ERR on qp)
-		TRACE_PRINT("QP created...");
-		while (!qp->rx) {
-			if (kthread_should_stop())
-				goto out;
-			schedule();
-		}
-	}
+	qp = sync_qp(qp, RX_QP);
+
 	DUMP_TRACE
 	sockets.tx = (struct socket *)qp->rx;
 	sockets.rx = (struct socket *)qp->tx;
@@ -363,7 +375,7 @@ static int start_new_connection(void *arg)
 	struct socket *rx;
 	struct sockaddr_in cli_addr;
 	struct sockaddr_in addr;
-	struct cbn_qp *qp, *tx_qp;
+	struct cbn_qp *qp;
 	struct rb_root *root;
 	struct sockets sockets;
 
@@ -416,19 +428,7 @@ static int start_new_connection(void *arg)
 	/*rp->root/qp->mark no longer valid, qp is a union*/
 	qp->tx = NULL;
 
-	if ((tx_qp = add_rb_data(root, qp))) { //this means the other conenction is already up
-		TRACE_PRINT("QP exists");
-		tx_qp->rx = rx;
-		kmem_cache_free(qp_slab, qp);
-		qp = tx_qp;
-	} else {
-		TRACE_PRINT("QP created...");
-		while (!qp->tx) {
-			if (kthread_should_stop())
-				goto create_fail;
-			schedule();
-		}
-	}
+	qp = sync_qp(qp, TX_QP);
 
 	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	DUMP_TRACE

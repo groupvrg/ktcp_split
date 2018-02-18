@@ -8,6 +8,9 @@
 #define RB_KEY_LENGTH 12
 static char chars[(RB_KEY_LENGTH << 3)] = {0};
 
+#define TX_QP	0
+#define RX_QP	1
+
 struct cbn_qp {
 	struct rb_node node;
 	union {
@@ -25,10 +28,16 @@ struct cbn_qp {
 	};
 	atomic_t ref_cnt;
 
-	struct rb_root *root;
-	struct list_head list;
-	volatile struct socket *tx;
-	volatile struct socket *rx;
+	struct rb_root 		*root;
+	struct list_head 	list;
+	wait_queue_head_t	wait;
+	union {
+		struct {
+			struct socket	*tx;
+			struct socket	*rx;
+		};
+		struct socket *qp_dir[2];
+	};
 };
 
 struct cbn_listner {
