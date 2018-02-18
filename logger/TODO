@@ -1,0 +1,4 @@
+1. complete ring buffer mgmnt
+2. add callback and ptr(default callback) registration, for stats. const char *(*cb)(void *)
+3. dump when ready mode (return when the log is empty not limit reached), wake each write not on WM
+4. integrate with tcp_split
