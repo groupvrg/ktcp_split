@@ -233,29 +233,36 @@ out:
 	DUMP_TRACE
 	return rc;
 }
+
 static inline struct cbn_qp *sync_qp(struct cbn_qp* qp, uint8_t dir)
 {
 	struct cbn_qp *tx_qp;
 
 	if ((tx_qp = add_rb_data(qp->root, qp))) { //this means the other conenction is already up
 		tx_qp->qp_dir[dir] = qp->qp_dir[dir ^ 1];
+		if (unlikely(atomic_read(&qp->ref_cnt))) {
+			TRACE_PRINT("ERROR: Active connection pair [%d] exists...", atomic_read(&qp->ref_cnt));
+			pr_err("ERROR: Active connection pair[%d] exists...\n", atomic_read(&qp->ref_cnt));
+			goto err;
+		}
 		kmem_cache_free(qp_slab, qp);
 		qp = tx_qp;
 		wake_up(&qp->wait);
-		TRACE_PRINT("QP exists");
+		TRACE_PRINT("QP exists, waking peer");
 	} else {
-		TRACE_PRINT("QP created...");
+		TRACE_PRINT("QP created... waiting for peer");
 		if (!qp->qp_dir[dir]) {
 			int error;
 			error = wait_event_interruptible_timeout(qp->wait,
-						 qp->qp_dir[dir], 3 * HZ);
+								 qp->qp_dir[dir], 3 * HZ);
 			if (error)
 				goto err;
 		}
 	}
 	return qp;
 err:
-	return NULL;
+	/* Consider error handling...*/
+	return qp;
 }
 
 static int start_new_connection_syn(void *arg)
