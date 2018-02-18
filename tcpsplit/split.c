@@ -32,11 +32,9 @@ struct kmem_cache *syn_slab;
 static struct kmem_cache *listner_slab;
 
 uint32_t ip_transparent = 0;
-int no_optimistic_connect = 0;
 
 static int start_new_connection_syn(void *arg);
 extern long next_hop_ip;
-extern int always_fresh;
 extern int start_new_pre_connection_syn(void *arg);
 
 static unsigned int put_qp(struct cbn_qp *qp)
@@ -74,11 +72,6 @@ static unsigned int cbn_ingress_hook(void *priv,
 		struct iphdr *iphdr = ip_hdr(skb);
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
 		struct addresses *addresses;
-
-		if (no_optimistic_connect) {
-			TRACE_PRINT("NO Early SIN...");
-			goto out;
-		}
 
 		if (strcmp(priv, "RX"))
 			goto out;
@@ -343,7 +336,7 @@ out:
 	DUMP_TRACE
 	return rc;
 }
-
+/*
 static int start_new_connection_syn_ack(int mark, struct cbn_qp *qp)
 {
 	struct addresses *addresses;
@@ -368,7 +361,7 @@ static int start_new_connection_syn_ack(int mark, struct cbn_qp *qp)
 out:
 	return rc;
 }
-
+*/
 static int start_new_connection(void *arg)
 {
 	int rc, size, line, mark, optval = 1;
@@ -418,12 +411,6 @@ static int start_new_connection(void *arg)
 	qp->port_s = cli_addr.sin_port;
 	qp->port_d = addr.sin_port;
 	qp->addr_s = cli_addr.sin_addr;
-
-	if (no_optimistic_connect && start_new_connection_syn_ack(mark, qp)) {
-		TRACE_PRINT("NO EARLY SYN Scheduling peer");
-		kmem_cache_free(qp_slab, qp);
-		goto out;
-	}
 
 	/*rp->root/qp->mark no longer valid, qp is a union*/
 	qp->tx = NULL;
@@ -534,19 +521,6 @@ out:
 		sock_release(sock);
 	DUMP_TRACE
 	return rc;
-}
-
-void nerf_command_cb(int flags)
-{
-	no_optimistic_connect = flags & OPTIMISTIC_SYN_OFF;
-	always_fresh = flags & ALWAYS_FRESH;
-	pr_info("NO OPTIMISTIC_SYN %s\nALWAYS FRESH %s\n",
-			no_optimistic_connect ? "ON" : "OFF",
-			always_fresh ? "ON" : "OFF");
-	if (!flags) {
-		TRACE_PRINT("Refilling pool");
-		refill_task_start(&cbn_pool);
-	}
 }
 
 void proc_write_cb(int tid, int port)

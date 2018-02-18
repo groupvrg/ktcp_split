@@ -16,8 +16,6 @@
 					h, (h)->next, (h)->prev);			\
 					list_add((x), (h));}
 
-int always_fresh = 0;
-
 static void kthread_pool_reuse(struct kthread_pool *cbn_pool, struct pool_elem *elem)
 {
 	list_del(&elem->list);
@@ -37,9 +35,6 @@ static int pipe_loop_task(void *data)
 		else
 			POOL_PRINT("ERROR %s: no pool task", __FUNCTION__);
 
-		if (always_fresh)
-			goto out;
-
 		POOL_PRINT("sleeping %s", current->comm);
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!kthread_should_stop()) {
@@ -52,10 +47,8 @@ static int pipe_loop_task(void *data)
 	//	consider adding some state? user might try freeing this struct, make sure its not running
 	//	also consider frreing yourself if you are here...
 	}
-out:
 	list_del(&elem->list);
 	kmem_cache_free(pool->pool_slab, elem);
-	//pr_warn("%s out no reuse %s", current->comm, always_fresh ? "ALWAYS_FRESH" : "");
 	return 0;
 }
 
@@ -112,11 +105,6 @@ static int refil_thread(void *data)
 static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 {
 	struct pool_elem *elem = NULL;
-
-	if (always_fresh) {
-		POOL_PRINT("Always Fresh - creating new thread");
-		refill_pool(cbn_pool, 1);
-	}
 
 	while (unlikely(list_empty(&cbn_pool->kthread_pool))) {
 		pr_warn("pool is empty refill is to slow\n");
