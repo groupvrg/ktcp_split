@@ -102,6 +102,11 @@ static int refil_thread(void *data)
 	return 0;
 }
 
+void refill_task_start(struct kthread_pool *cbn_pool)
+{
+	wake_up_process(cbn_pool->refil);
+}
+
 static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 {
 	struct pool_elem *elem = NULL;
@@ -114,13 +119,9 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 	elem = list_first_entry(&cbn_pool->kthread_pool, struct pool_elem, list);
 	list_del(&elem->list);
 	++cbn_pool->refil_needed;
+	refill_task_start(cbn_pool);
 	//POOL_PRINT("allocated %p [%p]\n", elem, elem->task);
 	return elem;
-}
-
-void refill_task_start(struct kthread_pool *cbn_pool)
-{
-	wake_up_process(cbn_pool->refil);
 }
 
 struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(void *), void *data)

@@ -29,6 +29,6 @@ int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool);
 void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool);
 
 void refill_task_start(struct kthread_pool *cbn_pool);
-#define DEF_CBN_POOL_SIZE 32
+#define DEF_CBN_POOL_SIZE 64
 
 #endif /* __CBN_KTHREAD_POOL__ */
