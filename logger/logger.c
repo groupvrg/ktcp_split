@@ -7,6 +7,7 @@
 #include <linux/time.h>
 
 #include "dpb.h"
+#include "stats_cb_mgr.h"
 
 MODULE_AUTHOR("Markuze Alex amarkuze@vmware.com");
 MODULE_DESCRIPTION("Simple stream logger");
@@ -23,9 +24,11 @@ module_param(bufsize, uint, 0);
 
 static struct {
 	struct trvl_buffer_mgr 	stats;
+	struct stats_cb_mgr	cbm;
 } dp_logger;
 
 #define _sbm &dp_logger.stats
+#define _s_cbm &dp_logger.cbm
 
 static int stats_log_open(struct inode *inode, struct file *file)
 {
@@ -57,6 +60,8 @@ static ssize_t stats_log_read(struct file *file, char __user *buf,
 
 	if (!buf)
 		return -EINVAL;
+
+	scbm_collect_stats(_s_cbm, _sbm);
 
 	while (cnt < len) {
 		int size;
@@ -93,6 +98,22 @@ static const struct file_operations stats_log_fops = {
 
 struct proc_dir_entry *proc_dir;
 
+static inline int md_init(void)
+{
+	int ret = 0;
+	bufsize = roundup_pow_of_two(bufsize);
+	trvlb_init(_sbm);
+	scbm_init(_s_cbm);
+
+	return ret;
+}
+
+static inline void md_close(void)
+{
+	scbm_close(_s_cbm);
+	trvlb_close(_sbm);
+}
+
 static __init int dp_log_init(void)
 {
 	int ret = -ENOMEM;
@@ -100,8 +121,7 @@ static __init int dp_log_init(void)
 	if (bufsize == 0)
 		return -EINVAL;
 
-	bufsize = roundup_pow_of_two(bufsize);
-	if ((ret = trvlb_init(_sbm, bufsize)))
+	if ((ret = md_init()))
 		goto err;
 	if (! (proc_dir = proc_mkdir_mode(PROC_DIR, 00555, NULL)))
 		goto err_proc;
@@ -114,7 +134,7 @@ static __init int dp_log_init(void)
 err_proc2:
 	remove_proc_subtree(PROC_DIR, NULL);
 err_proc:
-	trvlb_close(_sbm);
+	md_close();
 err:
 	return ret;
 }
@@ -123,6 +143,6 @@ module_init(dp_log_init);
 static __exit void dp_log_exit(void)
 {
 	remove_proc_subtree(PROC_DIR, NULL);
-	trvlb_close(_sbm);
+	md_close();
 }
 module_exit(dp_log_exit);
