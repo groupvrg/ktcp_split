@@ -1,5 +1,5 @@
-#ifndef __DATA_PATH_LOG__
-#define __DATA_PATH_LOG__
+#ifndef __TRVL_LOG__
+#define __TRVL_LOG__
 
 #include <linux/kernel.h>
 #include <linux/gfp.h>
@@ -7,24 +7,24 @@
 
 #define BUFF_SIZE PAGE_SIZE
 
-struct dp_buffer_mgr {
+struct trvl_buffer_mgr {
 	char buffer[BUFF_SIZE];
 	int len;
 };
 
-static inline int dpb_init(struct dp_buffer_mgr *mgr, uint bufsize)
+static inline int trvlb_init(struct trvl_buffer_mgr *mgr, uint bufsize)
 {
 	mgr->len = 0;
 	return 0;
 }
 
-static inline int dpb_close(struct dp_buffer_mgr *mgr)
+static inline int trvlb_close(struct trvl_buffer_mgr *mgr)
 {
 	mgr->len = 0;
 	return 0;
 }
 
-static inline int dpb_log_formated_string(struct dp_buffer_mgr *mgr, char *buff, int len)
+static inline int trvlb_log_formated_string(struct trvl_buffer_mgr *mgr, char *buff, int len)
 {
 	if (len > BUFF_SIZE)
 		return 0;
@@ -35,17 +35,17 @@ static inline int dpb_log_formated_string(struct dp_buffer_mgr *mgr, char *buff,
 	return len;
 }
 
-static inline char*dpb_pull_formated_buffer(struct dp_buffer_mgr *mgr, int *size)
+static inline char*trvlb_pull_formated_buffer(struct trvl_buffer_mgr *mgr, int *size)
 {
 	*size = mgr->len;
 	return mgr->buffer;
 }
 
-static inline void dpb_put_formated_buffer(struct dp_buffer_mgr *mgr, char *buffer, int flag)
+static inline void trvlb_put_formated_buffer(struct trvl_buffer_mgr *mgr, char *buffer, int flag)
 {
 	if (flag)
 		mgr->len = 0;
 	return;
 }
 
-#endif /*__DATA_PATH_LOG__*/
+#endif /*__TRVL_LOG__*/
