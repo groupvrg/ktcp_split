@@ -1,169 +1,125 @@
 #include <linux/kernel.h>
+#include <linux/uaccess.h>
 #include <linux/slab.h>
-#include <linux/debugfs.h>
+#include <linux/proc_fs.h>
 #include <linux/module.h>
 #include <linux/ktime.h>
 #include <linux/time.h>
 
+#include "dpb.h"
+
 MODULE_AUTHOR("Markuze Alex amarkuze@vmware.com");
 MODULE_DESCRIPTION("Simple stream logger");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("1.1");
+MODULE_VERSION("0.1");
 
 static unsigned int bufsize __read_mostly = 4096;
 MODULE_PARM_DESC(bufsize, "Log buffer size in KB (4096)");
 module_param(bufsize, uint, 0);
 
-static const char debugfsnem[] = "data_path_log";
+#define procname	"data_path_log"
+#define PROC_DIR 	"dp_logger"
 
 static struct {
-	spinlock_t	lock;
-	wait_queue_head_t wait;
-	ktime_t		start;
-	u32		flush;
-
-	unsigned long	head, tail;
+	struct dp_buffer_mgr mgr;
 } dp_logger;
 
-static inline int dp_logger_used(void)
-{
-	return (dp_logger.head != dp_logger.tail);
-}
+#define _dpbm &dp_logger.mgr
 
-static int tcpprobe_open(struct inode *inode, struct file *file)
+static int dplog_open(struct inode *inode, struct file *file)
 {
-	/* Reset (empty) log */
-	spin_lock_bh(&dp_logger.lock);
-	dp_logger.head = dp_logger.tail = 0;
-	dp_logger.start = ktime_get();
-	spin_unlock_bh(&dp_logger.lock);
-
 	return 0;
 }
 
-static int tcpprobe_sprint(char *tbuf, int n)
+static ssize_t dplog_write(struct file *file, const char __user *buf,
+			      size_t size, loff_t *ppos)
 {
-	const struct tcp_log *p
-		= dp_logger.log + dp_logger.tail;
-	struct timespec64 ts
-		= ktime_to_timespec64(ktime_sub(p->tstamp, dp_logger.start));
+	char *kbuf;
+	/* start by dragging the command into memory */
+	if (size <= 1 || size >= PAGE_SIZE)
+		return -EINVAL;
 
-	return scnprintf(tbuf, n,
-			"%lu.%09lu %pISpc %pISpc %d %#x %#x %u %u %u %u %u\n",
-			(unsigned long)ts.tv_sec,
-			(unsigned long)ts.tv_nsec,
-			&p->src, &p->dst, p->length, p->snd_nxt, p->snd_una,
-			p->snd_cwnd, p->ssthresh, p->snd_wnd, p->srtt, p->rcv_wnd);
+	kbuf = memdup_user_nul(buf, size);
+	if (IS_ERR(kbuf))
+		return PTR_ERR(kbuf);
+
+	dpb_log_formated_string(_dpbm, kbuf, size);
+	kfree(kbuf);
+
+	return size;
 }
 
-static ssize_t tcpprobe_write(struct file *file, const char __user *buf,
-			      size_t len, loff_t *ppos)
-{
-		dp_logger.flush = 1;	
-		wake_up(&dp_logger.wait);
-		return len;
-}
-
-static ssize_t tcpprobe_read(struct file *file, char __user *buf,
+static ssize_t dplog_read(struct file *file, char __user *buf,
 			     size_t len, loff_t *ppos)
 {
-	int error = 0;
 	size_t cnt = 0;
 
 	if (!buf)
 		return -EINVAL;
 
-	dp_logger.flush = 0;
-
 	while (cnt < len) {
-		char tbuf[256];
-		int width;
+		int size;
+		char *buffer;
 
-		/* Wait for data in buffer */
-		error = wait_event_interruptible(dp_logger.wait,
-						 dp_logger.flush || dp_logger_used() > 0);
-		if (error || dp_logger.flush)
-			break;
-
-		spin_lock_bh(&dp_logger.lock);
-		if (dp_logger.head == dp_logger.tail) {
-			/* multiple readers race? */
-			spin_unlock_bh(&dp_logger.lock);
-			continue;
+		buffer = dpb_pull_formated_buffer(_dpbm, &size);
+		if (!buffer || !size)
+			return cnt;
+		
+		if (cnt + size > len) {
+			dpb_put_formated_buffer(_dpbm, buffer, 0);
+			return cnt;
 		}
 
-		width = tcpprobe_sprint(tbuf, sizeof(tbuf));
-
-		if (cnt + width < len)
-			dp_logger.tail = (dp_logger.tail + 1) & (bufsize - 1);
-
-		spin_unlock_bh(&dp_logger.lock);
-
-		/* if record greater than space available
-		   return partial buffer (so far) */
-		if (cnt + width >= len)
-			break;
-
-		if (copy_to_user(buf + cnt, tbuf, width))
+		if (copy_to_user(buf + cnt, buffer, size)) {
+			dpb_put_formated_buffer(_dpbm, buffer, 0);
 			return -EFAULT;
-		cnt += width;
-	}
+		}
 
-	return cnt == 0 ? error : cnt;
+		/* Consume buffer from the logging system */
+		dpb_put_formated_buffer(_dpbm, buffer, size);
+		cnt += size;
+	}
+	return cnt;
 }
 
-static const struct file_operations tcpprobe_fops = {
+static const struct file_operations dplog_fops = {
 	.owner	 = THIS_MODULE,
-	.open	 = tcpprobe_open,
-	.read    = tcpprobe_read,
-	.write   = tcpprobe_write,
+	.open	 = dplog_open,
+	.read    = dplog_read,
+	.write   = dplog_write,
 	.llseek  = noop_llseek,
 };
 
-static __init int tcpprobe_init(void)
+struct proc_dir_entry *proc_dir;
+
+static __init int dplog_init(void)
 {
 	int ret = -ENOMEM;
-
-	/* Warning: if the function signature of tcp_rcv_established,
-	 * has been changed, you also have to change the signature of
-	 * jtcp_rcv_established, otherwise you end up right here!
-	 */
-	BUILD_BUG_ON(__same_type(tcp_rcv_established,
-				 jtcp_rcv_established) == 0);
-
-	init_waitqueue_head(&dp_logger.wait);
-	spin_lock_init(&dp_logger.lock);
 
 	if (bufsize == 0)
 		return -EINVAL;
 
 	bufsize = roundup_pow_of_two(bufsize);
-	dp_logger.log = kcalloc(bufsize, sizeof(struct tcp_log), GFP_KERNEL);
-	if (!dp_logger.log)
-		goto err0;
+	if ((ret = dpb_init(_dpbm, bufsize)))
+		goto err;
+	if (! (proc_dir = proc_mkdir_mode(PROC_DIR, 00555, NULL)))
+		goto err_proc;
+	if (!proc_create(procname, 0666, proc_dir, &dplog_fops))
+		goto err_proc2;
 
-	if (!proc_create(procname, S_IRUSR, init_net.proc_net, &tcpprobe_fops))
-		goto err0;
-
-	ret = register_jprobe(&tcp_jprobe);
-	if (ret)
-		goto err1;
-
-	pr_info("probe registered (port=%d/fwmark=%u) bufsize=%u\n",
-		port, fwmark, bufsize);
 	return 0;
- err1:
-	remove_proc_entry(procname, init_net.proc_net);
- err0:
-	kfree(dp_logger.log);
+err_proc2:
+	remove_proc_subtree(PROC_DIR, NULL);
+err_proc:
+	dpb_close(_dpbm);
+err:
 	return ret;
 }
-module_init(tcpprobe_init);
+module_init(dplog_init);
 
-static __exit void tcpprobe_exit(void)
+static __exit void dplog_exit(void)
 {
-	remove_proc_entry(procname, init_net.proc_net);
-	unregister_jprobe(&tcp_jprobe);
-	kfree(dp_logger.log);
+	remove_proc_subtree(PROC_DIR, NULL);
+	dpb_close(_dpbm);
 }
-module_exit(tcpprobe_exit);
+module_exit(dplog_exit);
