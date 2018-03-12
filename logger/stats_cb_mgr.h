@@ -39,14 +39,13 @@ static inline void scbm_collect_stats(struct stats_cb_mgr *scbm,
 
 	list_for_each_safe(itr, tmp, &scbm->list) {
 		char *buff;
-		int size;
+		int size, tailroom;
 		struct stats_cb_entry *entry = list_entry(itr,
 						struct stats_cb_entry, list);
-		buff = trvlb_get_buff_head(mgr, &size);
-		if ((size = entry->get_stat(entry->ctx, buff, size)) < 0)
+		buff = trvlb_get_buff_head(mgr, &tailroom);
+		if ((size = entry->get_stat(entry->ctx, buff, tailroom)) >= tailroom)
 			pr_err("CB is exeeding remainig trivial buffer len\n");
 		trvlb_put_buff_head(mgr, size);
-		pr_err("callback used...\n");
 	}
 }
 #endif /*__STATS_CBM__*/
