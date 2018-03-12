@@ -46,6 +46,7 @@ static inline void scbm_collect_stats(struct stats_cb_mgr *scbm,
 		if ((size = entry->get_stat(entry->ctx, buff, size)) < 0)
 			pr_err("CB is exeeding remainig trivial buffer len\n");
 		trvlb_put_buff_head(mgr, size);
+		pr_err("callback used...\n");
 	}
 }
 #endif /*__STATS_CBM__*/

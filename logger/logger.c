@@ -30,12 +30,24 @@ static struct {
 #define _sbm &dp_logger.stats
 #define _s_cbm &dp_logger.cbm
 
+/****************DEBUG**********************/
+
+int debug_stats(void *ctx, char *buffer, int tailroom)
+{
+	return scnprintf(buffer, tailroom, "Hello World\n");
+}
+
+static struct stats_cb_entry debug_entry = {
+	.ctx = NULL,
+	.get_stat = debug_stats,
+};
+/*******************************************/
 static int stats_log_open(struct inode *inode, struct file *file)
 {
 	return 0;
 }
 
-static ssize_t stats_log_write(struct file *file, const char __user *buf,
+static ssize_t logger_log_write(struct file *file, const char __user *buf,
 			      size_t size, loff_t *ppos)
 {
 	char *kbuf;
@@ -53,14 +65,28 @@ static ssize_t stats_log_write(struct file *file, const char __user *buf,
 	return size;
 }
 
+static ssize_t stats_log_write(struct file *file, const char __user *buf,
+			      size_t size, loff_t *ppos)
+{
+	scbm_register(_s_cbm, &debug_entry);
+	return size;
+}
+
 static ssize_t stats_log_read(struct file *file, char __user *buf,
 			     size_t len, loff_t *ppos)
 {
+	static uint32_t stop;
 	size_t cnt = 0;
 
 	if (!buf)
 		return -EINVAL;
 
+	/*Stats: will always print something,
+	 * cat seems to call read again if prev call was != 0 */
+	if (stop++ & 1)
+		return 0;
+
+	pr_err("%s called\n", __FUNCTION__);
 	scbm_collect_stats(_s_cbm, _sbm);
 
 	while (cnt < len) {
@@ -68,6 +94,7 @@ static ssize_t stats_log_read(struct file *file, char __user *buf,
 		char *buffer;
 
 		buffer = trvlb_pull_formated_buffer(_sbm, &size);
+		pr_err("size is %d\n", size);
 		if (!buffer || !size)
 			return cnt;
 		
@@ -87,6 +114,14 @@ static ssize_t stats_log_read(struct file *file, char __user *buf,
 	}
 	return cnt;
 }
+
+static const struct file_operations logger_log_fops = {
+	.owner	 = THIS_MODULE,
+	.open	 = stats_log_open,
+	.read    = stats_log_read,
+	.write   = logger_log_write,
+	.llseek  = noop_llseek,
+};
 
 static const struct file_operations stats_log_fops = {
 	.owner	 = THIS_MODULE,
@@ -127,7 +162,7 @@ static __init int dp_log_init(void)
 		goto err_proc;
 	if (!proc_create(stats_procname, 0666, proc_dir, &stats_log_fops))
 		goto err_proc2;
-	if (!proc_create(log_procname, 0666, proc_dir, &stats_log_fops))
+	if (!proc_create(log_procname, 0666, proc_dir, &logger_log_fops))
 		goto err_proc2;
 
 	return 0;
