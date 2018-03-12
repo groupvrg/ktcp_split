@@ -73,17 +73,17 @@ static ssize_t stats_log_write(struct file *file, const char __user *buf,
 }
 
 static ssize_t stats_log_read(struct file *file, char __user *buf,
-			     size_t len, loff_t *ppos)
+			      size_t len, loff_t *ppos)
 {
-	static uint32_t stop;
 	size_t cnt = 0;
 
 	if (!buf)
 		return -EINVAL;
 
 	/*Stats: will always print something,
-	 * cat seems to call read again if prev call was != 0 */
-	if (stop++ & 1)
+	 * cat seems to call read again if prev call was != 0
+	 * ppos points to file->f_pos*/
+	if ((*ppos)++ & 1)
 		return 0;
 
 	pr_err("%s called\n", __FUNCTION__);
