@@ -15,30 +15,35 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Markuze Alex");
 MODULE_DESCRIPTION("logging packets");
 
-static unsigned int udp_port(struct sk_buff *skb)
+static inline void udp_port(struct sk_buff *skb, int *src, int *dst)
 {
 	struct udphdr *udphdr = (struct udphdr *)skb_transport_header(skb);
-	return ntohs(udphdr->dest);
+	*dst = ntohs(udphdr->dest);
+	*src = ntohs(udphdr->source);
+	return;
 }
 
-static unsigned int tcp_port(struct sk_buff *skb)
+static inline void tcp_port(struct sk_buff *skb, int *src, int *dst)
 {
 	struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
-	return ntohs(tcphdr->dest);
+	*dst = ntohs(tcphdr->dest);
+	*src = ntohs(tcphdr->source);
 }
 
 static unsigned int get_port(struct sk_buff *skb)
 {
 	struct iphdr *iph = ip_hdr(skb);
-	int port = 0;
+	int src, dst;
 
-	
+	src = dst = 0;
+
 	if (iph->protocol == 6)
-		port = tcp_port(skb);	
+		tcp_port(skb, &src, &dst);
 	
 	if (iph->protocol == 17)
-		port = udp_port(skb);	
-	return (port >=5000 && port <=6000);
+		udp_port(skb, &src, &dst);
+
+	return (src >=5000 && src <=6000) || (dst >=5000 && dst <=6000);
 }
 
 static unsigned int cbn_trace_hook(void *priv,
