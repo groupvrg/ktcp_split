@@ -94,7 +94,7 @@ static inline const char *proto_string(u8 protocol)
 
 #define dump_tcph(tcphdr)	idx += sprintf(&store[idx], "\n\t\t%d => %d "					\
 						"\t\t%s %s %s\n"						\
-						"\t\tseq %d ack %d window %d\n"					\
+						"\t\tseq %u ack %d window %u\n"					\
 						,ntohs(tcphdr->source), ntohs(tcphdr->dest)			\
 						, tcphdr->syn ? "SYN" : ""					\
 						, tcphdr->ack ? "ACK" : ""					\

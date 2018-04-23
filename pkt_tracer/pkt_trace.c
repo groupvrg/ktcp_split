@@ -32,12 +32,13 @@ static unsigned int get_port(struct sk_buff *skb)
 	struct iphdr *iph = ip_hdr(skb);
 	int port = 0;
 
+	
 	if (iph->protocol == 6)
 		port = tcp_port(skb);	
-
+	
 	if (iph->protocol == 17)
 		port = udp_port(skb);	
-	return 0;//(port >=5000 || port <=6000);
+	return (port >=5000 && port <=6000);
 }
 
 static unsigned int cbn_trace_hook(void *priv,

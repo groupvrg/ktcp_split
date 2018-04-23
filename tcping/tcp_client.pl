@@ -16,7 +16,8 @@ sub get_params {
 	}
 }
 
-my $serverip = '10.154.0.2';	#VMA
+my $serverip = '10.128.0.9';	#VMA
+#my $serverip = '35.192.100.86';	#VMA
 my $serverport = 5556;
 my $size = (64 * 1024) - 28;
 get_params();
