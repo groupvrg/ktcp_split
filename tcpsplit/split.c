@@ -251,6 +251,7 @@ static inline struct cbn_qp *sync_qp(struct cbn_qp* qp, uint8_t dir)
 		TRACE_PRINT("QP exists, waking peer");
 	} else {
 		TRACE_PRINT("QP created... waiting for peer");
+		init_waitqueue_head(&qp->wait);
 		if (!qp->qp_dir[dir]) {
 			int error;
 			error = wait_event_interruptible_timeout(qp->wait,

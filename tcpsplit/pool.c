@@ -80,7 +80,7 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 		elem->task = k;
 		elem->pool = cbn_pool;
 		list_add(&elem->list, &cbn_pool->kthread_pool);
-		POOL_PRINT("pool thread %d [%p] allocated %llx", cbn_pool->top_count, elem, rdtsc());
+		//POOL_PRINT("pool thread %d [%p] allocated %llx", cbn_pool->top_count, elem, rdtsc());
 		--cbn_pool->refil_needed;
 		++cbn_pool->top_count;
 	}
