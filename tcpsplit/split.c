@@ -247,8 +247,8 @@ static inline struct cbn_qp *sync_qp(struct cbn_qp* qp, uint8_t dir)
 		}
 		kmem_cache_free(qp_slab, qp);
 		qp = tx_qp;
-		wake_up(&qp->wait);
 		TRACE_PRINT("QP exists, waking peer");
+		wake_up(&qp->wait);
 	} else {
 		TRACE_PRINT("QP created... waiting for peer");
 		init_waitqueue_head(&qp->wait);

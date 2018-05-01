@@ -7,7 +7,8 @@
 #include "cbn_common.h"
 #include "pool.h"
 
-#define POOL_PRINT TRACE_PRINT
+#define POOL_PRINT(...)
+#define POOL_ERR TRACE_PRINT
 
 #define cbn_list_del(x) {POOL_PRINT("list_del(%d:%s): %p {%p, %p}", __LINE__, current->comm, x, (x)->next, (x)->prev); list_del((x));}
 #define cbn_list_add(x, h) {POOL_PRINT("list_add(%d:%s): %p {%p, %p} h %p {%p, %p}", 	\
@@ -33,7 +34,7 @@ static int pipe_loop_task(void *data)
 		if (elem->pool_task)
 			elem->pool_task(elem->data);
 		else
-			POOL_PRINT("ERROR %s: no pool task", __FUNCTION__);
+			POOL_ERR("ERROR %s: no pool task", __FUNCTION__);
 
 		POOL_PRINT("sleeping %s", current->comm);
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -58,12 +59,12 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 {
 	count = (count) ? count : cbn_pool->refil_needed;
 
-	TRACE_PRINT("pool %p count %d", cbn_pool, count);
+	POOL_PRINT("pool %p count %d", cbn_pool, count);
 	while (count--) {
 		struct task_struct *k;
 		struct pool_elem *elem = kmem_cache_alloc(cbn_pool->pool_slab, GFP_ATOMIC);
 		if (unlikely(!elem)) {
-			POOL_PRINT("ERROR: elem is NULL");
+			POOL_ERR("ERROR: elem is NULL");
 			pr_err("ERROR: elem is NULL\n");
 			return;
 		}
@@ -71,7 +72,7 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 		k = kthread_create(threadfn, elem, "pool-thread-%d", cbn_pool->top_count);
 
 		if (unlikely(!k)) {
-			POOL_PRINT("ERROR: failed to create kthread %d", cbn_pool->top_count);
+			POOL_ERR("ERROR: failed to create kthread %d", cbn_pool->top_count);
 			pr_err("ERROR: failed to create kthread %d\n", cbn_pool->top_count);
 			kmem_cache_free(cbn_pool->pool_slab, elem);
 			return;
@@ -80,7 +81,7 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 		elem->task = k;
 		elem->pool = cbn_pool;
 		list_add(&elem->list, &cbn_pool->kthread_pool);
-		//POOL_PRINT("pool thread %d [%p] allocated %llx", cbn_pool->top_count, elem, rdtsc());
+		POOL_PRINT("pool thread %d [%p] allocated %llx", cbn_pool->top_count, elem, rdtsc());
 		--cbn_pool->refil_needed;
 		++cbn_pool->top_count;
 	}
@@ -113,6 +114,7 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 
 	while (unlikely(list_empty(&cbn_pool->kthread_pool))) {
 		pr_warn("pool is empty refill is to slow\n");
+		POOL_ERR("pool is empty refill is to slow\n");
 		refill_pool(cbn_pool, 1);
 	}
 
@@ -120,7 +122,7 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 	list_del(&elem->list);
 	++cbn_pool->refil_needed;
 	refill_task_start(cbn_pool);
-	//POOL_PRINT("allocated %p [%p]\n", elem, elem->task);
+	POOL_PRINT("allocated %p [%p]\n", elem, elem->task);
 	return elem;
 }
 
@@ -135,7 +137,7 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 	elem->pool_task = func;
 	elem->data = data;
 	list_add(&elem->list, &cbn_pool->kthread_running);
-	//POOL_PRINT("staring %s\n", elem->task->comm);
+	POOL_PRINT("staring %s\n", elem->task->comm);
 	wake_up_process(elem->task);
 	return elem;
 }

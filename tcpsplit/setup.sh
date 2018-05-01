@@ -1,1 +1,1 @@
-sudo iptables -I PREROUTING -t nat  -p tcp -m mark --mark 2 -j REDIRECT --to-port 9216
+sudo iptables -I PREROUTING -t nat  -p tcp -m mark --mark 2 -j REDIRECT --to-port 5557
