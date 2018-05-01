@@ -234,6 +234,51 @@ out:
 	return rc;
 }
 
+static inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
+{
+	struct cbn_qp *qp = pqp;
+
+	if ((qp = add_rb_data(pqp->root, pqp))) {
+		/* QP already exists */
+		if (qp->qp_dir[dir] != NULL) {
+			/* *
+			 * Double Syn, this DIR qp already exists,
+			 * either active(Valid socket) or in progress (-EINVAL)
+			 * Drop this QP and stop.
+			 * */
+			return NULL;
+		}
+		/* *
+		 * Other DIR beat you to it, use the existing QP
+		 * mark as -EINVAL for double SYN.
+		 * */
+		qp->qp_dir[dir] = pqp->qp_dir[dir];
+		kmem_cache_free(qp_slab, pqp);
+		pqp = qp;
+	}
+	return pqp;
+}
+
+static inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
+{
+	int err = 0;
+
+	/*
+	 * You shouldnt be here unless your dir sock is valid.
+	 * TODO: TOCTOU bug ahead.
+	 * */
+
+	if (IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1])) {
+		err = wait_event_interruptible_timeout(qp->wait,
+							qp->qp_dir[dir], 3 * HZ);
+	} else {
+		wake_up(&qp->wait);
+	}
+
+	return err;
+}
+
+#if 0
 static inline struct cbn_qp *sync_qp(struct cbn_qp* qp, uint8_t dir)
 {
 	struct cbn_qp *tx_qp;
@@ -265,6 +310,7 @@ err:
 	/* Consider error handling...*/
 	return qp;
 }
+#endif
 
 static int start_new_connection_syn(void *arg)
 {
@@ -285,8 +331,19 @@ static int start_new_connection_syn(void *arg)
 	atomic_set(&qp->ref_cnt, 0);
 
 	qp->tx = ERR_PTR(-EINVAL);
+	listner = search_rb_listner(&listner_root, addresses->mark);
+	qp->root = &listner->connections_root;
 
-	//TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
+	qp = qp_exists(qp, TX_QP);
+	//TODO: add locks to this shit
+	if (unlikely(qp == NULL)) {
+		TRACE_PRINT("connection exists : port %d IP %pI4n",
+				ntohs(addresses->dest.sin_port), &addresses->dest.sin_addr);
+		kmem_cache_free(syn_slab, addresses);
+		return  0;
+	}
+
+	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
 		pr_err("%s error (%d)\n", __FUNCTION__, rc);
 		goto connect_fail;
@@ -318,13 +375,11 @@ static int start_new_connection_syn(void *arg)
 connect_fail:
 	qp->rx = NULL;
 
-	listner = search_rb_listner(&listner_root, addresses->mark);
-	qp->root = &listner->connections_root;
-
-	kmem_cache_free(syn_slab, addresses);
-	//TODO: add locks to this shit
 	TRACE_PRINT("%s qp %p listner %p mark %d", __FUNCTION__, qp, listner, addresses->mark);
-	qp = sync_qp(qp, RX_QP);
+	kmem_cache_free(syn_slab, addresses);
+
+	if (wait_qp_ready(qp, TX_QP))
+		goto out;
 
 	DUMP_TRACE
 	sockets.tx = (struct socket *)qp->rx;
@@ -408,12 +463,10 @@ static int start_new_connection(void *arg)
 		goto create_fail;
 	}
 
-/*
 	line = __LINE__;
-	if ((rc = kernel_getsockname(tx, (struct sockaddr *)&addr, &size)))
-		goto connect_fail;
-*/
-	//TRACE_PRINT("connected local port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
+	if ((rc = kernel_getsockname(rx, (struct sockaddr *)&addr, &size)))
+		goto create_fail;
+	TRACE_PRINT("connected local port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
 
 	qp->addr_d = addr.sin_addr;
 	qp->port_s = cli_addr.sin_port;
@@ -423,7 +476,11 @@ static int start_new_connection(void *arg)
 	/*rp->root/qp->mark no longer valid, qp is a union*/
 	qp->tx = NULL;
 
-	qp = sync_qp(qp, TX_QP);
+	/* consolidate into one qp */
+	qp = qp_exists(qp, RX_QP);
+
+	if (wait_qp_ready(qp, RX_QP))
+		goto out;
 
 	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	DUMP_TRACE
@@ -435,7 +492,7 @@ static int start_new_connection(void *arg)
 	atomic_inc(&qp->ref_cnt);
 	half_duplex(&sockets, qp);
 out:
-	//TRACE_PRINT("closing port %d IP %pI4n", ntohs(addr.sin_port), &addr.sin_addr);
+	TRACE_PRINT("closing port %d IP %pI4n", ntohs(addr.sin_port), &addr.sin_addr);
 	/* Teardown */
 	/* free both sockets*/
 	rc = line = 0;
