@@ -246,6 +246,7 @@ static inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 			 * either active(Valid socket) or in progress (-EINVAL)
 			 * Drop this QP and stop.
 			 * */
+			pr_warn("double syn\n");
 			return NULL;
 		}
 		/* *
@@ -267,11 +268,13 @@ static inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 	 * You shouldnt be here unless your dir sock is valid.
 	 * TODO: TOCTOU bug ahead.
 	 * */
-
+	TRACE_PRINT("QP %p", qp);
 	if (IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1])) {
+		TRACE_PRINT("QP %p sleeping", qp);
 		err = wait_event_interruptible_timeout(qp->wait,
 							qp->qp_dir[dir], 3 * HZ);
 	} else {
+		TRACE_PRINT("QP %p waking peer", qp);
 		wake_up(&qp->wait);
 	}
 
@@ -343,6 +346,7 @@ static int start_new_connection_syn(void *arg)
 		kmem_cache_free(syn_slab, addresses);
 		return  0;
 	}
+	TRACE_PRINT("QP is %p", qp);
 
 	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
@@ -479,7 +483,7 @@ static int start_new_connection(void *arg)
 
 	/* consolidate into one qp */
 	qp = qp_exists(qp, RX_QP);
-
+	TRACE_PRINT("QP is %p", qp);
 	if (wait_qp_ready(qp, RX_QP))
 		goto out;
 
