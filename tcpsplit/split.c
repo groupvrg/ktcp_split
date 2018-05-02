@@ -246,7 +246,6 @@ static inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 			 * either active(Valid socket) or in progress (-EINVAL)
 			 * Drop this QP and stop.
 			 * */
-			pr_warn("double syn\n");
 			return NULL;
 		}
 		/* *
@@ -268,8 +267,9 @@ static inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 	 * You shouldnt be here unless your dir sock is valid.
 	 * TODO: TOCTOU bug ahead.
 	 * */
-	TRACE_PRINT("QP %p", qp);
 	if (IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1])) {
+		TRACE_PRINT("QP %p schedule", qp);
+		schedule();
 		TRACE_PRINT("QP %p sleeping", qp);
 		err = wait_event_interruptible_timeout(qp->wait,
 							qp->qp_dir[dir], 3 * HZ);
@@ -565,7 +565,7 @@ static int split_server(void *mark_port)
 		goto error;
 
 	server->status = 5;
-
+	TRACE_PRINT("accepting on port %d", port);
 	do {
 		struct socket *nsock;
 		struct cbn_qp *qp;
