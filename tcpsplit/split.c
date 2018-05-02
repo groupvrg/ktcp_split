@@ -329,6 +329,7 @@ static int start_new_connection_syn(void *arg)
 	qp->port_d = addresses->dest.sin_port;
 	qp->addr_s = addresses->src.sin_addr;
 	atomic_set(&qp->ref_cnt, 0);
+	init_waitqueue_head(&qp->wait);
 
 	qp->tx = ERR_PTR(-EINVAL);
 	listner = search_rb_listner(&listner_root, addresses->mark);
@@ -574,6 +575,7 @@ static int split_server(void *mark_port)
 		qp->tid 	= mark;
 		qp->root 	= &server->connections_root;
 		atomic_set(&qp->ref_cnt, 0);
+		init_waitqueue_head(&qp->wait);
 		TRACE_PRINT("%s scheduling start_new_connection [%d]", __FUNCTION__, mark);
 		kthread_pool_run(&cbn_pool, start_new_connection, qp);
 
