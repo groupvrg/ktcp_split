@@ -153,7 +153,7 @@ int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool)
 	cbn_pool->refil_needed = cbn_pool->pool_size;
 	cbn_pool->refil = kthread_run(refil_thread, cbn_pool, "pool-cache-refill");
 
-	set_user_nice(cbn_pool->refil, MAX_NICE);
+	//set_user_nice(cbn_pool->refil, MAX_NICE);
 	return 0;
 }
 
