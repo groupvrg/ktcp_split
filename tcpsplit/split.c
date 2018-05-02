@@ -68,6 +68,7 @@ static unsigned int cbn_ingress_hook(void *priv,
 {
 	if (!skb->mark)
 		goto out;
+
 	if (trace_iph(skb, priv)) {
 		struct iphdr *iphdr = ip_hdr(skb);
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
@@ -141,15 +142,15 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 		.priority	= (NF_IP_PRI_SECURITY +1),
 		.priv		= "SEC+1"
 		},
+*/
 		{
 		.hook		= cbn_ingress_hook,
 		.hooknum	= NF_INET_LOCAL_IN,
 		.pf		= PF_INET,
-		.priority	= NF_IP_PRI_FIRST,
+		.priority	= NF_IP_PRI_LAST,
 		.priv		= "LIN"
 		},
-
-*/
+/*
 		{
 		.hook		= cbn_ingress_hook,
 		.hooknum	= NF_INET_PRE_ROUTING,
@@ -157,6 +158,7 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 		.priority	= NF_IP_PRI_RAW + CBN_PRIO_OFFSET,
 		.priv		= "RX"
 		},
+*/
 //TODO: Add LOCAL_IN to mark packets with tennant_id
 };
 
