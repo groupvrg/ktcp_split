@@ -40,6 +40,16 @@ struct cbn_qp {
 	};
 };
 
+static inline void dump_key(struct cbn_qp *qp)
+{
+	int i;
+	pr_info("%p:\n", qp);
+	for (i = 0; i < RB_KEY_LENGTH; i+=4)
+	{
+		pr_info("> %x%x %x%x <\n", qp->key[0], qp->key[1], qp->key[2], qp->key[3]);
+	}
+}
+
 struct cbn_listner {
 	struct rb_node 	node;
 	struct rb_root  connections_root;

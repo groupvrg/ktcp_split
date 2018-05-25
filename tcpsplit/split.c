@@ -238,6 +238,7 @@ static inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 {
 	struct cbn_qp *qp = pqp;
 
+	dump_key(pqp);
 	if ((qp = add_rb_data(pqp->root, pqp))) {
 		/* QP already exists */
 		if (qp->qp_dir[dir] != NULL) {
@@ -278,7 +279,7 @@ static inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 		TRACE_PRINT("QP %p waking peer", qp);
 		wake_up(&qp->wait);
 	}
-	
+
 	if (err)
 		TRACE_PRINT("ERROR %d", err);
 	return err;
