@@ -69,7 +69,6 @@ static unsigned int cbn_ingress_hook(void *priv,
 	if (!skb->mark)
 		goto out;
 
-	TRACE_PRINT("Hello %s", (char *)priv);
 	if (trace_iph(skb, priv)) {
 		struct iphdr *iphdr = ip_hdr(skb);
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
@@ -354,7 +353,7 @@ static int start_new_connection_syn(void *arg)
 
 	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
-		pr_err("%s error (%d)\n", __FUNCTION__, rc);
+		pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
 		goto connect_fail;
 	}
 
@@ -362,7 +361,7 @@ static int start_new_connection_syn(void *arg)
 		goto connect_fail;
 
 	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0) {
-		pr_err("%s error (%d)\n", __FUNCTION__, rc);
+		pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
 		goto connect_fail;
 	}
 
@@ -376,7 +375,7 @@ static int start_new_connection_syn(void *arg)
 
 	addresses->dest.sin_family = AF_INET;
 	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0))) {
-		pr_err("%s error (%d)\n", __FUNCTION__, rc);
+		pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
 		goto connect_fail;
 	}
 
