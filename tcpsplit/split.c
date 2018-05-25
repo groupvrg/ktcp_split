@@ -241,6 +241,7 @@ static inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 	dump_key(pqp);
 	if ((qp = add_rb_data(pqp->root, pqp))) {
 		/* QP already exists */
+		TRACE_PRINT("QP %p [%p] <%d>", qp, qp->qp_dir[dir], dir);
 		if (qp->qp_dir[dir] != NULL) {
 			/* *
 			 * Double Syn, this DIR qp already exists,
@@ -338,6 +339,7 @@ static int start_new_connection_syn(void *arg)
 	atomic_set(&qp->ref_cnt, 0);
 	init_waitqueue_head(&qp->wait);
 
+	qp->rx = NULL;
 	qp->tx = ERR_PTR(-EINVAL);
 	listner = search_rb_listner(&listner_root, addresses->mark);
 	qp->root = &listner->connections_root;
@@ -382,7 +384,6 @@ static int start_new_connection_syn(void *arg)
 
 	qp->tx = tx;
 connect_fail:
-	qp->rx = NULL;
 
 	TRACE_PRINT("%s qp %p listner %p mark %d", __FUNCTION__, qp, listner, addresses->mark);
 	kmem_cache_free(syn_slab, addresses);
@@ -476,13 +477,13 @@ static int start_new_connection(void *arg)
 	qp->port_s = cli_addr.sin_port;
 	qp->port_d = addr.sin_port;
 	qp->addr_s = cli_addr.sin_addr;
+	/*rp->root/qp->mark no longer valid, qp is a union*/
 
 	line = __LINE__;
 	if ((rc = kernel_getsockname(rx, (struct sockaddr *)&addr, &size)))
 		goto create_fail;
 	TRACE_PRINT("connected local port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
 
-	/*rp->root/qp->mark no longer valid, qp is a union*/
 	qp->tx = NULL;
 
 	/* consolidate into one qp */
