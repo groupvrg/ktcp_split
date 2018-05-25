@@ -472,15 +472,15 @@ static int start_new_connection(void *arg)
 		goto create_fail;
 	}
 
-	line = __LINE__;
-	if ((rc = kernel_getsockname(rx, (struct sockaddr *)&addr, &size)))
-		goto create_fail;
-	TRACE_PRINT("connected local port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
-
 	qp->addr_d = addr.sin_addr;
 	qp->port_s = cli_addr.sin_port;
 	qp->port_d = addr.sin_port;
 	qp->addr_s = cli_addr.sin_addr;
+
+	line = __LINE__;
+	if ((rc = kernel_getsockname(rx, (struct sockaddr *)&addr, &size)))
+		goto create_fail;
+	TRACE_PRINT("connected local port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
 
 	/*rp->root/qp->mark no longer valid, qp is a union*/
 	qp->tx = NULL;

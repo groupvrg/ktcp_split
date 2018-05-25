@@ -46,7 +46,7 @@ static inline void dump_key(struct cbn_qp *qp)
 	pr_info("%p:\n", qp);
 	for (i = 0; i < RB_KEY_LENGTH; i+=4)
 	{
-		pr_info("> %x%x %x%x <\n", qp->key[0], qp->key[1], qp->key[2], qp->key[3]);
+		pr_info("> %x%x %x%x <\n", qp->key[i], qp->key[i+1], qp->key[i+2], qp->key[i+3]);
 	}
 }
 
