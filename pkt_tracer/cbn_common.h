@@ -98,7 +98,7 @@ static inline const char *proto_string(u8 protocol)
 						,ntohs(tcphdr->source), ntohs(tcphdr->dest)			\
 						, tcphdr->syn ? "SYN" : ""					\
 						, tcphdr->ack ? "ACK" : ""					\
-						, tcphdr->ack ? "FIN" : ""					\
+						, tcphdr->fin ? "FIN" : ""					\
 						,ntohl(tcphdr->seq), ntohl(tcphdr->ack_seq)			\
 						,ntohs(tcphdr->window)						\
 						);

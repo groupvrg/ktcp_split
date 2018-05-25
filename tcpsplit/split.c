@@ -69,6 +69,7 @@ static unsigned int cbn_ingress_hook(void *priv,
 	if (!skb->mark)
 		goto out;
 
+	TRACE_PRINT("Hello %s", (char *)priv);
 	if (trace_iph(skb, priv)) {
 		struct iphdr *iphdr = ip_hdr(skb);
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
@@ -142,15 +143,14 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 		.priority	= (NF_IP_PRI_SECURITY +1),
 		.priv		= "SEC+1"
 		},
-*/
 		{
 		.hook		= cbn_ingress_hook,
 		.hooknum	= NF_INET_LOCAL_IN,
 		.pf		= PF_INET,
-		.priority	= NF_IP_PRI_LAST,
+		.priority	= NF_IP_PRI_FIRST,
 		.priv		= "LIN"
 		},
-/*
+		*/
 		{
 		.hook		= cbn_ingress_hook,
 		.hooknum	= NF_INET_PRE_ROUTING,
@@ -158,7 +158,6 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 		.priority	= NF_IP_PRI_RAW + CBN_PRIO_OFFSET,
 		.priv		= "RX"
 		},
-*/
 //TODO: Add LOCAL_IN to mark packets with tennant_id
 };
 
@@ -274,12 +273,15 @@ static inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 		schedule();
 		TRACE_PRINT("QP %p sleeping", qp);
 		err = wait_event_interruptible_timeout(qp->wait,
-							qp->qp_dir[dir], 3 * HZ);
+							!IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]),
+						       	3 * HZ);
 	} else {
 		TRACE_PRINT("QP %p waking peer", qp);
 		wake_up(&qp->wait);
 	}
-
+	
+	if (err)
+		TRACE_PRINT("ERROR %d", err);
 	return err;
 }
 
