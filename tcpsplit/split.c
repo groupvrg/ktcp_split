@@ -281,9 +281,9 @@ static inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 		wake_up(&qp->wait);
 	}
 
-	if (err)
+	if (!err)
 		TRACE_PRINT("ERROR %d", err);
-	return err;
+	return !!err;
 }
 
 #if 0
