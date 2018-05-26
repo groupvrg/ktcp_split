@@ -273,17 +273,20 @@ static inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 		TRACE_PRINT("QP %p schedule", qp);
 		schedule();
 		TRACE_PRINT("QP %p sleeping", qp);
+		/*should return non zero*/
 		err = wait_event_interruptible_timeout(qp->wait,
 							!IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]),
 						       	3 * HZ);
+		if (!err) {
+			TRACE_PRINT("TIMEOUT %d", err);
+			err = 1;
+		}
 	} else {
 		TRACE_PRINT("QP %p waking peer", qp);
 		wake_up(&qp->wait);
 	}
 
-	if (!err)
-		TRACE_PRINT("ERROR %d", err);
-	return !!err;
+	return err;
 }
 
 #if 0
