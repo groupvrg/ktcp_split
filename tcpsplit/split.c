@@ -270,14 +270,15 @@ static inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 	 * TODO: TOCTOU bug ahead.
 	 * */
 	if (IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1])) {
+		int rc;
 		TRACE_PRINT("QP %p schedule", qp);
 		schedule();
 		TRACE_PRINT("QP %p sleeping", qp);
 		/*should return non zero*/
-		err = wait_event_interruptible_timeout(qp->wait,
+		rc = wait_event_interruptible_timeout(qp->wait,
 							!IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]),
 						       	3 * HZ);
-		if (!err) {
+		if (!rc) {
 			TRACE_PRINT("TIMEOUT %d", err);
 			err = 1;
 		}
