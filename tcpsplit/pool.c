@@ -7,7 +7,8 @@
 #include "cbn_common.h"
 #include "pool.h"
 
-#define POOL_PRINT(...)
+//#define POOL_PRINT(...)
+#define POOL_PRINT TRACE_PRINT
 #define POOL_ERR TRACE_PRINT
 
 #define cbn_list_del(x) {POOL_PRINT("list_del(%d:%s): %p {%p, %p}", __LINE__, current->comm, x, (x)->next, (x)->prev); list_del((x));}
@@ -60,6 +61,7 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 	count = (count) ? count : cbn_pool->refil_needed;
 
 	POOL_PRINT("pool %p count %d", cbn_pool, count);
+	count = (count < 0) ? 0 : count;
 	while (count--) {
 		struct task_struct *k;
 		struct pool_elem *elem = kmem_cache_alloc(cbn_pool->pool_slab, GFP_ATOMIC);
