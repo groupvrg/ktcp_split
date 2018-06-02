@@ -238,7 +238,6 @@ static inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 {
 	struct cbn_qp *qp = pqp;
 
-	dump_key(pqp);
 	if ((qp = add_rb_data(pqp->root, pqp))) {
 		/* QP already exists */
 		TRACE_PRINT("QP %p [%p] <%d>", qp, qp->qp_dir[dir], dir);
