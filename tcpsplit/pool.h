@@ -8,7 +8,9 @@ struct kthread_pool {
 	struct kmem_cache *pool_slab;
 	struct task_struct *refil;
 	struct list_head kthread_pool;
+	spinlock_t pool_lock;
 	struct list_head kthread_running;
+	spinlock_t running_lock;
 };
 
 struct pool_elem {

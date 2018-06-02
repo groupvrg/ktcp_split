@@ -20,9 +20,13 @@
 
 static void kthread_pool_reuse(struct kthread_pool *cbn_pool, struct pool_elem *elem)
 {
+	spin_lock_bh(&cbn_pool->running_lock);
 	list_del(&elem->list);
+	spin_unlock_bh(&cbn_pool->running_lock);
+	spin_lock_bh(&cbn_pool->pool_lock);
 	list_add(&elem->list, &cbn_pool->kthread_pool);
 	--cbn_pool->refil_needed;
+	spin_unlock_bh(&cbn_pool->pool_lock);
 }
 
 static int pipe_loop_task(void *data)
@@ -49,7 +53,9 @@ static int pipe_loop_task(void *data)
 	//	consider adding some state? user might try freeing this struct, make sure its not running
 	//	also consider frreing yourself if you are here...
 	}
+	spin_lock_bh(&pool->running_lock);
 	list_del(&elem->list);
+	spin_unlock_bh(&pool->running_lock);
 	kmem_cache_free(pool->pool_slab, elem);
 	return 0;
 }
@@ -82,10 +88,12 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 		INIT_LIST_HEAD(&elem->list);
 		elem->task = k;
 		elem->pool = cbn_pool;
+		spin_lock_bh(&cbn_pool->pool_lock);
 		list_add(&elem->list, &cbn_pool->kthread_pool);
-		POOL_PRINT("pool thread %d [%p] allocated %llx", cbn_pool->top_count, elem, rdtsc());
 		--cbn_pool->refil_needed;
 		++cbn_pool->top_count;
+		spin_unlock_bh(&cbn_pool->pool_lock);
+		POOL_PRINT("pool thread %d [%p] allocated %llx", cbn_pool->top_count, elem, rdtsc());
 	}
 }
 
@@ -114,16 +122,18 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 {
 	struct pool_elem *elem = NULL;
 
+	refill_task_start(cbn_pool);
 	while (unlikely(list_empty(&cbn_pool->kthread_pool))) {
 		pr_warn("pool is empty refill is to slow\n");
 		POOL_ERR("pool is empty refill is to slow\n");
-		refill_pool(cbn_pool, 1);
+		return NULL;
 	}
 
+	spin_lock_bh(&cbn_pool->pool_lock);
 	elem = list_first_entry(&cbn_pool->kthread_pool, struct pool_elem, list);
 	list_del(&elem->list);
 	++cbn_pool->refil_needed;
-	refill_task_start(cbn_pool);
+	spin_unlock_bh(&cbn_pool->pool_lock);
 	POOL_PRINT("allocated %p [%p]\n", elem, elem->task);
 	return elem;
 }
@@ -138,7 +148,9 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 
 	elem->pool_task = func;
 	elem->data = data;
+	spin_lock_bh(&cbn_pool->running_lock);
 	list_add(&elem->list, &cbn_pool->kthread_running);
+	spin_unlock_bh(&cbn_pool->running_lock);
 	POOL_PRINT("staring %s\n", elem->task->comm);
 	wake_up_process(elem->task);
 	return elem;
@@ -149,6 +161,10 @@ int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool)
 	TRACE_PRINT("starting: %s", __FUNCTION__);
 	INIT_LIST_HEAD(&cbn_pool->kthread_pool);
 	INIT_LIST_HEAD(&cbn_pool->kthread_running);
+
+	spin_lock_init(&cbn_pool->pool_lock);
+	spin_lock_init(&cbn_pool->running_lock);
+
 	cbn_pool->pool_slab = kmem_cache_create("pool-thread-cache",
 						sizeof(struct pool_elem), 0, 0, NULL);
 

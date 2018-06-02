@@ -4,7 +4,7 @@
 #include <linux/kthread.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-
+#include <spinlock.h>
 #include <linux/printk.h>
 
 struct kthread_pool {
