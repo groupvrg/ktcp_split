@@ -1,3 +1,5 @@
+echo 2,5557 > /proc/cbn/cbn_proc
+
 sudo iptables -D PREROUTING 1 -t nat
 sudo iptables -I PREROUTING -t nat -i gue+ -p tcp -m mark --mark 2 -j REDIRECT --to-ports 5557
 
