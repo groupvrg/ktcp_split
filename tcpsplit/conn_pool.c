@@ -326,7 +326,7 @@ static int prec_conn_listner_server(void *arg)
 		rc = kernel_accept(sock, &nsock, 0);
 		if (unlikely(rc)) {
 			TRACE_PRINT("rc is %d", rc);
-			goto rc;
+			goto out;
 		}
 
 		TRACE_PRINT("new pre connection...");
