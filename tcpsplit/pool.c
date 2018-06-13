@@ -185,6 +185,7 @@ void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool)
 	list_for_each_safe(itr, tmp, &cbn_pool->kthread_pool) {
 		struct pool_elem *task = container_of(itr, struct pool_elem, list);
 		list_del(itr);
+		TRACE_PRINT("stopping pool %s", task->task->comm);
 		kthread_stop(task->task);
 		kmem_cache_free(cbn_pool->pool_slab, task);
 	}
@@ -192,6 +193,7 @@ void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool)
 	list_for_each_safe(itr, tmp, &cbn_pool->kthread_running) {
 		struct pool_elem *task = container_of(itr, struct pool_elem, list);
 		list_del(itr);
+		TRACE_PRINT("stopping pool %s", task->task->comm);
 		kthread_stop(task->task);
 		kmem_cache_free(cbn_pool->pool_slab, task);
 	}
