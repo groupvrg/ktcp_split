@@ -406,7 +406,7 @@ int __init cbn_pre_connect_init(void)
 	long port = PRECONN_SERVER_PORT;
 	INIT_LIST_HEAD(&pre_conn_list_client);
 	INIT_LIST_HEAD(&pre_conn_list_server);
-	kthread_pool_run(&cbn_pool, prec_conn_listner_server, (void *)port);
+	kthread_run(prec_conn_listner_server, (void *)port,"pre-conn-server");
 
 	return 0;
 }
@@ -416,7 +416,8 @@ int __exit cbn_pre_connect_end(void)
 	struct list_head *itr, *tmp;
 
 	TRACE_PRINT("listner %p [%p]", pre_conn_listner, pre_conn_listner ? pre_conn_listner->sock: NULL);
-	kernel_sock_shutdown(pre_conn_listner->sock, SHUT_RDWR);
+	if (pre_conn_listner)
+		kernel_sock_shutdown(pre_conn_listner->sock, SHUT_RDWR);
 
 	TRACE_PRINT("clear client connections");
 	clear_client_pre_connections();
