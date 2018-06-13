@@ -637,8 +637,8 @@ int __init cbn_datapath_init(void)
 					sizeof(struct addresses), 0, 0, NULL);
 
 	cbn_kthread_pool_init(&cbn_pool);
-	nf_register_net_hooks(&init_net, cbn_nf_hooks, ARRAY_SIZE(cbn_nf_hooks));
 	cbn_pre_connect_init();
+	nf_register_net_hooks(&init_net, cbn_nf_hooks, ARRAY_SIZE(cbn_nf_hooks));
 	cbn_proc_init();
 	return 0;
 }
@@ -647,9 +647,11 @@ void __exit cbn_datapath_clean(void)
 {
 	TRACE_PRINT("Removing proc");
 	cbn_proc_clean();
+	TRACE_PRINT("Removing nf");
+	nf_unregister_net_hooks(&init_net, cbn_nf_hooks,  ARRAY_SIZE(cbn_nf_hooks));
 	TRACE_PRINT("Removing pre-connections");
 	cbn_pre_connect_end();
-	nf_unregister_net_hooks(&init_net, cbn_nf_hooks,  ARRAY_SIZE(cbn_nf_hooks));
+	TRACE_PRINT("Stop sockets");
 	stop_sockets();
 	TRACE_PRINT("sockets stopped");
 	cbn_kthread_pool_clean(&cbn_pool);

@@ -324,8 +324,10 @@ static int prec_conn_listner_server(void *arg)
 		struct cbn_qp *qp;
 
 		rc = kernel_accept(sock, &nsock, 0);
-		if (unlikely(rc))
-			goto out;
+		if (unlikely(rc)) {
+			TRACE_PRINT("rc is %d", rc);
+			goto rc;
+		}
 
 		TRACE_PRINT("new pre connection...");
 		qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
@@ -413,10 +415,13 @@ int __exit cbn_pre_connect_end(void)
 {
 	struct list_head *itr, *tmp;
 
+	TRACE_PRINT("listner %p [%p]", pre_conn_listner, pre_conn_listner ? pre_conn_listner->sock: NULL);
 	kernel_sock_shutdown(pre_conn_listner->sock, SHUT_RDWR);
 
+	TRACE_PRINT("clear client connections");
 	clear_client_pre_connections();
 
+	TRACE_PRINT("clear server connections");
 	list_for_each_safe(itr, tmp, &pre_conn_list_server) {
 		struct cbn_qp *elem = container_of(itr, struct cbn_qp, list);
 		list_del(itr);
