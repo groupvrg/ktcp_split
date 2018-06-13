@@ -49,14 +49,7 @@ static int pipe_loop_task(void *data)
 			schedule();
 		}
 		__set_current_state(TASK_RUNNING);
-	// TODO:
-	//	consider adding some state? user might try freeing this struct, make sure its not running
-	//	also consider frreing yourself if you are here...
 	}
-	spin_lock_bh(&pool->running_lock);
-	list_del(&elem->list);
-	spin_unlock_bh(&pool->running_lock);
-	kmem_cache_free(pool->pool_slab, elem);
 	return 0;
 }
 
@@ -193,7 +186,7 @@ void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool)
 	list_for_each_safe(itr, tmp, &cbn_pool->kthread_running) {
 		struct pool_elem *task = container_of(itr, struct pool_elem, list);
 		list_del(itr);
-		TRACE_PRINT("stopping pool %s", task->task->comm);
+		TRACE_PRINT("stopping running %s", task->task->comm);
 		kthread_stop(task->task);
 		kmem_cache_free(cbn_pool->pool_slab, task);
 	}
