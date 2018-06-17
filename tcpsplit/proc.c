@@ -8,7 +8,6 @@
 #include "cbn_common.h"
 #include "proc.h"
 
-extern void proc_write_cb(int tid, int port);
 extern void preconn_write_cb(int *);
 extern char* proc_read_string(int *);
 extern uint32_t ip_transparent;
@@ -37,7 +36,7 @@ static int cbn_proc_open(struct inode *inode, struct  file *file)
 }
 
 #define PROC_CSV_NUM 2
-static ssize_t cbn_proc_command(struct file *file, const char __user *buf,
+static ssize_t cbn_add_server(struct file *file, const char __user *buf,
 				    size_t size, loff_t *_pos)
 {
 	char *kbuf;
@@ -57,7 +56,7 @@ static ssize_t cbn_proc_command(struct file *file, const char __user *buf,
 	kfree(kbuf);
 	if (values[0] == PROC_CSV_NUM) {
 		pr_info("starting new server %d %d\n", values[1], values[2]);
-		proc_write_cb(values[1], values[2]);
+		add_server_cb(values[1], values[2]);
 	} else {
 		pr_err("Failed to start new server %d\n" ,values[2]);
 		size = -EINVAL;
@@ -66,6 +65,34 @@ static ssize_t cbn_proc_command(struct file *file, const char __user *buf,
 	return size;
 }
 
+static ssize_t cbn_del_server(struct file *file, const char __user *buf,
+				    size_t size, loff_t *_pos)
+{
+	char *kbuf;
+	int   values[PROC_CSV_NUM + 1] = {0};
+
+	/* start by dragging the command into memory */
+	if (size <= 1 || size >= PAGE_SIZE)
+		return -EINVAL;
+
+	kbuf = memdup_user_nul(buf, size);
+	if (IS_ERR(kbuf))
+		return PTR_ERR(kbuf);
+
+	get_options(kbuf, ARRAY_SIZE(values), values);
+
+	/* start new server */
+	kfree(kbuf);
+	if (values[0] == 1) {
+		pr_info("starting new server %d %d\n", values[1], values[2]);
+		del_server_cb(values[1]);
+	} else {
+		pr_err("Invalid num of params for del server %d\n" ,values[0]);
+		size = -EINVAL;
+	}
+	ERR_LINE();
+	return size;
+}
 #define IP_LEN 4
 static ssize_t preconn_proc_command(struct file *file, const char __user *buf,
 				    size_t size, loff_t *_pos)
@@ -145,11 +172,20 @@ static const struct file_operations preconn_proc_fops = {
 	.release 	= single_release,
 };
 
-static const struct file_operations cbn_proc_fops = {
+static const struct file_operations cbn_add_fops = {
 	.owner		= THIS_MODULE,
 	.open		= cbn_proc_open,
 	.read 		= seq_read,
-	.write		= cbn_proc_command,
+	.write		= cbn_add_server,
+	.llseek 	= seq_lseek,
+	.release 	= single_release,
+};
+
+static const struct file_operations cbn_del_fops = {
+	.owner		= THIS_MODULE,
+	.open		= cbn_proc_open,
+	.read 		= seq_read,
+	.write		= cbn_del_server,
 	.llseek 	= seq_lseek,
 	.release 	= single_release,
 };
@@ -167,7 +203,8 @@ static struct proc_dir_entry *cbn_dir;
 int __init cbn_proc_init(void)
 {
 	cbn_dir = proc_mkdir_mode("cbn", 00555, NULL);
-	proc_create("cbn_proc", 00666, cbn_dir, &cbn_proc_fops);
+	proc_create("cbn_proc", 00666, cbn_dir, &cbn_add_fops);
+	proc_create("cbn_del", 00666, cbn_dir, &cbn_del_fops);
 	proc_create("conn_pool", 00666, cbn_dir, &preconn_proc_fops);
 	proc_create("cbn_transparent", 00666, cbn_dir, &cbn_transparent_fops);
 	return 0;

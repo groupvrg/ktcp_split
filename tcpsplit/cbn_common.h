@@ -165,4 +165,9 @@ static inline int trace_iph(struct sk_buff *skb, const char *str)
 	trace_printk(store);
 	*/
 }
+
+
+void add_server_cb(int tid, int port);
+void del_server_cb(int tid);
+
 #endif /*__CBN_COMMON_H__*/

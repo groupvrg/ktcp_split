@@ -19,7 +19,6 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Markuze Alex");
 MODULE_DESCRIPTION("CBN TCP Split Module");
 
-#define STR 	    "DIFF"
 #define BACKLOG     64
 
 struct kthread_pool cbn_pool = {.pool_size = DEF_CBN_POOL_SIZE};
@@ -612,10 +611,21 @@ out:
 	return rc;
 }
 
-void proc_write_cb(int tid, int port)
+void add_server_cb(int tid, int port)
 {
-	pr_info("%s scheduling split server <%s>", __FUNCTION__, STR);
+	pr_info("%s scheduling split server <%d>\n", __FUNCTION__, tid);
 	kthread_pool_run(&cbn_pool, split_server, uint2void(tid, port));
+}
+
+void del_server_cb(int tid)
+{
+	struct cbn_listner *listner = search_rb_listner(&listner_root, tid);
+	if (listner) {
+		pr_info("%s stopping split server <%d>\n", __FUNCTION__, tid);
+		remove_listner_server(listner);
+	} else {
+		pr_warn("%s ERROR: split server <%d> not running\n", __FUNCTION__, tid);
+	}
 }
 
 const char *proc_read_string(int *loc)
