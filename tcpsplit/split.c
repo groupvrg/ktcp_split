@@ -69,6 +69,10 @@ static unsigned int cbn_ingress_hook(void *priv,
 	if (!skb->mark)
 		goto out;
 
+	if (!search_rb_listner(&listner_root, skb->mark)) {
+		goto out;
+	}
+
 	if (trace_iph(skb, priv)) {
 		struct iphdr *iphdr = ip_hdr(skb);
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
