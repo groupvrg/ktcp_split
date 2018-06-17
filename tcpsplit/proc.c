@@ -55,7 +55,6 @@ static ssize_t cbn_add_server(struct file *file, const char __user *buf,
 	/* start new server */
 	kfree(kbuf);
 	if (values[0] == PROC_CSV_NUM) {
-		pr_info("starting new server %d %d\n", values[1], values[2]);
 		add_server_cb(values[1], values[2]);
 	} else {
 		pr_err("Failed to start new server %d\n" ,values[2]);
@@ -84,7 +83,6 @@ static ssize_t cbn_del_server(struct file *file, const char __user *buf,
 	/* start new server */
 	kfree(kbuf);
 	if (values[0] == 1) {
-		pr_info("starting new server %d %d\n", values[1], values[2]);
 		del_server_cb(values[1]);
 	} else {
 		pr_err("Invalid num of params for del server %d\n" ,values[0]);
