@@ -182,14 +182,20 @@ static inline void stop_tennat_proxies(struct rb_root *root)
 	}
 }
 
+static inline void remove_listner_server(struct cbn_listner *pos)
+{
+	kernel_sock_shutdown(pos->sock, SHUT_RDWR);
+	stop_tennat_proxies(&pos->connections_root);
+	rb_erase(&pos->node, &listner_root);
+	kmem_cache_free(listner_slab, pos);
+}
+
 static inline void stop_sockets(void)
 {
 	struct cbn_listner *pos, *tmp;
 
 	rbtree_postorder_for_each_entry_safe(pos, tmp, &listner_root, node) {
-		//sock_release(pos->sock); //TODO: again maybe just shut down?
-		kernel_sock_shutdown(pos->sock, SHUT_RDWR);
-		stop_tennat_proxies(&pos->connections_root);
+		remove_listner_server(pos);
 	}
 }
 
