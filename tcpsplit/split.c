@@ -183,7 +183,8 @@ static inline void stop_tennat_proxies(struct rb_root *root)
 
 static inline void remove_listner_server(struct cbn_listner *pos)
 {
-	kernel_sock_shutdown(pos->sock, SHUT_RDWR);
+	if (pos->sock)
+		kernel_sock_shutdown(pos->sock, SHUT_RDWR);
 	stop_tennat_proxies(&pos->connections_root);
 	rb_erase(&pos->node, &listner_root);
 	kmem_cache_free(listner_slab, pos);
@@ -604,6 +605,7 @@ static int split_server(void *mark_port)
 	server->status = 6;
 error:
 	TRACE_PRINT("Exiting %d <%d>\n", rc, (server) ? server->status : -1);
+	remove_listner_server(server);
 out:
 	if (sock)
 		sock_release(sock);
