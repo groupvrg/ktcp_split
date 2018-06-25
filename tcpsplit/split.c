@@ -30,7 +30,7 @@ struct kmem_cache *syn_slab;
 
 static struct kmem_cache *listner_slab;
 
-uint32_t ip_transparent = 0;
+uint32_t ip_transparent = 1;
 
 static int start_new_connection_syn(void *arg);
 extern long next_hop_ip;
@@ -288,7 +288,7 @@ static inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 							!IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]),
 						       	3 * HZ);
 		if (!rc) {
-			TRACE_PRINT("TIMEOUT %d", err);
+			TRACE_PRINT("TIMEOUT %d", rc);
 			err = 1;
 		}
 	} else {
@@ -360,8 +360,9 @@ static int start_new_connection_syn(void *arg)
 	qp = qp_exists(qp, TX_QP);
 	//TODO: add locks to this shit
 	if (unlikely(qp == NULL)) {
-		TRACE_PRINT("connection exists : port %d IP %pI4n",
-				ntohs(addresses->dest.sin_port), &addresses->dest.sin_addr);
+		TRACE_PRINT("connection exists : port %d IP %pI4n mark %d",
+				ntohs(addresses->dest.sin_port), &addresses->dest.sin_addr,
+				addresses->mark);
 		kmem_cache_free(syn_slab, addresses);
 		return  0;
 	}
@@ -382,11 +383,15 @@ static int start_new_connection_syn(void *arg)
 	}
 
 	if (ip_transparent) {
-		if ((rc = kernel_setsockopt(tx, SOL_IP, IP_TRANSPARENT, (char *)&T, sizeof(int))))
+		if ((rc = kernel_setsockopt(tx, SOL_IP, IP_TRANSPARENT, (char *)&T, sizeof(int)))) {
+			pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
 			goto connect_fail;
+		}
 
-		if ((rc = kernel_bind(tx, (struct sockaddr *)&addresses->src, sizeof(struct sockaddr))))
+		if ((rc = kernel_bind(tx, (struct sockaddr *)&addresses->src, sizeof(struct sockaddr)))) {
+			pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
 			goto connect_fail;
+		}
 	}
 
 	addresses->dest.sin_family = AF_INET;
