@@ -388,6 +388,11 @@ static int start_new_connection_syn(void *arg)
 			goto connect_fail;
 		}
 
+		addresses->src.sin_family = AF_INET;
+		addresses->src.sin_port = 0;
+		TRACE_PRINT("Binding : port %d IP %pI4n mark %d",
+				ntohs(addresses->src.sin_port), &addresses->src.sin_addr,
+				addresses->mark);
 		if ((rc = kernel_bind(tx, (struct sockaddr *)&addresses->src, sizeof(struct sockaddr)))) {
 			pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
 			goto connect_fail;
