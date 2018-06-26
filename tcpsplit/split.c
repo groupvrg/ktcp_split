@@ -21,6 +21,10 @@ MODULE_DESCRIPTION("CBN TCP Split Module");
 
 #define BACKLOG     64
 
+static int pool_size = 0;
+module_param(pool_size, int, 0);
+/*MODULE_PARAM_DESC(pool_size, "Optional variable to change the size of the thread pool size");*/
+
 struct kthread_pool cbn_pool = {.pool_size = DEF_CBN_POOL_SIZE};
 
 struct rb_root listner_root = RB_ROOT;
@@ -657,6 +661,14 @@ const char *proc_read_string(int *loc)
 	return buffer;
 }
 
+static inline void parse_module_params(void)
+{
+	if (pool_size > 0) {
+		pr_info("Thread Pool size set to %u\n", pool_size);
+		cbn_pool.pool_size = pool_size;
+	}
+}
+
 int __init cbn_datapath_init(void)
 {
 	qp_slab = kmem_cache_create("cbn_qp_mdata",
@@ -667,7 +679,7 @@ int __init cbn_datapath_init(void)
 
 	syn_slab = kmem_cache_create("cbn_syn_mdata",
 					sizeof(struct addresses), 0, 0, NULL);
-
+	parse_module_params();
 	cbn_kthread_pool_init(&cbn_pool);
 	cbn_pre_connect_init();
 	nf_register_net_hooks(&init_net, cbn_nf_hooks, ARRAY_SIZE(cbn_nf_hooks));
