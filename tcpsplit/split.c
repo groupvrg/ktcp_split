@@ -664,13 +664,14 @@ const char *proc_read_string(int *loc)
 static inline void parse_module_params(void)
 {
 	if (pool_size > 0) {
-		pr_info("Thread Pool size set to %u\n", pool_size);
 		cbn_pool.pool_size = pool_size;
 	}
 }
 
 int __init cbn_datapath_init(void)
 {
+	parse_module_params();
+	pr_info("Starting KTCP [%d]\n", cbn_pool.pool_size);
 	qp_slab = kmem_cache_create("cbn_qp_mdata",
 					sizeof(struct cbn_qp), 0, 0, NULL);
 
@@ -679,7 +680,6 @@ int __init cbn_datapath_init(void)
 
 	syn_slab = kmem_cache_create("cbn_syn_mdata",
 					sizeof(struct addresses), 0, 0, NULL);
-	parse_module_params();
 	cbn_kthread_pool_init(&cbn_pool);
 	cbn_pre_connect_init();
 	nf_register_net_hooks(&init_net, cbn_nf_hooks, ARRAY_SIZE(cbn_nf_hooks));
