@@ -238,7 +238,7 @@ static int start_new_pending_connection(void *arg)
 	if (ip_transparent) {
 		if ((rc = kernel_setsockopt(tx, SOL_IP, IP_TRANSPARENT, (char *)&T, sizeof(int))))
 			goto connect_fail;
-
+		MUST BIND TO A ROUTABLE IP....
 		if ((rc = kernel_bind(tx, (struct sockaddr *)&addresses->src, sizeof(struct sockaddr))))
 			goto connect_fail;
 	}
@@ -283,6 +283,60 @@ static struct cbn_listner *pre_conn_listner;
 static void preconn_resgister_server(struct cbn_listner *server)
 {
 	pre_conn_listner 		= server;
+}
+
+static struct socket *probe_sock;
+
+static int prec_conn_probe_server(void *arg)
+{
+	int rc = 0;
+	struct sockaddr_in srv_addr;
+	u32 port = (long)arg;
+
+	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_RAW, IPPROTO_TCP, &probe_sock)))
+		goto error;
+
+/*
+	srv_addr.sin_family 		= AF_INET;
+	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
+	srv_addr.sin_port 		= htons(port);
+
+	if ((rc = kernel_bind(probe_sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
+		goto error;
+*/
+	do {
+		struct msghdr msg = { 0 };
+		struct kvec kvec[1];
+
+		/* TODO: wait for new probe header
+			0. - capture in RX tcp_syn queue tcp header and wake probe server
+			...
+			1. - capture in POST_ROUTING TCP src port 4
+				1.1 next is gue* - mark with tx flag
+				1.2 next is !gue - new_syn and kill packet.
+			2. - capture in POST_ROUTING udp and tx flag is on and get ip
+					- alloc new preconn
+					- no preconnection - create new x5 & use regular syn
+		*/
+		/* TODO: fix tcp src port to port */
+		kvec[0].iov_base = addressess;/* tcp header */
+		kvec[0].iov_len = sizeof(struct tcp_hdr);
+
+		msg->msg_name
+		if ((rc = kernel_sendmsg(tx, &msg, kvec, 1, sizeof(struct addresses))) <= 0) {
+			pr_err("Failed to forward info to next hop!\n");
+		}
+	} while (!kthread_should_stop());
+error:
+	if (rc) {
+		pr_error("Error in %s [%d]\n", __FUNCTION__, rc);
+		if (probe_sock) {
+			sock_release(probe_sock);
+			probe_sock = NULL;
+		}
+	}
+out:
+	return rc;
 }
 
 #define BACKLOG 16
@@ -407,6 +461,7 @@ int __init cbn_pre_connect_init(void)
 	INIT_LIST_HEAD(&pre_conn_list_client);
 	INIT_LIST_HEAD(&pre_conn_list_server);
 	kthread_run(prec_conn_listner_server, (void *)port,"pre-conn-server");
+	kthread_run(prec_conn_probe_server, (void *)CBN_PROBE_PORT,"pre-conn-server");
 
 	return 0;
 }

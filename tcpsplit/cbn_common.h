@@ -13,6 +13,8 @@
 #define ALWAYS_FRESH		1
 #define OPTIMISTIC_SYN_OFF 	2
 
+#define CBN_PROBE_PORT		4 /* Lowest unassigned IANA port */
+
 #define cbn_err(fmt, ...)	__cbn_err("%s: " fmt, __FUNCTION__, ##__VA_ARGS__);	\
 				pr_err( "%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
 

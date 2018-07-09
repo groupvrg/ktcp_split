@@ -64,6 +64,59 @@ static unsigned int cbn_trace_hook(void *priv,
 	return NF_ACCEPT;
 }
 */
+static inline void udp_port(struct sk_buff *skb, int *src, int *dst)
+{
+        struct udphdr *udphdr = (struct udphdr *)skb_transport_header(skb);
+        *dst = ntohs(udphdr->dest);
+        *src = ntohs(udphdr->source);
+        return;
+}
+
+static inline void tcp_port(struct sk_buff *skb, int *src, int *dst)
+{
+        struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
+        *dst = ntohs(tcphdr->dest);
+        *src = ntohs(tcphdr->source);
+}
+
+static unsigned void get_port(struct sk_buff *skb)
+{
+        struct iphdr *iph = ip_hdr(skb);
+        int src, dst;
+
+        src = dst = 0;
+
+        if (iph->protocol == 6)
+                tcp_port(skb, &src, &dst);
+
+        if (iph->protocol == 17)
+                udp_port(skb, &src, &dst);
+	return;
+}
+
+static unsigned int cbn_egress_hook(void *priv,
+					struct sk_buff *skb,
+					const struct nf_hook_state *state)
+{
+	if (!skb->mark)
+		goto out;
+/*
+	if (udp & (skb_shinfo(skb)->tx_flags & SKBTX_CBN_PROBE))
+		get next hop ip and
+			1. start new_pre_connection if exists
+			2. alloc if dont
+
+	if (tx & src_port = CBP_PROBE_PORT) {
+		skb_shinfo(skb)->tx_flags |= SKBTX_CBN_PROBE;
+		goto out;
+	}
+
+*/
+	/* kill this probe packet... */
+	return NF_DROP;
+out:
+	return NF_ACCEPT;
+}
 
 static unsigned int cbn_ingress_hook(void *priv,
 					struct sk_buff *skb,
@@ -83,7 +136,13 @@ static unsigned int cbn_ingress_hook(void *priv,
 
 		if (strcmp(priv, "RX"))
 			goto out;
+		/*
+			alloc tcp_hdr
+			push to queue
+			wake probe
+		*/
 
+		/*
 		addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
 		if (unlikely(!addresses)) {
 			pr_err("Faield to alloc mem %s\n", __FUNCTION__);
@@ -100,6 +159,7 @@ static unsigned int cbn_ingress_hook(void *priv,
 			kthread_pool_run(&cbn_pool, start_new_pre_connection_syn, addresses); //elem?
 		else
 			kthread_pool_run(&cbn_pool, start_new_connection_syn, addresses); //elem?
+		*/
 		//1.alloc task + data
 		//2.rb_tree lookup
 		// sched poll on qp init - play with niceness?
