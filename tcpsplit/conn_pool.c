@@ -12,40 +12,51 @@
 #include "pool.h"
 #include "proc.h"
 #include "rb_data_tree.h"
+#include "preconn_rb_tree.h"
 #include "cbn_common.h"
 
 extern struct kthread_pool cbn_pool;
 extern struct kmem_cache *qp_slab;
 extern struct kmem_cache *syn_slab;
+extern struct kmem_cache *probe_slab;
 extern struct rb_root listner_root;
 
 static struct list_head pre_conn_list_server;
 static struct list_head pre_conn_list_client;
-long next_hop_ip = 0;
+static struct kmem_cache *preconn_slab;
+static struct rb_root preconn_root = RB_ROOT;
 
 static int prealloc_connection(void *arg);
 
-static inline struct cbn_qp *alloc_prexeisting_conn(void)
+static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 {
 	struct cbn_qp *elem;
-	while (unlikely(list_empty(&pre_conn_list_client))) {
-		pr_err("pool is empty refill is to slow\n");
+	struct list_head *pre_conn_list;
+	unsigned long next_hop_ip = ip;
+	struct cbn_preconnection *preconn = search_rb_preconn(&preconn_root, ip);
+
+	pre_conn_list = (preconn) ? &preconn->list : NULL;
+
+	if (unlikely(!pre_conn_list || list_empty(pre_conn_list))) {
+		pr_err("preconn pool is empty! %pI4h \n", &next_hop_ip);
+		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
+		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		return NULL;
 	}
 
-	elem = list_first_entry(&pre_conn_list_client, struct cbn_qp, list);
+	elem = list_first_entry(pre_conn_list, struct cbn_qp, list);
 	list_del(&elem->list);
 	kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 	return elem;
 }
 
-static inline int forward_conn_info(struct socket *tx, struct addresses *addressess)
+static inline int forward_conn_info(struct socket *tx, struct addresses *addresses)
 {
 	int rc;
 	struct msghdr msg = { 0 };
 	struct kvec kvec[1];
 
-	kvec[0].iov_base = addressess;
+	kvec[0].iov_base = addresses;
 	kvec[0].iov_len = sizeof(struct addresses);
 
 	if ((rc = kernel_sendmsg(tx, &msg, kvec, 1, sizeof(struct addresses))) <= 0) {
@@ -56,16 +67,19 @@ static inline int forward_conn_info(struct socket *tx, struct addresses *address
 
 int start_new_pre_connection_syn(void *arg)
 {
-	int rc;
+	int rc = 0;
 	struct addresses *addresses = arg;
 	struct cbn_listner *listner;
 	struct cbn_qp *qp, *tx_qp;
 	struct sockets sockets;
 
 	INIT_TRACE
-
-	qp = alloc_prexeisting_conn();
-
+	qp = alloc_prexeisting_conn(addresses->sin_addr.s_addr);
+	if (!qp) {
+		start_new_connection_syn(arg);
+		goto out;
+	}
+	/* check for failure + fallback to start_new_connection_syn...*/
 	qp->addr_d = addresses->dest.sin_addr;
 	qp->port_s = addresses->src.sin_port;
 	qp->port_d = addresses->dest.sin_port;
@@ -107,19 +121,31 @@ connect_fail:
 	sock_release((struct socket *)qp->tx);
 	TRACE_PRINT("OUT: connection to port %s ", __FUNCTION__);
 	DUMP_TRACE
+out:
 	return rc;
 }
 
 #define PRECONN_SERVER_PORT	51000
 
-static inline void fill_preconn_address(int ip, struct addresses *addresses)
+static inline void fill_preconn_address(__be32 ip, struct addresses *addresses)
 {
-	struct in_addr addr;
-
-	addr.s_addr = htonl(ip);
+	//	ip should already be __be32
+	//	addr.s_addr = htonl(ip);
 	addresses->dest.sin_family = AF_INET;
-	addresses->dest.sin_addr = addr;
+	addresses->dest.sin_addr.s_addr = ip;
 	addresses->dest.sin_port = htons(PRECONN_SERVER_PORT);
+}
+
+static inline int add_preconn_qp(struct cbn_qp *qp, struct rb_root *root)
+{
+	struct cbn_preconnection *precon  = get_rb_preconn(root, qp->addr_d.s_addr,
+								preconn_slab, GFP_KERNEL);
+	if (unlikely(!precon)) {
+		pr_err("Failed to alloc memory for preconn %pI4n\n", &qp->addr_d);
+		return -1;
+	}
+	list_add(&qp->list, &precon->list);
+	return 0;
 }
 
 static int prealloc_connection(void *arg)
@@ -139,12 +165,13 @@ static int prealloc_connection(void *arg)
 	qp->addr_d = addresses->dest.sin_addr;
 	qp->port_d = addresses->dest.sin_port;
 
-	//TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
+	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	line = __LINE__;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
 		goto out;
 
 	line = __LINE__;
+	/* TODO: Mark needs to be CBN_CORE_ROUTE */
 	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
 		goto connect_fail;
 
@@ -163,10 +190,9 @@ static int prealloc_connection(void *arg)
 	qp->tx = tx;
 	qp->rx = NULL;
 
-	//TODO: protect with lock
-	list_add(&qp->list, &pre_conn_list_client);
 	line = __LINE__;
-	goto out;
+	if (!add_preconn_qp(qp, &preconn_root))
+		goto out;
 
 connect_fail:
 	sock_release(tx);
@@ -177,14 +203,14 @@ out:
 }
 
 static inline int preconn_wait_for_next_hop(struct cbn_qp *qp,
-					struct addresses *addressess)
+					struct addresses *addresses)
 {
 
 	struct msghdr msg = { 0 };
 	struct kvec kvec;
 	int rc;
 
-	kvec.iov_base = addressess;
+	kvec.iov_base = addresses;
 	kvec.iov_len = sizeof(struct addresses);
 
 	if ((rc = kernel_recvmsg((struct socket *)qp->rx, &msg, &kvec, 1, sizeof(struct addresses), MSG_WAITALL)) <= 0)
@@ -222,6 +248,7 @@ static int start_new_pending_connection(void *arg)
 		goto create_fail;
 	}
 
+	/* TODO: allow pipelining  - check if next hop is also preconnected....*/
 //TRACE_PRINT("connection to port %d IP %pI4n from %d IP %pI4n",
 //		ntohs(addresses->dest.sin_port),
 //		&addresses->dest.sin_addr,
@@ -285,57 +312,55 @@ static void preconn_resgister_server(struct cbn_listner *server)
 	pre_conn_listner 		= server;
 }
 
-static struct socket *probe_sock;
-
-static int prec_conn_probe_server(void *arg)
+/* call this on add tennat... & add to .h*/
+struct socket *craete_prec_conn_probe(u32 mark)
 {
 	int rc = 0;
-	struct sockaddr_in srv_addr;
-	u32 port = (long)arg;
+	int line;
+	struct socket *sock;
 
-	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_RAW, IPPROTO_TCP, &probe_sock)))
+	line = __LINE__;
+	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_RAW, IPPROTO_TCP, &sock)))
 		goto error;
 
-/*
-	srv_addr.sin_family 		= AF_INET;
-	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
-	srv_addr.sin_port 		= htons(port);
-
-	if ((rc = kernel_bind(probe_sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
+	line = __LINE__;
+	if ((rc = kernel_setsockopt(sock, SOL_SOCKET, SO_MARK, (char *)&mark, sizeof(u32))) < 0)
 		goto error;
-*/
-	do {
-		struct msghdr msg = { 0 };
-		struct kvec kvec[1];
 
-		/* TODO: wait for new probe header
-			0. - capture in RX tcp_syn queue tcp header and wake probe server
-			...
-			1. - capture in POST_ROUTING TCP src port 4
-				1.1 next is gue* - mark with tx flag
-				1.2 next is !gue - new_syn and kill packet.
-			2. - capture in POST_ROUTING udp and tx flag is on and get ip
-					- alloc new preconn
-					- no preconnection - create new x5 & use regular syn
-		*/
-		/* TODO: fix tcp src port to port */
-		kvec[0].iov_base = addressess;/* tcp header */
-		kvec[0].iov_len = sizeof(struct tcp_hdr);
+	line = __LINE__;
+	if ((rc = kernel_setsockopt(sock, SOL_IP, IP_HDRINCL , (char *)&mark, sizeof(u32))))
+		goto error;
 
-		msg->msg_name
-		if ((rc = kernel_sendmsg(tx, &msg, kvec, 1, sizeof(struct addresses))) <= 0) {
-			pr_err("Failed to forward info to next hop!\n");
-		}
-	} while (!kthread_should_stop());
+	return sock;
 error:
-	if (rc) {
-		pr_error("Error in %s [%d]\n", __FUNCTION__, rc);
-		if (probe_sock) {
-			sock_release(probe_sock);
-			probe_sock = NULL;
-		}
+	pr_err("error %d in line %d\n", rc, line);
+	return NULL;
+}
+
+
+int start_probe_syn(void *arg)
+{
+	int rc = 0;
+	struct msghdr msg = { 0 };
+	struct kvec kvec[2];
+	struct probe *probe = (struct probe*)arg;
+
+	kvec[0].iov_base = &probe->iphdr;
+	kvec[0].iov_len = sizeof(struct iphdr);
+
+	probe->tcphdr.source = htons(CBN_PROBE_PORT);
+	kvec[1].iov_base = &probe->tcphdr;
+	kvec[1].iov_len = sizeof(struct tcphdr);
+
+	if ((rc = kernel_sendmsg(probe->listner->raw, &msg, kvec, 2,
+				  sizeof(struct tcphdr) +
+				  sizeof(struct iphdr))) <= 0) {
+		pr_err("Failed to send next hop %d\n", rc);
 	}
-out:
+
+	/* tcphdr & iphdr already copied...*/
+	kmem_cache_free(probe_slab, probe);
+
 	return rc;
 }
 
@@ -433,25 +458,17 @@ void preconn_write_cb(int *array)
 
 	ip = build_ip(array);
 	if (!ip) {
-		pr_err("disabling preconn_pool & freeing exisiting preconnections\n");
-		next_hop_ip = 0;
-		clear_client_pre_connections();
+		pr_err("ERROR: ip is invalid %d.%d.%d.%d\n",array[0], array[1], array[2], array[3]);
 		return;
-
-	}
-	if (next_hop_ip && next_hop_ip != ip) {
-		pr_err("Already have an existing next_hop_ip!!\n");
 	}
 
 	if (ip) {
 		pr_info("connecting to %d.%d.%d.%d (%lx)\n", array[0], array[1], array[2], array[3], ip);
-		next_hop_ip = ip;
+		ip = htonl(ip);
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)ip);
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)ip);
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)ip);
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)ip);
-	} else {
-		pr_err("ip is invalid %d.%d.%d.%d\n",array[0], array[1], array[2], array[3]);
 	}
 }
 
@@ -460,8 +477,10 @@ int __init cbn_pre_connect_init(void)
 	long port = PRECONN_SERVER_PORT;
 	INIT_LIST_HEAD(&pre_conn_list_client);
 	INIT_LIST_HEAD(&pre_conn_list_server);
+
+	preconn_slab = kmem_cache_create("cbn_preconn_slab",
+					 sizeof(struct cbn_preconnection), 0, 0, NULL);
 	kthread_run(prec_conn_listner_server, (void *)port,"pre-conn-server");
-	kthread_run(prec_conn_probe_server, (void *)CBN_PROBE_PORT,"pre-conn-server");
 
 	return 0;
 }
@@ -484,6 +503,6 @@ int __exit cbn_pre_connect_end(void)
 		sock_release((struct socket *)elem->rx);
 		kmem_cache_free(qp_slab, elem);
 	}
-
+	kmem_cache_destroy(preconn_slab);
 	return 0;
 }

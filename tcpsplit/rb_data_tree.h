@@ -57,6 +57,7 @@ struct cbn_listner {
 	uint16_t	port;
 	uint16_t	status;
 	struct socket	*sock;
+	struct socket	*raw;
 };
 /*
  * Multiple listner support:
@@ -161,6 +162,5 @@ static inline struct cbn_listner *add_rb_listner(struct rb_root *root, struct cb
 
 	return NULL;
 }
-
 
 #endif /*__CBN_RB_TREE_H__*/

@@ -6,10 +6,9 @@
 #include <linux/seq_file.h>
 #include <linux/string.h>
 #include "cbn_common.h"
+#include "tcp_split.h"
 #include "proc.h"
 
-extern void preconn_write_cb(int *);
-extern char* proc_read_string(int *);
 extern uint32_t ip_transparent;
 
 static int cbn_proc_show(struct seq_file *m, void *v)

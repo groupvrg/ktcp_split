@@ -31,14 +31,13 @@ struct rb_root listner_root = RB_ROOT;
 
 struct kmem_cache *qp_slab;
 struct kmem_cache *syn_slab;
+struct kmem_cache *probe_slab;
 
 static struct kmem_cache *listner_slab;
 
 uint32_t ip_transparent = 1;
 
-static int start_new_connection_syn(void *arg);
-extern long next_hop_ip;
-extern int start_new_pre_connection_syn(void *arg);
+int start_new_pre_connection_syn(void *arg);
 
 static unsigned int put_qp(struct cbn_qp *qp)
 {
@@ -79,7 +78,7 @@ static inline void tcp_port(struct sk_buff *skb, int *src, int *dst)
         *src = ntohs(tcphdr->source);
 }
 
-static unsigned void get_port(struct sk_buff *skb)
+static inline void get_port(struct sk_buff *skb)
 {
         struct iphdr *iph = ip_hdr(skb);
         int src, dst;
@@ -94,75 +93,136 @@ static unsigned void get_port(struct sk_buff *skb)
 	return;
 }
 
+#define CBN_TUNNEL_PREFIX	"gue"
+static inline bool is_out_gue(struct sk_buff *skb)
+{
+	return !memcmp(skb->dev->name, CBN_TUNNEL_PREFIX, strlen(CBN_TUNNEL_PREFIX));
+}
+
+static inline struct addresses *build_addresses(struct sk_buff *skb)
+{
+	struct iphdr *iphdr = ip_hdr(skb);
+	struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
+
+	struct addresses *addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
+	if (unlikely(!addresses)) {
+		pr_err("Faield to alloc mem %s\n", __FUNCTION__);
+		return NULL;
+	}
+
+	addresses->dest.sin_addr.s_addr = iphdr->daddr;
+	addresses->src.sin_addr.s_addr  = iphdr->saddr;
+	addresses->dest.sin_port        = tcphdr->dest;
+	addresses->src.sin_port         = tcphdr->source;
+	addresses->mark                 = skb->mark;
+
+	return addresses;
+}
+
+static inline struct addresses *get_cbn_probe(struct sk_buff *skb)
+{
+	if (unlikely(skb_shinfo(skb)->nr_frags)) {
+		pr_err("%s failed to get cbn probe due to nr_frags != 0 [%d]\n",
+				__FUNCTION__,
+				skb_shinfo(skb)->nr_frags);
+		return NULL;
+	}
+
+	//skb_shinfo(skb)->tx_flags |= SKBTX_CBN_PROBE;
+	return (struct addresses *)skb_shinfo(skb)->frags[0].page.p;
+}
+
+
+static inline int set_cbn_probe(struct sk_buff *skb, struct addresses *addresses)
+{
+	if (unlikely(skb_shinfo(skb)->nr_frags)) {
+		pr_err("%s failed to set cbn probe due to nr_frags != 0 [%d]\n",
+				__FUNCTION__,
+				skb_shinfo(skb)->nr_frags);
+		return -1;
+	}
+
+	skb_shinfo(skb)->tx_flags |= SKBTX_CBN_PROBE;
+	skb_shinfo(skb)->frags[0].page.p = (struct page *)addresses;
+	return 0;
+}
+
 static unsigned int cbn_egress_hook(void *priv,
 					struct sk_buff *skb,
 					const struct nf_hook_state *state)
 {
+        struct iphdr *iph = ip_hdr(skb);
+
 	if (!skb->mark)
 		goto out;
-/*
-	if (udp & (skb_shinfo(skb)->tx_flags & SKBTX_CBN_PROBE))
-		get next hop ip and
-			1. start new_pre_connection if exists
-			2. alloc if dont
 
-	if (tx & src_port = CBP_PROBE_PORT) {
-		skb_shinfo(skb)->tx_flags |= SKBTX_CBN_PROBE;
+	if ((iph->protocol == IPPROTO_TCP)) {
+		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
+		if (unlikely((ntohs(tcphdr->source) == CBP_PROBE_PORT))) {
+			struct addresses *addresses = build_addresses(skb);
+			if (!addresses) {
+				pr_err("Faield to alloc mem %s\n", __FUNCTION__);
+				goto drop;
+			}
+			if (is_out_gue(skb)) {
+				if (set_cbn_probe(skb, addresses))
+					goto drop;
+			} else {
+				kthread_pool_run(&cbn_pool, start_new_connection_syn, addresses);
+				goto drop;
+			}
+		}
 		goto out;
 	}
 
-*/
-	/* kill this probe packet... */
-	return NF_DROP;
+
+	if ((iph->protocol == IPPROTO_UDP) & (skb_shinfo(skb)->tx_flags & SKBTX_CBN_PROBE)) {
+		struct addresses *addresses = get_cbn_probe(skb);
+		if (addresses) {
+			addresses->sin_addr.s_addr = iph->daddr;
+			kthread_pool_run(&cbn_pool, start_new_pre_connection_syn, addresses);
+		}
+		goto drop;
+	}
 out:
 	return NF_ACCEPT;
+drop:
+	return NF_DROP;
 }
 
 static unsigned int cbn_ingress_hook(void *priv,
 					struct sk_buff *skb,
 					const struct nf_hook_state *state)
 {
+	struct cbn_listner *listner;
+
+	if (strcmp(priv, "RX"))
+		goto out;
+
 	if (!skb->mark)
 		goto out;
 
-	if (!search_rb_listner(&listner_root, skb->mark)) {
+	if (!(listner = search_rb_listner(&listner_root, skb->mark))) {
 		goto out;
 	}
 
 	if (trace_iph(skb, priv)) {
 		struct iphdr *iphdr = ip_hdr(skb);
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
-		struct addresses *addresses;
+		struct probe *probe;
 
-		if (strcmp(priv, "RX"))
-			goto out;
-		/*
-			alloc tcp_hdr
-			push to queue
-			wake probe
-		*/
-
-		/*
-		addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
-		if (unlikely(!addresses)) {
-			pr_err("Faield to alloc mem %s\n", __FUNCTION__);
+		probe = kmem_cache_alloc(probe_slab, GFP_ATOMIC);
+		if (unlikely(!probe)) {
+			pr_err("Faield to alloc probe %s\n", __FUNCTION__);
 			goto out;
 		}
 
-		addresses->dest.sin_addr.s_addr	= iphdr->daddr;
-		addresses->src.sin_addr.s_addr	= iphdr->saddr;
-		addresses->dest.sin_port	= tcphdr->dest;
-		addresses->src.sin_port		= tcphdr->source;
-		addresses->mark			= skb->mark;
-		TRACE_PRINT("%s scheduling start_new_connection_syn [%lx]", __FUNCTION__, next_hop_ip);
-		if (next_hop_ip)
-			kthread_pool_run(&cbn_pool, start_new_pre_connection_syn, addresses); //elem?
-		else
-			kthread_pool_run(&cbn_pool, start_new_connection_syn, addresses); //elem?
-		*/
-		//1.alloc task + data
-		//2.rb_tree lookup
-		// sched poll on qp init - play with niceness?
+		memcpy(&probe->iphdr, iphdr, sizeof(struct iphdr));
+		memcpy(&probe->tcphdr, tcphdr, sizeof(struct tcphdr));
+		probe->listner = listner;
+
+		TRACE_PRINT("%s scheduling probe process [%x]", __FUNCTION__, skb->mark);
+		kthread_pool_run(&cbn_pool, start_probe_syn, probe);
 	}
 
 out:
@@ -172,14 +232,14 @@ out:
 #define CBN_PRIO_OFFSET 50
 
 static struct nf_hook_ops cbn_nf_hooks[] = {
-	/*
 		{
-		.hook		= cbn_ingress_hook,
+		.hook		= cbn_egress_hook,
 		.hooknum	= NF_INET_POST_ROUTING,
 		.pf		= PF_INET,
-		.priority	= NF_IP_PRI_FIRST,
+		.priority	= NF_IP_PRI_LAST,
 		.priv		= "TX"
 		},
+	/*
 		{
 		.hook		= cbn_ingress_hook,
 		.hooknum	= NF_INET_LOCAL_OUT,
@@ -397,7 +457,7 @@ err:
 }
 #endif
 
-static int start_new_connection_syn(void *arg)
+int start_new_connection_syn(void *arg)
 {
 	int rc, T = 1;
 	struct addresses *addresses = arg;
@@ -657,6 +717,12 @@ static int split_server(void *mark_port)
 		goto error;
 
 	server->status = 5;
+	TRACE_PRINT("create a new probe socket %d", mark);
+	server->raw  = craete_prec_conn_probe(mark);
+	if (!server->raw)
+		goto error;
+
+	server->status = 6;
 	TRACE_PRINT("accepting on port %d", port);
 	do {
 		struct socket *nsock;
@@ -704,7 +770,7 @@ void del_server_cb(int tid)
 	}
 }
 
-const char *proc_read_string(int *loc)
+inline char *proc_read_string(int *loc)
 {
 	struct cbn_listner *pos, *tmp;
 	int  idx = 0;
@@ -740,6 +806,8 @@ int __init cbn_datapath_init(void)
 
 	syn_slab = kmem_cache_create("cbn_syn_mdata",
 					sizeof(struct addresses), 0, 0, NULL);
+	probe_slab = kmem_cache_create("cbn_probe_headers",
+					sizeof(struct probe), 0, 0, NULL);
 	cbn_kthread_pool_init(&cbn_pool);
 	cbn_pre_connect_init();
 	nf_register_net_hooks(&init_net, cbn_nf_hooks, ARRAY_SIZE(cbn_nf_hooks));
@@ -762,6 +830,7 @@ void __exit cbn_datapath_clean(void)
 	TRACE_PRINT("proxies stopped");
 	kmem_cache_destroy(qp_slab);
 	kmem_cache_destroy(syn_slab);
+	kmem_cache_destroy(probe_slab);
 	kmem_cache_destroy(listner_slab);
 }
 

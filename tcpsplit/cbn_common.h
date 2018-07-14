@@ -134,10 +134,10 @@ static inline int trace_iph(struct sk_buff *skb, const char *str)
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
 		if (unlikely(tcphdr->syn && !tcphdr->ack)) {
 			rc = 1;
+#ifdef TRACE_PACKETS
 			idx += sprintf(&store[idx], "%s:\n",str);
 			dump_iph(iphdr);
 			dump_tcph(tcphdr);
-#ifdef TRACE_PACKETS
 			trace_printk(store);
 #endif
 		}
@@ -167,9 +167,4 @@ static inline int trace_iph(struct sk_buff *skb, const char *str)
 	trace_printk(store);
 	*/
 }
-
-
-void add_server_cb(int tid, int port);
-void del_server_cb(int tid);
-
 #endif /*__CBN_COMMON_H__*/

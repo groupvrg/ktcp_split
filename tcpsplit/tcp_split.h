@@ -3,6 +3,13 @@
 
 #include "rb_data_tree.h"
 
+//SKBTX_ flags in skbuff.h (example: SKBTX_IN_PROGRESS)
+//WARN: make sure this bit is free
+#define SKBTX_CBN_PROBE (1 << 7)
+
+//Lowest official IANA unassigned port
+#define CBP_PROBE_PORT 	4
+
 struct sockets {
 	struct socket *rx;
 	struct socket *tx;
@@ -12,7 +19,14 @@ struct sockets {
 struct addresses {
 	struct sockaddr_in dest;
 	struct sockaddr_in src;
+	struct in_addr	sin_addr;
 	int mark;
+};
+
+struct probe {
+	struct iphdr iphdr;
+	struct tcphdr tcphdr;
+	struct cbn_listner *listner;
 };
 
 #define UINT_SHIFT	32
@@ -30,7 +44,16 @@ static inline void void2uint(void *ptr, uint32_t *a, uint32_t *b)
 
 int half_duplex(struct sockets *sock, struct cbn_qp *qp);
 
+void add_server_cb(int tid, int port);
+void del_server_cb(int tid);
+void preconn_write_cb(int *);
+inline char* proc_read_string(int *);
+
+struct socket *craete_prec_conn_probe(u32 mark);
+
 int __init cbn_pre_connect_init(void);
 int __exit cbn_pre_connect_end(void);
 
+int start_probe_syn(void *arg);
+int start_new_connection_syn(void *arg);
 #endif /*__CBN_DATAPATH_H__*/
