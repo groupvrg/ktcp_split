@@ -343,6 +343,7 @@ int start_probe_syn(void *arg)
 	int rc = 0;
 	struct msghdr msg = { 0 };
 	struct kvec kvec[2];
+	struct sockaddr_in addr;
 	struct probe *probe = (struct probe*)arg;
 
 	kvec[0].iov_base = &probe->iphdr;
@@ -351,6 +352,14 @@ int start_probe_syn(void *arg)
 	probe->tcphdr.source = htons(CBN_PROBE_PORT);
 	kvec[1].iov_base = &probe->tcphdr;
 	kvec[1].iov_len = sizeof(struct tcphdr);
+
+	/* Need to set dest addr here...*/
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr 	= probe->iphdr.daddr;
+	addr.sin_port 		= probe->tcphdr.dest;
+
+	msg.msg_namelen = sizeof(struct sockaddr_in);
+	msg.msg_name = &addr;
 
 	if ((rc = kernel_sendmsg(probe->listner->raw, &msg, kvec, 2,
 				  sizeof(struct tcphdr) +
