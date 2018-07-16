@@ -349,6 +349,12 @@ int start_probe_syn(void *arg)
 	kvec[0].iov_base = &probe->iphdr;
 	kvec[0].iov_len = sizeof(struct iphdr);
 
+	/*
+	 * We need the original port number to find the pair QP
+	 * we store it in the __be16 window field of the tcpheader
+	 * to be extracted on cbn_egress_hook
+	 * */
+	probe->tcphdr.window = probe->tcphdr.source;
 	probe->tcphdr.source = htons(CBN_PROBE_PORT);
 	kvec[1].iov_base = &probe->tcphdr;
 	kvec[1].iov_len = sizeof(struct tcphdr);

@@ -165,6 +165,7 @@ static unsigned int cbn_egress_hook(void *priv,
 				pr_err("Faield to alloc mem %s\n", __FUNCTION__);
 				goto drop;
 			}
+			addresses->src.sin_port = tcphdr->window;
 			TRACE_PRINT("cought a raw packet frags %d name %s",
 					skb_shinfo(skb)->nr_frags,
 					skb->dev->name);
