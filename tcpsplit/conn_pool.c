@@ -354,9 +354,9 @@ int start_probe_syn(void *arg)
 	kvec[1].iov_len = sizeof(struct tcphdr);
 
 	/* Need to set dest addr here...*/
-	addr.sin_family = AF_INET;
+	addr.sin_family 	= AF_INET;
 	addr.sin_addr.s_addr 	= probe->iphdr.daddr;
-	addr.sin_port 		= probe->tcphdr.dest;
+	addr.sin_port 		= 0;//probe->tcphdr.dest;
 
 	msg.msg_namelen = sizeof(struct sockaddr_in);
 	msg.msg_name = &addr;

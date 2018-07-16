@@ -109,6 +109,7 @@ static inline struct addresses *build_addresses(struct sk_buff *skb)
 		pr_err("Faield to alloc mem %s\n", __FUNCTION__);
 		return NULL;
 	}
+	trace_iph(skb, __FUNCTION__);
 
 	addresses->dest.sin_addr.s_addr = iphdr->daddr;
 	addresses->src.sin_addr.s_addr  = iphdr->saddr;
@@ -164,6 +165,9 @@ static unsigned int cbn_egress_hook(void *priv,
 				pr_err("Faield to alloc mem %s\n", __FUNCTION__);
 				goto drop;
 			}
+			TRACE_PRINT("cought a raw packet frags %d name %s",
+					skb_shinfo(skb)->nr_frags,
+					skb->dev->name);
 			if (is_out_gue(skb)) {
 				if (set_cbn_probe(skb, addresses))
 					goto drop;

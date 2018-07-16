@@ -9,6 +9,6 @@ if [ -n "$1" ]; then
 else
 	sudo insmod cbn_split.ko
 fi
-exit
+
 sudo sh -c 'echo 0 > /proc/sys/kernel/hung_task_timeout_secs'
 sudo sh -c 'echo 1 > /proc/sys/kernel/ftrace_dump_on_oops'

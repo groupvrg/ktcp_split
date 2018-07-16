@@ -25,7 +25,7 @@
 #define TRACE_LINE()
 #ifndef TRACE_PRINT
 #define TRACE_PRINT(fmt, ...) { /*pr_err("%s:%s:"fmt"\n", __FUNCTION__, current->comm,##__VA_ARGS__ );*/\
-				 trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); \
+				 trace_printk("%d:%s:%s:"fmt"\n", __LINE__, current->comm, __FUNCTION__,##__VA_ARGS__ ); \
 				 /*___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d:"fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__); */}
 
 //#define TRACE_LINE() {	 trace_printk("%d:%s (%s)\n", __LINE__, __FUNCTION__, current->comm);/*___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d", __FUNCTION__, __LINE__);*/ }
