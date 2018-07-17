@@ -120,12 +120,24 @@ static inline struct addresses *build_addresses(struct sk_buff *skb)
 	return addresses;
 }
 
+static inline bool is_cbn_probe(struct sk_buff *skb)
+{
+	if (likely(skb->inner_protocol == IPPROTO_IPIP)) {
+		struct iphdr *iphdr = (struct iphdr *)skb_inner_network_header(skb);
+		TRACE_PRINT("proto [%d]\n", iphdr->protocol);
+		if (iphdr->protocol == IPPROTO_TCP) {
+			struct tcphdr *tcphdr = (struct tcphdr *)skb_inner_transport_header(skb);
+			return (ntohs(tcphdr->source) == CBP_PROBE_PORT);
+		}
+	}
+	return false;
+}
+
 static inline struct addresses *get_cbn_probe(struct sk_buff *skb)
 {
 	struct tcphdr *ptr = (struct tcphdr *)skb_inner_transport_header(skb);
 	struct addresses **addresses = (struct addresses **)(++ptr);
-	skb->__unused = 0;
-	TRACE_PRINT("skb %p addr %p [%lu] => %p\n", skb, ptr, (unsigned long)ptr - (unsigned long)skb_transport_header(skb), *addresses);
+	TRACE_PRINT("skb %p addr %p [%d|%d] => %p\n", skb, ptr, skb->inner_protocol, ntohs(skb->inner_protocol), *addresses);
 	return *addresses;
 }
 
@@ -133,7 +145,6 @@ static inline struct addresses *get_cbn_probe(struct sk_buff *skb)
 static inline int set_cbn_probe(struct sk_buff *skb, struct addresses *addresses)
 {
 	struct addresses **ptr = (struct addresses **)skb_put(skb, sizeof(struct addresses *));
-	skb->__unused = 1;
 	*ptr = addresses;
 	TRACE_PRINT("skb %p addr %p [%lu] => %p\n", skb, ptr, (unsigned long)ptr - (unsigned long)skb_transport_header(skb), addresses);
 	return 0;
@@ -168,7 +179,7 @@ static unsigned int cbn_egress_hook(void *priv,
 		goto out;
 	}
 
-	if ((iph->protocol == IPPROTO_UDP) & (skb->__unused)) {
+	if ((iph->protocol == IPPROTO_UDP) & is_cbn_probe(skb)) {
 		struct addresses *addresses = get_cbn_probe(skb);
 		if (addresses) {
 			TRACE_PRINT("Next hop is %pI4n\n", &iph->daddr);
