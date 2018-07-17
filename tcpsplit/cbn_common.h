@@ -21,14 +21,16 @@
 #define INIT_TRACE	char ___buff[512] = {0}; int ___idx = 0;
 
 #define ERR_LINE() { pr_err("(%s): %d:%s \n", current->comm, __LINE__, __FUNCTION__);}
-//#define TRACE_PRINT(fmt, ...)
+
+#define TRACE_DEBUG(fmt, ...)
 #define TRACE_LINE()
+//#define TRACE_LINE() {	 trace_printk("%d:%s (%s)\n", __LINE__, __FUNCTION__, current->comm);/*___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d", __FUNCTION__, __LINE__);*/ }
+
 #ifndef TRACE_PRINT
 #define TRACE_PRINT(fmt, ...) { /*pr_err("%s:%s:"fmt"\n", __FUNCTION__, current->comm,##__VA_ARGS__ );*/\
 				 trace_printk("%d:%s:%s:"fmt"\n", __LINE__, current->comm, __FUNCTION__,##__VA_ARGS__ ); \
 				 /*___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d:"fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__); */}
 
-//#define TRACE_LINE() {	 trace_printk("%d:%s (%s)\n", __LINE__, __FUNCTION__, current->comm);/*___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d", __FUNCTION__, __LINE__);*/ }
 #endif
 #define DUMP_TRACE	 if (___idx) {___buff[___idx] = '\n'; trace_printk(___buff);} ___buff[0] = ___idx = 0;
 
@@ -94,9 +96,13 @@ static inline const char *proto_string(u8 protocol)
 			iphdr->ttl, proto_string(iphdr->protocol), iphdr->protocol,				\
 			iphdr->check, &iphdr->saddr, &iphdr->daddr						\
 			);
+
+#define	dump_udphdr(udphdr)	idx += sprintf(&store[idx],"src : %05d  dst %05d\n"				\
+						,ntohs(udphdr->source), ntohs(udphdr->dest));
+
 #define dump_tcph(tcphdr)	idx += sprintf(&store[idx], "\n\t\t%d => %d "					\
-						"\t\t%s %s %s\n"								\
-						"\t\tseq %d ack %d window %d\n"							\
+						"\t\t%s %s %s\n"						\
+						"\t\tseq %d ack %d window %d\n"					\
 						,ntohs(tcphdr->source), ntohs(tcphdr->dest)			\
 						, tcphdr->syn ? "SYN" : ""					\
 						, tcphdr->ack ? "ACK" : ""					\
@@ -117,6 +123,10 @@ static inline void trace_only(struct sk_buff *skb, const char *str)
 	if (iphdr->protocol == 6) {
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
 		dump_tcph(tcphdr);
+	}
+	if (iphdr->protocol == 17) {
+		struct udphdr *udphdr = (struct udphdr *)skb_transport_header(skb);
+		dump_udphdr(udphdr);
 	}
 #ifdef TRACE_PACKETS
 	trace_printk(store);

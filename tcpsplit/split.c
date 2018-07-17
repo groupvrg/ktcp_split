@@ -122,29 +122,20 @@ static inline struct addresses *build_addresses(struct sk_buff *skb)
 
 static inline struct addresses *get_cbn_probe(struct sk_buff *skb)
 {
-	if (unlikely(skb_shinfo(skb)->nr_frags)) {
-		pr_err("%s failed to get cbn probe due to nr_frags != 0 [%d]\n",
-				__FUNCTION__,
-				skb_shinfo(skb)->nr_frags);
-		return NULL;
-	}
-
-	//skb_shinfo(skb)->tx_flags |= SKBTX_CBN_PROBE;
-	return (struct addresses *)skb_shinfo(skb)->frags[0].page.p;
+	struct tcphdr *ptr = (struct tcphdr *)skb_inner_transport_header(skb);
+	struct addresses **addresses = (struct addresses **)(++ptr);
+	skb->__unused = 0;
+	TRACE_PRINT("skb %p addr %p [%lu] => %p\n", skb, ptr, (unsigned long)ptr - (unsigned long)skb_transport_header(skb), *addresses);
+	return *addresses;
 }
 
 
 static inline int set_cbn_probe(struct sk_buff *skb, struct addresses *addresses)
 {
-	if (unlikely(skb_shinfo(skb)->nr_frags)) {
-		pr_err("%s failed to set cbn probe due to nr_frags != 0 [%d]\n",
-				__FUNCTION__,
-				skb_shinfo(skb)->nr_frags);
-		return -1;
-	}
-
-	skb_shinfo(skb)->tx_flags |= SKBTX_CBN_PROBE;
-	skb_shinfo(skb)->frags[0].page.p = (struct page *)addresses;
+	struct addresses **ptr = (struct addresses **)skb_put(skb, sizeof(struct addresses *));
+	skb->__unused = 1;
+	*ptr = addresses;
+	TRACE_PRINT("skb %p addr %p [%lu] => %p\n", skb, ptr, (unsigned long)ptr - (unsigned long)skb_transport_header(skb), addresses);
 	return 0;
 }
 
@@ -166,9 +157,6 @@ static unsigned int cbn_egress_hook(void *priv,
 				goto drop;
 			}
 			addresses->src.sin_port = tcphdr->window;
-			TRACE_PRINT("cought a raw packet frags %d name %s",
-					skb_shinfo(skb)->nr_frags,
-					skb->dev->name);
 			if (is_out_gue(skb)) {
 				if (set_cbn_probe(skb, addresses))
 					goto drop;
@@ -180,9 +168,7 @@ static unsigned int cbn_egress_hook(void *priv,
 		goto out;
 	}
 
-	trace_iph(skb, (skb_shinfo(skb)->tx_flags & SKBTX_CBN_PROBE) ? "CBN_PROBE": "NaN");
-
-	if ((iph->protocol == IPPROTO_UDP) & (skb_shinfo(skb)->tx_flags & SKBTX_CBN_PROBE)) {
+	if ((iph->protocol == IPPROTO_UDP) & (skb->__unused)) {
 		struct addresses *addresses = get_cbn_probe(skb);
 		if (addresses) {
 			TRACE_PRINT("Next hop is %pI4n\n", &iph->daddr);
@@ -194,6 +180,7 @@ static unsigned int cbn_egress_hook(void *priv,
 out:
 	return NF_ACCEPT;
 drop:
+	TRACE_PRINT("Packet dropped %s\n", __FUNCTION__);
 	return NF_DROP;
 }
 
@@ -243,7 +230,7 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 		.hook		= cbn_egress_hook,
 		.hooknum	= NF_INET_POST_ROUTING,
 		.pf		= PF_INET,
-		.priority	= NF_IP_PRI_LAST,
+		.priority	= NF_IP_PRI_FIRST,
 		.priv		= "TX"
 		},
 	/*
@@ -365,10 +352,12 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 
 	goto out;
 err:
-	TRACE_PRINT("%s [%s] stopping on error (%d) at %s with %lld bytes\n", __FUNCTION__,
-		dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
+	if (rc)
+		TRACE_PRINT("%s [%s] stopping on error (%d) at %s with %lld bytes", __FUNCTION__,
+				dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 out:
-	TRACE_PRINT("%s going out (%d)", __FUNCTION__, rc);
+	if (rc)
+		TRACE_PRINT("%s going out (%d)", __FUNCTION__, rc);
 	for (i = 0; i < VEC_SZ; i++)
 		free_page((unsigned long)(kvec[i].iov_base));
 	DUMP_TRACE
@@ -421,7 +410,7 @@ inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 			err = 1;
 		}
 	} else {
-		TRACE_PRINT("QP %p waking peer", qp);
+		TRACE_DEBUG("QP %p waking peer", qp);
 		wake_up(&qp->wait);
 	}
 
@@ -495,7 +484,7 @@ int start_new_connection_syn(void *arg)
 		kmem_cache_free(syn_slab, addresses);
 		return  0;
 	}
-	TRACE_PRINT("QP is %p", qp);
+	TRACE_DEBUG("QP is %p", qp);
 
 	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
@@ -641,7 +630,7 @@ static int start_new_connection(void *arg)
 
 	/* consolidate into one qp */
 	qp = qp_exists(qp, RX_QP);
-	TRACE_PRINT("QP is %p", qp);
+	TRACE_DEBUG("QP is %p", qp);
 	if (wait_qp_ready(qp, RX_QP))
 		goto out;
 
