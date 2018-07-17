@@ -38,7 +38,7 @@ static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 	pre_conn_list = (preconn) ? &preconn->list : NULL;
 
 	if (unlikely(!pre_conn_list || list_empty(pre_conn_list))) {
-		pr_err("preconn pool is empty! %pI4h \n", &next_hop_ip);
+		pr_err("preconn pool is empty! %pI4n, spawning refill...\n", &next_hop_ip);
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		return NULL;
@@ -70,12 +70,13 @@ int start_new_pre_connection_syn(void *arg)
 	int rc = 0;
 	struct addresses *addresses = arg;
 	struct cbn_listner *listner;
-	struct cbn_qp *qp, *tx_qp;
+	struct cbn_qp *qp;
 	struct sockets sockets;
 
 	INIT_TRACE
 	qp = alloc_prexeisting_conn(addresses->sin_addr.s_addr);
 	if (!qp) {
+		TRACE_PRINT("Couldnt alloc a pre_connection to %pI4n", &addresses->sin_addr.s_addr);
 		start_new_connection_syn(arg);
 		goto out;
 	}
@@ -95,19 +96,9 @@ int start_new_pre_connection_syn(void *arg)
 	kmem_cache_free(syn_slab, addresses);
 	//TODO: add locks to this shit
 	TRACE_LINE();
-	if ((tx_qp = add_rb_data(&listner->connections_root, qp))) { //this means the other conenction is already up
-		tx_qp->tx = qp->tx;
-		kmem_cache_free(qp_slab, qp);
-		qp = tx_qp;
-		TRACE_PRINT("QP exists");
-	} else {
-		TRACE_PRINT("QP created...");
-		while (!qp->rx) {
-			if (kthread_should_stop())
-				goto connect_fail;
-			schedule();
-		}
-	}
+	if (wait_qp_ready(qp, TX_QP))
+		goto out;
+
 	TRACE_LINE();
 	DUMP_TRACE
 	sockets.tx 	= (struct socket *)qp->rx;
@@ -312,7 +303,6 @@ static void preconn_resgister_server(struct cbn_listner *server)
 	pre_conn_listner 		= server;
 }
 
-/* call this on add tennat... & add to .h*/
 struct socket *craete_prec_conn_probe(u32 mark)
 {
 	int rc = 0;
@@ -370,6 +360,7 @@ int start_probe_syn(void *arg)
 	if ((rc = kernel_sendmsg(probe->listner->raw, &msg, kvec, 2,
 				  sizeof(struct tcphdr) +
 				  sizeof(struct iphdr))) <= 0) {
+		/* FIXME: -1 will return if next dev is not gue+*/
 		pr_err("Failed to send next hop %d\n", rc);
 	}
 

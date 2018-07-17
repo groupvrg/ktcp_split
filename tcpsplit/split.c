@@ -180,10 +180,12 @@ static unsigned int cbn_egress_hook(void *priv,
 		goto out;
 	}
 
+	trace_iph(skb, (skb_shinfo(skb)->tx_flags & SKBTX_CBN_PROBE) ? "CBN_PROBE": "NaN");
 
 	if ((iph->protocol == IPPROTO_UDP) & (skb_shinfo(skb)->tx_flags & SKBTX_CBN_PROBE)) {
 		struct addresses *addresses = get_cbn_probe(skb);
 		if (addresses) {
+			TRACE_PRINT("Next hop is %pI4n\n", &iph->daddr);
 			addresses->sin_addr.s_addr = iph->daddr;
 			kthread_pool_run(&cbn_pool, start_new_pre_connection_syn, addresses);
 		}
@@ -399,7 +401,7 @@ static inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 	return pqp;
 }
 
-static inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
+inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 {
 	int err = 0;
 
@@ -409,9 +411,7 @@ static inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 	 * */
 	if (IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1])) {
 		int rc;
-		TRACE_PRINT("QP %p schedule", qp);
 		schedule();
-		TRACE_PRINT("QP %p sleeping", qp);
 		/*should return non zero*/
 		rc = wait_event_interruptible_timeout(qp->wait,
 							!IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]),
@@ -631,10 +631,11 @@ static int start_new_connection(void *arg)
 	qp->addr_s = cli_addr.sin_addr;
 	/*rp->root/qp->mark no longer valid, qp is a union*/
 
-	line = __LINE__;
-	if ((rc = kernel_getsockname(rx, (struct sockaddr *)&addr, &size)))
-		goto create_fail;
-	TRACE_PRINT("connected local port %d IP %pI4n (%d)", ntohs(addr.sin_port), &addr.sin_addr, addr.sin_family);
+	//line = __LINE__;
+	//if ((rc = kernel_getsockname(rx, (struct sockaddr *)&addr, &size)))
+	//	goto create_fail;
+	TRACE_PRINT("[L] %d IP %pI4n => %d IP %pI4n (%d)", ntohs(cli_addr.sin_port), &cli_addr.sin_addr,
+								ntohs(addr.sin_port), &addr.sin_addr, mark);
 
 	qp->tx = NULL;
 
