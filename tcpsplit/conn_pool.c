@@ -70,12 +70,14 @@ static inline int forward_conn_info(struct socket *tx, struct addresses *address
 int start_new_pre_connection_syn(void *arg)
 {
 	int rc = 0;
+	int line = __LINE__;
 	struct addresses *addresses = arg;
 	struct cbn_listner *listner;
 	struct cbn_qp *qp, *tqp;
 	struct sockets sockets;
 
 	INIT_TRACE
+	line = __LINE__;
 	qp = alloc_prexeisting_conn(addresses->sin_addr.s_addr);
 	if (!qp) {
 		TRACE_PRINT("Couldnt alloc a pre_connection to %pI4n", &addresses->sin_addr.s_addr);
@@ -88,9 +90,11 @@ int start_new_pre_connection_syn(void *arg)
 	qp->port_d = addresses->dest.sin_port;
 	qp->addr_s = addresses->src.sin_addr;
 
+	line = __LINE__;
 	listner = search_rb_listner(&listner_root, addresses->mark);
 	if (unlikely(!listner)) {
 		TRACE_PRINT("Listner missing %d, going out", addresses->mark);
+		goto out;
 	}
 	qp->root = &listner->connections_root;
 
@@ -98,11 +102,13 @@ int start_new_pre_connection_syn(void *arg)
 			ntohs(qp->port_d), &qp->addr_d, ntohs(qp->port_s), &qp->addr_s);
 
 	tqp = qp_exists(qp, TX_QP);
+	line = __LINE__;
 	if (unlikely(tqp == NULL)) {
 		TRACE_PRINT("Double ack... going out...\n");
 		/*TODO: free qp...*/
 		goto out;
 	}
+	line = __LINE__;
 	if ((rc	= forward_conn_info((struct socket *)qp->tx, addresses)) <= 0)
 		goto connect_fail;
 
@@ -116,14 +122,14 @@ int start_new_pre_connection_syn(void *arg)
 	DUMP_TRACE
 	sockets.tx 	= (struct socket *)qp->rx;
 	sockets.rx 	= (struct socket *)qp->tx;
-	qp->root 	= &listner->connections_root;
 	atomic_inc(&qp->ref_cnt);
 	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
 
 connect_fail:
 	sock_release((struct socket *)qp->tx);
-	TRACE_PRINT("OUT: connection to port %s ", __FUNCTION__);
+	if (rc)
+		TRACE_PRINT("OUT: Error %d on %d", rc, line);
 	DUMP_TRACE
 out:
 	return rc;
