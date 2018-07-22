@@ -109,8 +109,11 @@ int start_new_pre_connection_syn(void *arg)
 		goto out;
 	}
 	line = __LINE__;
-	if ((rc	= forward_conn_info((struct socket *)qp->tx, addresses)) <= 0)
-		goto connect_fail;
+	if ((rc	= forward_conn_info((struct socket *)qp->tx, addresses)) <= 0) {
+		TRACE_PRINT("Failed to forward pre_connection to %pI4n", &addresses->sin_addr.s_addr);
+		start_new_connection_syn(arg);
+		goto out;
+	}
 
 	kmem_cache_free(syn_slab, addresses);
 	//TODO: add locks to this shit
@@ -126,7 +129,6 @@ int start_new_pre_connection_syn(void *arg)
 	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
 
-connect_fail:
 	sock_release((struct socket *)qp->tx);
 	if (rc)
 		TRACE_PRINT("OUT: Error %d on %d", rc, line);
@@ -233,9 +235,9 @@ static int start_half_duplex(void *arg)
 {
 	void **args = arg;
 	struct cbn_qp *qp = args[1];
-	TRACE_PRINT("starting half duplex");
+	//TRACE_PRINT("starting half duplex");
 	half_duplex(args[0], args[1]);
-	TRACE_PRINT("Going out... waking pair");
+	//TRACE_PRINT("Going out... waking pair");
 	args[0] = NULL;
 	wake_up(&qp->wait);
 	return 0;
@@ -322,11 +324,13 @@ static int start_new_pending_connection(void *arg)
 	if (!rc)
 		pr_err("T/O waiting on start_half_duplex");
 
+
 connect_fail:
 	sock_release(tx);
 	sock_release((struct socket *)qp->rx);
 create_fail:
-	TRACE_PRINT("OUT: connection failed %d [%d]", rc , line);
+	if (rc < 0)
+		TRACE_PRINT("OUT: connection failed %d [%d]", rc , line);
 	DUMP_TRACE
 	return rc;
 }
