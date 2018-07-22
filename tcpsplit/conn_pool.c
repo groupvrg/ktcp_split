@@ -232,8 +232,12 @@ err:
 static int start_half_duplex(void *arg)
 {
 	void **args = arg;
+	struct cbn_qp *qp = args[1];
 	TRACE_PRINT("starting half duplex");
 	half_duplex(args[0], args[1]);
+	TRACE_PRINT("Going out... waking pair");
+	args[0] = NULL;
+	wake_up(&qp->wait);
 	return 0;
 }
 
@@ -313,6 +317,10 @@ static int start_new_pending_connection(void *arg)
 	atomic_inc(&qp->ref_cnt);
 	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
+	/* Must wait for the other thread to end...*/
+	rc = wait_event_interruptible_timeout(qp->wait, (ptr_pair[0] == NULL),5 * HZ);
+	if (!rc)
+		pr_err("T/O waiting on start_half_duplex");
 
 connect_fail:
 	sock_release(tx);
