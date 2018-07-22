@@ -150,6 +150,7 @@ static int prealloc_connection(void *arg)
 	INIT_TRACE
 	fill_preconn_address(ip, addresses);
 	qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
+	init_waitqueue_head(&qp->wait);
 	atomic_set(&qp->ref_cnt, 0);
 	qp->addr_d = addresses->dest.sin_addr;
 	qp->port_d = addresses->dest.sin_port;
@@ -415,6 +416,7 @@ static int prec_conn_listner_server(void *arg)
 		TRACE_PRINT("new pre connection...");
 		qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
 		atomic_set(&qp->ref_cnt, 0);
+		init_waitqueue_head(&qp->wait);
 		qp->rx 		= nsock;
 		qp->tid 	= 0;
 		qp->root 	= NULL;
