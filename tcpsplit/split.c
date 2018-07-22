@@ -374,7 +374,7 @@ out:
 	return rc;
 }
 
-static inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
+inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 {
 	struct cbn_qp *qp = pqp;
 

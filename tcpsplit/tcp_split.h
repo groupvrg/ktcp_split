@@ -55,4 +55,5 @@ int __exit cbn_pre_connect_end(void);
 int start_probe_syn(void *arg);
 int start_new_connection_syn(void *arg);
 inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir);
+inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir);
 #endif /*__CBN_DATAPATH_H__*/

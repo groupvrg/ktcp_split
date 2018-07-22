@@ -70,7 +70,7 @@ int start_new_pre_connection_syn(void *arg)
 	int rc = 0;
 	struct addresses *addresses = arg;
 	struct cbn_listner *listner;
-	struct cbn_qp *qp;
+	struct cbn_qp *qp, *tqp;
 	struct sockets sockets;
 
 	INIT_TRACE
@@ -86,13 +86,24 @@ int start_new_pre_connection_syn(void *arg)
 	qp->port_d = addresses->dest.sin_port;
 	qp->addr_s = addresses->src.sin_addr;
 
-	//TRACE_PRINT("connection to port %d IP %pI4n from %d IP %pI4n",
-	//		ntohs(qp->port_d), &qp->addr_d, ntohs(qp->port_s), &qp->addr_s);
+	listner = search_rb_listner(&listner_root, addresses->mark);
+	if (unlikely(!listner)) {
+		TRACE_PRINT("Listner missing %d, going out", addresses->mark);
+	}
+	qp->root = &listner->connections_root;
 
+	TRACE_PRINT("connection to port %d IP %pI4n from %d IP %pI4n",
+			ntohs(qp->port_d), &qp->addr_d, ntohs(qp->port_s), &qp->addr_s);
+
+	tqp = qp_exists(qp, TX_QP);
+	if (unlikely(tqp == NULL)) {
+		TRACE_PRINT("Double ack... going out...\n");
+		/*TODO: free qp...*/
+		goto out;
+	}
 	if ((rc	= forward_conn_info((struct socket *)qp->tx, addresses)) <= 0)
 		goto connect_fail;
 
-	listner = search_rb_listner(&listner_root, addresses->mark);
 	kmem_cache_free(syn_slab, addresses);
 	//TODO: add locks to this shit
 	TRACE_LINE();
@@ -187,7 +198,8 @@ static int prealloc_connection(void *arg)
 connect_fail:
 	sock_release(tx);
 out:
-	TRACE_PRINT("pre-connection out %s <%d @ %d>", __FUNCTION__, rc, line);
+	if (rc)
+		TRACE_PRINT("pre-connection out %s <%d @ %d>", __FUNCTION__, rc, line);
 	DUMP_TRACE
 	return rc;
 }
