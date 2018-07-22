@@ -109,7 +109,7 @@ static inline struct addresses *build_addresses(struct sk_buff *skb)
 		pr_err("Faield to alloc mem %s\n", __FUNCTION__);
 		return NULL;
 	}
-	trace_iph(skb, __FUNCTION__);
+	//trace_iph(skb, __FUNCTION__);
 
 	addresses->dest.sin_addr.s_addr = iphdr->daddr;
 	addresses->src.sin_addr.s_addr  = iphdr->saddr;
@@ -124,7 +124,6 @@ static inline bool is_cbn_probe(struct sk_buff *skb)
 {
 	if (likely(skb->inner_protocol == IPPROTO_IPIP)) {
 		struct iphdr *iphdr = (struct iphdr *)skb_inner_network_header(skb);
-		TRACE_PRINT("proto [%d]\n", iphdr->protocol);
 		if (iphdr->protocol == IPPROTO_TCP) {
 			struct tcphdr *tcphdr = (struct tcphdr *)skb_inner_transport_header(skb);
 			return (ntohs(tcphdr->source) == CBP_PROBE_PORT);
@@ -137,7 +136,7 @@ static inline struct addresses *get_cbn_probe(struct sk_buff *skb)
 {
 	struct tcphdr *ptr = (struct tcphdr *)skb_inner_transport_header(skb);
 	struct addresses **addresses = (struct addresses **)(++ptr);
-	TRACE_PRINT("skb %p addr %p [%d|%d] => %p\n", skb, ptr, skb->inner_protocol, ntohs(skb->inner_protocol), *addresses);
+	//TRACE_PRINT("skb %p addr %p [%d|%d] => %p\n", skb, ptr, skb->inner_protocol, ntohs(skb->inner_protocol), *addresses);
 	return *addresses;
 }
 
@@ -146,7 +145,7 @@ static inline int set_cbn_probe(struct sk_buff *skb, struct addresses *addresses
 {
 	struct addresses **ptr = (struct addresses **)skb_put(skb, sizeof(struct addresses *));
 	*ptr = addresses;
-	TRACE_PRINT("skb %p addr %p [%lu] => %p\n", skb, ptr, (unsigned long)ptr - (unsigned long)skb_transport_header(skb), addresses);
+	//TRACE_PRINT("skb %p addr %p [%lu] => %p\n", skb, ptr, (unsigned long)ptr - (unsigned long)skb_transport_header(skb), addresses);
 	return 0;
 }
 
@@ -191,7 +190,7 @@ static unsigned int cbn_egress_hook(void *priv,
 out:
 	return NF_ACCEPT;
 drop:
-	TRACE_PRINT("Packet dropped %s\n", __FUNCTION__);
+	//TRACE_PRINT("Packet dropped %s\n", __FUNCTION__);
 	return NF_DROP;
 }
 
@@ -381,7 +380,7 @@ static inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 
 	if ((qp = add_rb_data(pqp->root, pqp))) {
 		/* QP already exists */
-		TRACE_PRINT("QP %p [%p] <%d>", qp, qp->qp_dir[dir], dir);
+		TRACE_PRINT("QP exists %p [%p] <%d>", qp, qp->qp_dir[dir], dir);
 		if (qp->qp_dir[dir] != NULL) {
 			/* *
 			 * Double Syn, this DIR qp already exists,
@@ -495,7 +494,7 @@ int start_new_connection_syn(void *arg)
 		kmem_cache_free(syn_slab, addresses);
 		return  0;
 	}
-	TRACE_DEBUG("QP is %p", qp);
+	TRACE_DEBUG("new QP is %p", qp);
 
 	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
@@ -662,7 +661,8 @@ out:
 
 create_fail:
 	sock_release(rx);
-	TRACE_PRINT("out [%d - %d]", rc, ++line);
+	if (rc)
+		TRACE_PRINT("out [%d - %d]", rc, ++line);
 	DUMP_TRACE
 	return rc;
 }
