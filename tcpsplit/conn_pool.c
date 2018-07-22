@@ -116,8 +116,6 @@ out:
 	return rc;
 }
 
-#define PRECONN_SERVER_PORT	51000
-
 static inline void fill_preconn_address(__be32 ip, struct addresses *addresses)
 {
 	//	ip should already be __be32

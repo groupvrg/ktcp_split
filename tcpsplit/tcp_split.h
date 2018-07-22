@@ -3,9 +3,7 @@
 
 #include "rb_data_tree.h"
 
-//SKBTX_ flags in skbuff.h (example: SKBTX_IN_PROGRESS)
-//WARN: make sure this bit is free
-#define SKBTX_CBN_PROBE (1 << 7)
+#define PRECONN_SERVER_PORT	5565
 
 //Lowest official IANA unassigned port
 #define CBP_PROBE_PORT 	4
