@@ -15,6 +15,8 @@
 #include "preconn_rb_tree.h"
 #include "cbn_common.h"
 
+extern uint32_t ip_transparent;
+
 extern struct kthread_pool cbn_pool;
 extern struct kmem_cache *qp_slab;
 extern struct kmem_cache *syn_slab;
@@ -232,6 +234,7 @@ static int start_half_duplex(void *arg)
 static int start_new_pending_connection(void *arg)
 {
 	int rc, optval = 1;
+	int line;
 	struct cbn_qp *qp = arg;
 	struct addresses addresses_s;
 	struct addresses *addresses;
@@ -241,38 +244,45 @@ static int start_new_pending_connection(void *arg)
 
 	INIT_TRACE
 
+	line = __LINE__;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
 		goto create_fail;
 
 	addresses = &addresses_s;
+	line = __LINE__;
 	if ((rc = preconn_wait_for_next_hop(qp, addresses)) <= 0) {
 		pr_err("waiting for next hop failed %d\n", rc);
 		goto create_fail;
 	}
 
 	/* TODO: allow pipelining  - check if next hop is also preconnected....*/
-//TRACE_PRINT("connection to port %d IP %pI4n from %d IP %pI4n",
-//		ntohs(addresses->dest.sin_port),
-//		&addresses->dest.sin_addr,
-//		ntohs(addresses->src.sin_port),
-//		&addresses->src.sin_addr);
+	TRACE_PRINT("connection to port %d IP %pI4n from %d IP %pI4n",
+			ntohs(addresses->dest.sin_port),
+			&addresses->dest.sin_addr,
+			ntohs(addresses->src.sin_port),
+			&addresses->src.sin_addr);
 
+	line = __LINE__;
 	if ((rc = kernel_setsockopt(tx, SOL_TCP, TCP_NODELAY, (char *)&optval, sizeof(optval))) < 0)
 		goto connect_fail;
 
-	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
+	line = __LINE__;
+	if ((rc = kernel_setsockopt(tx, SOL_SOCKET,
+					SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
 		goto connect_fail;
 
-/*
+
+	line = __LINE__;
 	if (ip_transparent) {
-		if ((rc = kernel_setsockopt(tx, SOL_IP, IP_TRANSPARENT, (char *)&T, sizeof(int))))
+		if ((rc = kernel_setsockopt(tx, SOL_IP, IP_TRANSPARENT, (char *)&optval, sizeof(int))))
 			goto connect_fail;
-		MUST BIND TO A ROUTABLE IP....
+		/*TODO: set src port to 0*/
 		if ((rc = kernel_bind(tx, (struct sockaddr *)&addresses->src, sizeof(struct sockaddr))))
 			goto connect_fail;
 	}
-*/
+
 	addresses->dest.sin_family = AF_INET;
+	line = __LINE__;
 	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0)))
 		goto connect_fail;
 
@@ -302,7 +312,7 @@ connect_fail:
 	sock_release(tx);
 	sock_release((struct socket *)qp->rx);
 create_fail:
-	TRACE_PRINT("OUT: connection to port %s ", __FUNCTION__);
+	TRACE_PRINT("OUT: connection failed %d [%d]", rc , line);
 	DUMP_TRACE
 	return rc;
 }
