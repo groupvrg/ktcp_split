@@ -44,7 +44,7 @@ uint32_t ip_transparent = 1;
 
 int start_new_pre_connection_syn(void *arg);
 
-static int getorigdst(struct sock *sk)
+static int getorigdst(struct sock *sk, struct sockaddr_in *out)
 {
 	const struct inet_sock *inet = inet_sk(sk);
 	const struct nf_conntrack_tuple_hash *h;
@@ -64,7 +64,7 @@ static int getorigdst(struct sock *sk)
 
 	/* We only do TCP and SCTP at the moment: is there a better way? */
 	if (unlikely(tuple.dst.protonum != IPPROTO_TCP &&
-		    tuple.dst.protonum != IPPROTO_SCTP)) {
+			tuple.dst.protonum != IPPROTO_SCTP)) {
 		pr_err("SO_ORIGINAL_DST: Not a TCP/SCTP socket\n");
 		return -ENOPROTOOPT;
 	}
@@ -80,9 +80,9 @@ static int getorigdst(struct sock *sk)
 		sin.sin_addr.s_addr = ct->tuplehash[IP_CT_DIR_ORIGINAL]
 			.tuple.dst.u3.ip;
 		memset(sin.sin_zero, 0, sizeof(sin.sin_zero));
-
-		pr_debug("SO_ORIGINAL_DST: %pI4 %u\n",
-			 &sin.sin_addr.s_addr, ntohs(sin.sin_port));
+		memcpy(out, &sin, sizeof(struct sockaddr_in));
+		TRACE_PRINT("SO_ORIGINAL_DST: %pI4 %u\n",
+				&sin.sin_addr.s_addr, ntohs(sin.sin_port));
 		nf_ct_put(ct);
 		return 0;
 	}
@@ -654,17 +654,22 @@ static int start_new_connection(void *arg)
 	root 	= qp->root;
 
 	size = sizeof(addr);
-	line = __LINE__;
-	if ((rc = kernel_getsockopt(rx, SOL_IP, SO_ORIGINAL_DST, (char *)&addr, &size))) {
-		pr_err("%s error (%d)\n", __FUNCTION__, rc);
-		goto create_fail;
-	}
 
+	line = __LINE__;
 	if ((rc = kernel_setsockopt(rx, SOL_SOCKET, SO_MARK, (char *)&mark, sizeof(u32))) < 0) {
 		pr_err("%s error (%d)\n", __FUNCTION__, rc);
 		goto create_fail;
 	}
 
+	// Due to MARK being part of CT this call will fail, I'm using a modified version of getorigdst
+	//if ((rc = kernel_getsockopt(rx, SOL_IP, SO_ORIGINAL_DST, (char *)&addr, &size))) {
+	line = __LINE__;
+	if ((rc = getorigdst(rx->sk, &addr))) {
+		pr_err("%s error (%d)\n", __FUNCTION__, rc);
+		goto create_fail;
+	}
+
+	line = __LINE__;
 	if ((rc = kernel_setsockopt(rx, SOL_TCP, TCP_NODELAY, (char *)&optval, sizeof(optval))) < 0)
 		goto create_fail;
 
