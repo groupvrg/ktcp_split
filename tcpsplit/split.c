@@ -44,7 +44,9 @@ uint32_t ip_transparent = 1;
 
 int start_new_pre_connection_syn(void *arg);
 
-static int getorigdst(struct sock *sk, struct sockaddr_in *out)
+// Due to MARK being part of CT this call might fail, modifed getorigdist is needed then
+// one isse - it can compile only against kernels with the CT patches.
+static inline int getorigdst(struct sock *sk, struct sockaddr_in *out)
 {
 	const struct inet_sock *inet = inet_sk(sk);
 	const struct nf_conntrack_tuple_hash *h;
@@ -661,10 +663,9 @@ static int start_new_connection(void *arg)
 		goto create_fail;
 	}
 
-	// Due to MARK being part of CT this call will fail, I'm using a modified version of getorigdst
-	//if ((rc = kernel_getsockopt(rx, SOL_IP, SO_ORIGINAL_DST, (char *)&addr, &size))) {
+	//if ((rc = getorigdst(rx->sk, &addr))) {
 	line = __LINE__;
-	if ((rc = getorigdst(rx->sk, &addr))) {
+	if ((rc = kernel_getsockopt(rx, SOL_IP, SO_ORIGINAL_DST, (char *)&addr, &size))) {
 		pr_err("%s error (%d)\n", __FUNCTION__, rc);
 		goto create_fail;
 	}
