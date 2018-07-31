@@ -1,6 +1,11 @@
 #sudo rmmod cbn_split
 make
 if [ "$?" != 0 ]; then
+	RED='\033[1;31m'
+	NC='\033[0m' # No Color
+	echo
+	echo -e "${RED}Please make sure this kernel has the cbn conntrack patches!!!${NC}"
+	echo
 	exit
 fi
 

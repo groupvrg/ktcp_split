@@ -15,6 +15,11 @@
 #include "rb_data_tree.h"
 #include "cbn_common.h"
 
+//getorigdst
+#include <net/inet_sock.h>
+#include <net/netfilter/nf_conntrack_tuple.h>
+#include <net/netfilter/nf_conntrack_core.h>
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Markuze Alex");
 MODULE_DESCRIPTION("CBN TCP Split Module");
@@ -38,6 +43,51 @@ static struct kmem_cache *listner_slab;
 uint32_t ip_transparent = 1;
 
 int start_new_pre_connection_syn(void *arg);
+
+static int getorigdst(struct sock *sk)
+{
+	const struct inet_sock *inet = inet_sk(sk);
+	const struct nf_conntrack_tuple_hash *h;
+	struct nf_conntrack_tuple tuple;
+
+	memset(&tuple, 0, sizeof(tuple));
+
+	lock_sock(sk);
+	tuple.src.u3.ip		= inet->inet_rcv_saddr;
+	tuple.src.u.tcp.port	= inet->inet_sport;
+	tuple.dst.u3.ip		= inet->inet_daddr;
+	tuple.dst.u.tcp.port	= inet->inet_dport;
+	tuple.src.l3num		= PF_INET;
+	tuple.dst.protonum	= sk->sk_protocol;
+	tuple.mark 		= sk->sk_mark;
+	release_sock(sk);
+
+	/* We only do TCP and SCTP at the moment: is there a better way? */
+	if (unlikely(tuple.dst.protonum != IPPROTO_TCP &&
+		    tuple.dst.protonum != IPPROTO_SCTP)) {
+		pr_err("SO_ORIGINAL_DST: Not a TCP/SCTP socket\n");
+		return -ENOPROTOOPT;
+	}
+
+	h = nf_conntrack_find_get(&init_net, &nf_ct_zone_dflt, &tuple);
+	if (h) {
+		struct sockaddr_in sin;
+		struct nf_conn *ct = nf_ct_tuplehash_to_ctrack(h);
+
+		sin.sin_family = AF_INET;
+		sin.sin_port = ct->tuplehash[IP_CT_DIR_ORIGINAL]
+			.tuple.dst.u.tcp.port;
+		sin.sin_addr.s_addr = ct->tuplehash[IP_CT_DIR_ORIGINAL]
+			.tuple.dst.u3.ip;
+		memset(sin.sin_zero, 0, sizeof(sin.sin_zero));
+
+		pr_debug("SO_ORIGINAL_DST: %pI4 %u\n",
+			 &sin.sin_addr.s_addr, ntohs(sin.sin_port));
+		nf_ct_put(ct);
+		return 0;
+	}
+	return -ENOENT;
+}
 
 static unsigned int put_qp(struct cbn_qp *qp)
 {
