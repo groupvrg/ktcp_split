@@ -181,8 +181,9 @@ static int prealloc_connection(void *arg)
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
 		goto out;
 
+	addresses->mark = CBN_CORE_ROUTE_MARK;
+
 	line = __LINE__;
-	/* TODO: Mark needs to be CBN_CORE_ROUTE */
 	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
 		goto connect_fail;
 
@@ -436,6 +437,10 @@ static int prec_conn_listner_server(void *arg)
 	srv_addr.sin_port 		= htons(port);
 
 	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
+		goto error;
+
+	port = CBN_CORE_ROUTE_MARK;
+	if ((rc = kernel_setsockopt(sock, SOL_SOCKET, SO_MARK, (char *)&port, sizeof(u32))) < 0)
 		goto error;
 
 	if ((rc = kernel_listen(sock, BACKLOG)))
