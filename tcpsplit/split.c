@@ -44,6 +44,7 @@ uint32_t ip_transparent = 1;
 
 int start_new_pre_connection_syn(void *arg);
 
+#if 0
 // Due to MARK being part of CT this call might fail, modifed getorigdist is needed then
 // one isse - it can compile only against kernels with the CT patches.
 static inline int getorigdst(struct sock *sk, struct sockaddr_in *out)
@@ -90,6 +91,7 @@ static inline int getorigdst(struct sock *sk, struct sockaddr_in *out)
 	}
 	return -ENOENT;
 }
+#endif
 
 static unsigned int put_qp(struct cbn_qp *qp)
 {
