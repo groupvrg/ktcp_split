@@ -45,6 +45,7 @@ static int pipe_loop_task(void *data)
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!kthread_should_stop()) {
 			POOL_PRINT("%s out to reuse <%p>", current->comm, current);
+			elem->pool_task = NULL;
 			kthread_pool_reuse(pool, elem);
 			schedule();
 		}
@@ -70,7 +71,7 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 			return;
 		}
 
-		k = kthread_create(threadfn, elem, "pool-thread-%d", cbn_pool->top_count);
+		k = kthread_create(threadfn, elem, "pool-th-%d", cbn_pool->top_count);
 
 		if (unlikely(!k)) {
 			POOL_ERR("ERROR: failed to create kthread %d", cbn_pool->top_count);
@@ -137,6 +138,10 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 	if (unlikely(!elem)) {
 		pr_err("Failed to alloc elem\n");
 		return ERR_PTR(-ENOMEM);
+	}
+
+	if (unlikely(elem->pool_task)) {
+		pr_err("ERRORL task allocated twice....!!!! <%s>", elem->task->comm);
 	}
 
 	elem->pool_task = func;

@@ -235,7 +235,7 @@ static unsigned int cbn_egress_hook(void *priv,
 	if ((iph->protocol == IPPROTO_UDP) & is_cbn_probe(skb)) {
 		struct addresses *addresses = get_cbn_probe(skb);
 		if (addresses) {
-			TRACE_PRINT("Next hop is %pI4n\n", &iph->daddr);
+			//TRACE_PRINT("Next hop is %pI4n\n", &iph->daddr);
 			addresses->sin_addr.s_addr = iph->daddr;
 			kthread_pool_run(&cbn_pool, start_new_pre_connection_syn, addresses);
 		}
@@ -434,13 +434,13 @@ inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 
 	if ((qp = add_rb_data(pqp->root, pqp))) {
 		/* QP already exists */
-		TRACE_PRINT("QP exists %p [%p] <%d>", qp, qp->qp_dir[dir], dir);
 		if (qp->qp_dir[dir] != NULL) {
 			/* *
 			 * Double Syn, this DIR qp already exists,
 			 * either active(Valid socket) or in progress (-EINVAL)
 			 * Drop this QP and stop.
 			 * */
+			TRACE_PRINT("WARN: QP exists %p [%p] <%d>", qp, qp->qp_dir[dir], dir);
 			return NULL;
 		}
 		/* *
@@ -548,7 +548,7 @@ int start_new_connection_syn(void *arg)
 		kmem_cache_free(syn_slab, addresses);
 		return  0;
 	}
-	TRACE_DEBUG("new QP is %p", qp);
+	//TRACE_DEBUG("new QP is %p", qp);
 
 	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
@@ -572,9 +572,9 @@ int start_new_connection_syn(void *arg)
 
 		addresses->src.sin_family = AF_INET;
 		addresses->src.sin_port = 0;
-		TRACE_PRINT("Binding : port %d IP %pI4n mark %d",
-				ntohs(addresses->src.sin_port), &addresses->src.sin_addr,
-				addresses->mark);
+		//TRACE_PRINT("Binding : port %d IP %pI4n mark %d",
+		//		ntohs(addresses->src.sin_port), &addresses->src.sin_addr,
+		//		addresses->mark);
 		if ((rc = kernel_bind(tx, (struct sockaddr *)&addresses->src, sizeof(struct sockaddr)))) {
 			pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
 			goto connect_fail;
@@ -590,7 +590,7 @@ int start_new_connection_syn(void *arg)
 	qp->tx = tx;
 connect_fail:
 
-	TRACE_PRINT("%s qp %p listner %p mark %d", __FUNCTION__, qp, listner, addresses->mark);
+	//TRACE_PRINT("%s qp %p listner %p mark %d", __FUNCTION__, qp, listner, addresses->mark);
 	kmem_cache_free(syn_slab, addresses);
 
 	if (wait_qp_ready(qp, TX_QP))
@@ -600,7 +600,7 @@ connect_fail:
 	sockets.tx = (struct socket *)qp->rx;
 	sockets.rx = (struct socket *)qp->tx;
 	sockets.dir = 1;
-	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
+	//TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	if (IS_ERR_OR_NULL((struct socket *)qp->rx) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
 	atomic_inc(&qp->ref_cnt);
