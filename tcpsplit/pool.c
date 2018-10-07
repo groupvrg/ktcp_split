@@ -20,13 +20,13 @@
 
 static void kthread_pool_reuse(struct kthread_pool *cbn_pool, struct pool_elem *elem)
 {
-	spin_lock_bh(&cbn_pool->running_lock);
+	spin_lock_irq(&cbn_pool->running_lock);
 	list_del(&elem->list);
-	spin_unlock_bh(&cbn_pool->running_lock);
-	spin_lock_bh(&cbn_pool->pool_lock);
+	spin_unlock_irq(&cbn_pool->running_lock);
+	spin_lock_irq(&cbn_pool->pool_lock);
 	list_add(&elem->list, &cbn_pool->kthread_pool);
 	--cbn_pool->refil_needed;
-	spin_unlock_bh(&cbn_pool->pool_lock);
+	spin_unlock_irq(&cbn_pool->pool_lock);
 }
 
 static int pipe_loop_task(void *data)
@@ -83,11 +83,11 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 		elem->task = k;
 		elem->pool = cbn_pool;
 		elem->pool_task = NULL;
-		spin_lock_bh(&cbn_pool->pool_lock);
+		spin_lock_irq(&cbn_pool->pool_lock);
 		list_add(&elem->list, &cbn_pool->kthread_pool);
 		--cbn_pool->refil_needed;
 		++cbn_pool->top_count;
-		spin_unlock_bh(&cbn_pool->pool_lock);
+		spin_unlock_irq(&cbn_pool->pool_lock);
 		POOL_ERR("pool thread %d [%p] allocated %llx", cbn_pool->top_count, elem, rdtsc());
 	}
 }
@@ -124,11 +124,11 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 		return NULL;
 	}
 
-	spin_lock_bh(&cbn_pool->pool_lock);
+	spin_lock_irq(&cbn_pool->pool_lock);
 	elem = list_first_entry(&cbn_pool->kthread_pool, struct pool_elem, list);
 	list_del(&elem->list);
 	++cbn_pool->refil_needed;
-	spin_unlock_bh(&cbn_pool->pool_lock);
+	spin_unlock_irq(&cbn_pool->pool_lock);
 	POOL_PRINT("allocated %p [%p]\n", elem, elem->task);
 	return elem;
 }
@@ -148,9 +148,9 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 
 	elem->pool_task = func;
 	elem->data = data;
-	spin_lock_bh(&cbn_pool->running_lock);
+	spin_lock_irq(&cbn_pool->running_lock);
 	list_add(&elem->list, &cbn_pool->kthread_running);
-	spin_unlock_bh(&cbn_pool->running_lock);
+	spin_unlock_irq(&cbn_pool->running_lock);
 	POOL_PRINT("staring %s\n", elem->task->comm);
 	wake_up_process(elem->task);
 	return elem;

@@ -109,8 +109,10 @@ static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *da
 			new = &((*new)->rb_left);
 		else if (result > 0)
 			new = &((*new)->rb_right);
-		else
+		else  {
+			spin_unlock_irq(lock);
 			return this;
+		}
 	}
 
 	/* Add new node and rebalance tree. */
