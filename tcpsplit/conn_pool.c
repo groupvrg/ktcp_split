@@ -15,6 +15,8 @@
 #include "preconn_rb_tree.h"
 #include "cbn_common.h"
 
+#define PRECONN_PRINT(...)
+
 extern uint32_t ip_transparent;
 
 extern struct kthread_pool cbn_pool;
@@ -40,7 +42,7 @@ static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 	pre_conn_list = (preconn) ? &preconn->list : NULL;
 
 	if (unlikely(!pre_conn_list || list_empty(pre_conn_list))) {
-		pr_err("preconn pool is empty! "IP4", spawning refill...\n", IP4N(&next_hop_ip));
+		pr_err("preconn pool is empty! "TCP4", spawning refill...\n", TCP4N(&next_hop_ip, PRECONN_SERVER_PORT));
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		return NULL;
@@ -76,11 +78,10 @@ int start_new_pre_connection_syn(void *arg)
 	struct cbn_qp *qp, *tqp;
 	struct sockets sockets;
 
-	INIT_TRACE
 	line = __LINE__;
 	qp = alloc_prexeisting_conn(addresses->sin_addr.s_addr);
 	if (!qp) {
-		TRACE_PRINT("Couldnt alloc a pre_connection to "IP4, IP4N(&addresses->sin_addr.s_addr));
+		PRECONN_PRINT("Couldnt alloc a pre_connection to "TCP4, TCP4N(&addresses->sin_addr.s_addr, PRECONN_SERVER_PORT));
 		start_new_connection_syn(arg);
 		goto out;
 	}
@@ -93,24 +94,24 @@ int start_new_pre_connection_syn(void *arg)
 	line = __LINE__;
 	listner = search_rb_listner(&listner_root, addresses->mark);
 	if (unlikely(!listner)) {
-		TRACE_PRINT("Listner missing %d, going out", addresses->mark);
+		PRECONN_PRINT("Listner missing %d, going out", addresses->mark);
 		goto out;
 	}
 	qp->root = &listner->connections_root;
 
-	TRACE_PRINT("connection to port %d IP "IP4" from %d IP "IP4,
-			ntohs(qp->port_d), IP4N(&qp->addr_d), ntohs(qp->port_s), IP4N(&qp->addr_s));
+	PRECONN_PRINT("connection to "TCP4" from "TCP4,
+			TCP4N(&qp->addr_d, ntohs(qp->port_d)), TCP4N(&qp->addr_s, ntohs(qp->port_s)));
 
 	tqp = qp_exists(qp, TX_QP);
 	line = __LINE__;
 	if (unlikely(tqp == NULL)) {
-		TRACE_PRINT("Double ack... going out...\n");
+		PRECONN_PRINT("Double ack... going out...\n");
 		/*TODO: free qp...*/
 		goto out;
 	}
 	line = __LINE__;
 	if ((rc	= forward_conn_info((struct socket *)qp->tx, addresses)) <= 0) {
-		TRACE_PRINT("Failed to forward pre_connection to "IP4, IP4N(&addresses->sin_addr.s_addr));
+		PRECONN_PRINT("Failed to forward pre_connection to "TCPP4, TCPP4N(&addresses->sin_addr.s_addr, PRECONN_SERVER_PORT));
 		start_new_connection_syn(arg);
 		goto out;
 	}
@@ -122,17 +123,15 @@ int start_new_pre_connection_syn(void *arg)
 		goto out;
 
 	TRACE_LINE();
-	DUMP_TRACE
 	sockets.tx 	= (struct socket *)qp->rx;
 	sockets.rx 	= (struct socket *)qp->tx;
 	atomic_inc(&qp->ref_cnt);
-	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
+	PRECONN_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	rc = half_duplex(&sockets, qp);
 
 	sock_release((struct socket *)qp->tx);
 	if (rc)
-		TRACE_PRINT("OUT: Error %d on %d", rc, line);
-	DUMP_TRACE
+		PRECONN_PRINT("OUT: Error %d on %d", rc, line);
 out:
 	return rc;
 }
@@ -168,7 +167,6 @@ static int prealloc_connection(void *arg)
 	struct cbn_qp *qp;
 	struct socket *tx;
 
-	INIT_TRACE
 	fill_preconn_address(ip, addresses);
 	qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
 	init_waitqueue_head(&qp->wait);
@@ -176,7 +174,7 @@ static int prealloc_connection(void *arg)
 	qp->addr_d = addresses->dest.sin_addr;
 	qp->port_d = addresses->dest.sin_port;
 
-	TRACE_PRINT("connection to port %d IP "IP4, ntohs(qp->port_d), IP4N(&qp->addr_d));
+	PRECONN_PRINT("connection to "TCP4, TCP4N(&qp->addr_d, ntohs(qp->port_d)));
 	line = __LINE__;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
 		goto out;
@@ -210,8 +208,7 @@ connect_fail:
 	sock_release(tx);
 out:
 	if (rc)
-		TRACE_PRINT("pre-connection out %s <%d @ %d>", __FUNCTION__, rc, line);
-	DUMP_TRACE
+		PRECONN_PRINT("pre-connection out %s <%d @ %d>", __FUNCTION__, rc, line);
 	return rc;
 }
 
@@ -236,9 +233,9 @@ static int start_half_duplex(void *arg)
 {
 	void **args = arg;
 	struct cbn_qp *qp = args[1];
-	//TRACE_PRINT("starting half duplex");
+	//PRECONN_PRINT("starting half duplex");
 	half_duplex(args[0], args[1]);
-	//TRACE_PRINT("Going out... waking pair");
+	//PRECONN_PRINT("Going out... waking pair");
 	args[0] = NULL;
 	wake_up(&qp->wait);
 	return 0;
@@ -255,8 +252,6 @@ static int start_new_pending_connection(void *arg)
 	struct socket *tx;
 	void *ptr_pair[2];
 
-	INIT_TRACE
-
 	line = __LINE__;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
 		goto create_fail;
@@ -269,11 +264,9 @@ static int start_new_pending_connection(void *arg)
 	}
 
 	/* TODO: allow pipelining  - check if next hop is also preconnected....*/
-	TRACE_PRINT("connection to port %d IP "IP4" from %d IP "IP4,
-			ntohs(addresses->dest.sin_port),
-			IP4N(&addresses->dest.sin_addr),
-			ntohs(addresses->src.sin_port),
-			IP4N(&addresses->src.sin_addr));
+	PRECONN_PRINT("connection to "TCP4" from "TCP4,
+			TCP4N(&addresses->dest.sin_addr, ntohs(addresses->dest.sin_port)),
+			TCP4N(&addresses->src.sin_addr, ntohs(addresses->src.sin_port)));
 
 	line = __LINE__;
 	if ((rc = kernel_setsockopt(tx, SOL_TCP, TCP_NODELAY, (char *)&optval, sizeof(optval))) < 0)
@@ -302,7 +295,6 @@ static int start_new_pending_connection(void *arg)
 	qp->tx = tx;
 
 	TRACE_LINE();
-	DUMP_TRACE
 
 	sockets.tx = (struct socket *)qp->rx;
 	sockets.rx = (struct socket *)qp->tx;
@@ -318,7 +310,7 @@ static int start_new_pending_connection(void *arg)
 	kthread_pool_run(&cbn_pool, start_half_duplex, ptr_pair);
 
 	atomic_inc(&qp->ref_cnt);
-	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
+	PRECONN_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
 	/* Must wait for the other thread to end...*/
 	rc = wait_event_interruptible_timeout(qp->wait, (ptr_pair[0] == NULL),5 * HZ);
@@ -331,8 +323,7 @@ connect_fail:
 	sock_release((struct socket *)qp->rx);
 create_fail:
 	if (rc < 0)
-		TRACE_PRINT("OUT: connection failed %d [%d]", rc , line);
-	DUMP_TRACE
+		PRECONN_PRINT("OUT: connection failed %d [%d]", rc , line);
 	return rc;
 }
 
@@ -421,10 +412,8 @@ static int prec_conn_listner_server(void *arg)
 	struct cbn_listner *server;
 	u32 port;
 
-	INIT_TRACE
-
 	port = (long)arg;
-	TRACE_PRINT("Pre conn server running %d", port);
+	PRECONN_PRINT("Pre conn server running %d", port);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
 		goto error;
 
@@ -446,7 +435,7 @@ static int prec_conn_listner_server(void *arg)
 	if ((rc = kernel_listen(sock, BACKLOG)))
 		goto error;
 
-	TRACE_PRINT("Listening to new pre connections");
+	PRECONN_PRINT("Listening to new pre connections");
 	preconn_resgister_server(server);
 	do {
 		struct socket *nsock;
@@ -454,11 +443,11 @@ static int prec_conn_listner_server(void *arg)
 
 		rc = kernel_accept(sock, &nsock, 0);
 		if (unlikely(rc)) {
-			TRACE_PRINT("rc is %d", rc);
+			PRECONN_PRINT("rc is %d", rc);
 			goto out;
 		}
 
-		TRACE_PRINT("new pre connection...");
+		PRECONN_PRINT("new pre connection...");
 		qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
 		atomic_set(&qp->ref_cnt, 0);
 		init_waitqueue_head(&qp->wait);
@@ -476,7 +465,6 @@ static int prec_conn_listner_server(void *arg)
 	out:
 	if (sock)
 		sock_release(sock);
-	DUMP_TRACE
 	return rc;
 }
 
@@ -540,14 +528,14 @@ int __exit cbn_pre_connect_end(void)
 {
 	struct list_head *itr, *tmp;
 
-	TRACE_PRINT("listner %p [%p]", pre_conn_listner, pre_conn_listner ? pre_conn_listner->sock: NULL);
+	PRECONN_PRINT("listner %p [%p]", pre_conn_listner, pre_conn_listner ? pre_conn_listner->sock: NULL);
 	if (pre_conn_listner)
 		kernel_sock_shutdown(pre_conn_listner->sock, SHUT_RDWR);
 
-	TRACE_PRINT("clear client connections");
+	PRECONN_PRINT("clear client connections");
 	clear_client_pre_connections();
 
-	TRACE_PRINT("clear server connections");
+	PRECONN_PRINT("clear server connections");
 	list_for_each_safe(itr, tmp, &pre_conn_list_server) {
 		struct cbn_qp *elem = container_of(itr, struct cbn_qp, list);
 		list_del(itr);

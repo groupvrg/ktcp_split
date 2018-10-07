@@ -82,12 +82,13 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 		INIT_LIST_HEAD(&elem->list);
 		elem->task = k;
 		elem->pool = cbn_pool;
+		elem->pool_task = NULL;
 		spin_lock_bh(&cbn_pool->pool_lock);
 		list_add(&elem->list, &cbn_pool->kthread_pool);
 		--cbn_pool->refil_needed;
 		++cbn_pool->top_count;
 		spin_unlock_bh(&cbn_pool->pool_lock);
-		POOL_PRINT("pool thread %d [%p] allocated %llx", cbn_pool->top_count, elem, rdtsc());
+		POOL_ERR("pool thread %d [%p] allocated %llx", cbn_pool->top_count, elem, rdtsc());
 	}
 }
 
@@ -142,6 +143,7 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 
 	if (unlikely(elem->pool_task)) {
 		pr_err("ERRORL task allocated twice....!!!! <%s>", elem->task->comm);
+		POOL_ERR("ERRORL task allocated twice....!!!! <%s>", elem->task->comm);
 	}
 
 	elem->pool_task = func;

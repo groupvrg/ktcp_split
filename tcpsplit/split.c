@@ -542,15 +542,19 @@ int start_new_connection_syn(void *arg)
 	qp = qp_exists(qp, TX_QP);
 	//TODO: add locks to this shit
 	if (unlikely(qp == NULL)) {
-		TRACE_PRINT("connection exists : port %d IP "IP4" mark %d",
-				ntohs(addresses->dest.sin_port), IP4N(&addresses->dest.sin_addr),
+		TRACE_PRINT("connection exists : "TCP4" => "TCP4" mark %d",
+				TCP4N(&addresses->src.sin_addr, ntohs(addresses->src.sin_port)),
+				TCP4N(&addresses->dest.sin_addr, ntohs(addresses->dest.sin_port)),
 				addresses->mark);
 		kmem_cache_free(syn_slab, addresses);
 		return  0;
 	}
 	//TRACE_DEBUG("new QP is %p", qp);
 
-	TRACE_PRINT("connection to port %d IP "IP4, ntohs(qp->port_d), IP4N(&qp->addr_d));
+	TRACE_PRINT("[R] start connection : "TCP4" => "TCP4" mark %d",
+			TCP4N(&addresses->src.sin_addr, ntohs(addresses->src.sin_port)),
+			TCP4N(&addresses->dest.sin_addr, ntohs(addresses->dest.sin_port)),
+			addresses->mark);
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
 		pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
 		goto connect_fail;
@@ -691,8 +695,8 @@ static int start_new_connection(void *arg)
 	//line = __LINE__;
 	//if ((rc = kernel_getsockname(rx, (struct sockaddr *)&addr, &size)))
 	//	goto create_fail;
-	TRACE_PRINT("[L] %d IP "IP4" => %d IP "IP4" (%d)", ntohs(cli_addr.sin_port), IP4N(&cli_addr.sin_addr),
-								ntohs(addr.sin_port), IP4N(&addr.sin_addr), mark);
+	TRACE_PRINT("[L] "TCP4" => "TCP4" (%d)", TCP4N(&cli_addr.sin_addr, ntohs(cli_addr.sin_port)),
+						TCP4N(&addr.sin_addr, ntohs(addr.sin_port)), mark);
 
 	qp->tx = NULL;
 
@@ -712,7 +716,8 @@ static int start_new_connection(void *arg)
 	atomic_inc(&qp->ref_cnt);
 	half_duplex(&sockets, qp);
 out:
-	TRACE_PRINT("closing port %d IP "IP4, ntohs(addr.sin_port), IP4N(&addr.sin_addr));
+	TRACE_PRINT(" Closing [L] "TCP4" => "TCP4" (%d)", TCP4N(&cli_addr.sin_addr, ntohs(cli_addr.sin_port)),
+						TCP4N(&addr.sin_addr, ntohs(addr.sin_port)), mark);
 	/* Teardown */
 	/* free both sockets*/
 	rc = line = 0;

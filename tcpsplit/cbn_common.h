@@ -82,8 +82,11 @@ static inline const char *proto_string(u8 protocol)
 	return "";
 }
 
-#define IP4N(x)	((const unsigned char*)(x))[0], ((const unsigned char*)(x))[1],((const unsigned char*)(x))[2],((const unsigned char*)(x))[3]
+#define IP4N(x)		((const unsigned char*)(x))[0], ((const unsigned char*)(x))[1],((const unsigned char*)(x))[2],((const unsigned char*)(x))[3]
+#define TCP4N(x, p)	((const unsigned char*)(x))[0], ((const unsigned char*)(x))[1],((const unsigned char*)(x))[2],((const unsigned char*)(x))[3], p
 #define IP4	"%u.%u.%u.%u"
+#define TCP4	"%u.%u.%u.%u:%u"
+
 #define dump_iph(iphdr) 	idx += sprintf(&store[idx],"\t\tmark %d secmark %d\n\t\t"  \
 		 "ihl %d ver %d tos %d total len %d\n\t\t"							\
 		 "id %05d frag_off %05lu [%s]\n\t\t"								\
