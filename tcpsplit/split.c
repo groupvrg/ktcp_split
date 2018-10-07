@@ -103,9 +103,9 @@ static unsigned int put_qp(struct cbn_qp *qp)
 		// TODO: protect with lock on MC
 		// reusable connections may not have a root
 		if (qp->root) {
-			spin_lock_bh(&qp_lock);
+			spin_lock_irq(&qp_lock);
 			rb_erase(&qp->node, qp->root);
-			spin_unlock_bh(&qp_lock);
+			spin_unlock_irq(&qp_lock);
 		} else {
 			list_del(&qp->list);
 		}
