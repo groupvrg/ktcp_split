@@ -103,6 +103,7 @@ static unsigned int put_qp(struct cbn_qp *qp)
 		// TODO: protect with lock on MC
 		// reusable connections may not have a root
 		if (qp->root) {
+			dump_qp(qp);
 			spin_lock_irq(&qp_lock);
 			rb_erase(&qp->node, qp->root);
 			spin_unlock_irq(&qp_lock);
@@ -395,8 +396,6 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 	int rc = -ENOMEM;
 	uint64_t bytes = 0;
 
-	INIT_TRACE
-
 	for (i = 0; i < VEC_SZ; i++) {
 		kvec[i].iov_len = PAGE_SIZE;
 		if (! (kvec[i].iov_base = page_address(alloc_page(GFP_KERNEL))))
@@ -428,9 +427,11 @@ err:
 out:
 	if (rc)
 		TRACE_PRINT("%s going out (%d)", __FUNCTION__, rc);
+	TRACE_DEBUG("%s [%s] stopping (%d) at %s with %lld bytes", __FUNCTION__,
+			dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 	for (i = 0; i < VEC_SZ; i++)
 		free_page((unsigned long)(kvec[i].iov_base));
-	DUMP_TRACE
+
 	return rc;
 }
 
@@ -610,18 +611,17 @@ connect_fail:
 	sockets.tx = (struct socket *)qp->rx;
 	sockets.rx = (struct socket *)qp->tx;
 	sockets.dir = 1;
-	//TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	if (IS_ERR_OR_NULL((struct socket *)qp->rx) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
 	atomic_inc(&qp->ref_cnt);
+	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	rc = half_duplex(&sockets, qp);
 
 out:
 	if (tx)
 		sock_release(tx);
 
-	TRACE_PRINT("OUT: %s <%d>", __FUNCTION__, rc);
-	DUMP_TRACE
+	TRACE_PRINT("closing connection <%d>", rc);
 	return rc;
 }
 /*
@@ -712,7 +712,6 @@ static int start_new_connection(void *arg)
 	if (wait_qp_ready(qp, RX_QP))
 		goto out;
 
-	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	DUMP_TRACE
 	sockets.tx = (struct socket *)qp->tx;
 	sockets.rx = (struct socket *)qp->rx;
@@ -720,6 +719,7 @@ static int start_new_connection(void *arg)
 	if (IS_ERR_OR_NULL((struct socket *)(qp->rx)) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
 	atomic_inc(&qp->ref_cnt);
+	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
 out:
 	TRACE_PRINT(" Closing [L] "TCP4" => "TCP4" (%d)", TCP4N(&cli_addr.sin_addr, ntohs(cli_addr.sin_port)),
@@ -813,7 +813,7 @@ static int split_server(void *mark_port)
 		qp->root 	= &server->connections_root;
 		atomic_set(&qp->ref_cnt, 0);
 		init_waitqueue_head(&qp->wait);
-		TRACE_PRINT("%s scheduling start_new_connection [%d]", __FUNCTION__, mark);
+		//TRACE_PRINT("%s scheduling start_new_connection [%d]", __FUNCTION__, mark);
 		kthread_pool_run(&cbn_pool, start_new_connection, qp);
 
 	} while (!kthread_should_stop());

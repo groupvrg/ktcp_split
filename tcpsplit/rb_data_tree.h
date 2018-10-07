@@ -40,6 +40,11 @@ struct cbn_qp {
 	};
 };
 
+static inline void dump_qp(struct cbn_qp *qp)
+{
+	TRACE_PRINTK("Key : "TCP4N" => "TCP4"\n", TCP4N(&qp->addr_s, ntohs(qp->port_s)), TCP4N(&qp->addr_d, ntohs(qp->port_d)));
+}
+
 static inline void dump_key(struct cbn_qp *qp)
 {
 	int i;
@@ -99,6 +104,7 @@ static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *da
 	struct rb_node **new = &(root->rb_node), *parent = NULL;
 
 	/* Figure out where to put new node */
+	dump_qp(data);
 	spin_lock_irq(lock);
 	while (*new) {
 		struct cbn_qp *this = container_of(*new, struct cbn_qp, node);
