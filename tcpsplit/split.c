@@ -38,6 +38,9 @@ struct kmem_cache *qp_slab;
 struct kmem_cache *syn_slab;
 struct kmem_cache *probe_slab;
 
+spinlock_t qp_lock;
+
+
 static struct kmem_cache *listner_slab;
 
 uint32_t ip_transparent = 1;
@@ -99,10 +102,13 @@ static unsigned int put_qp(struct cbn_qp *qp)
 	if (! (rc = atomic_dec_return(&qp->ref_cnt))) {
 		// TODO: protect with lock on MC
 		// reusable connections may not have a root
-		if (qp->root)
+		if (qp->root) {
+			spin_lock_bh(&qp_lock);
 			rb_erase(&qp->node, qp->root);
-		else
+			spin_unlock_bh(&qp_lock);
+		} else {
 			list_del(&qp->list);
+		}
 		kmem_cache_free(qp_slab, qp);
 	}
 	return rc;
@@ -432,7 +438,7 @@ inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 {
 	struct cbn_qp *qp = pqp;
 
-	if ((qp = add_rb_data(pqp->root, pqp))) {
+	if ((qp = add_rb_data(pqp->root, pqp, &qp_lock))) {
 		/* QP already exists */
 		if (qp->qp_dir[dir] != NULL) {
 			/* *
@@ -867,6 +873,8 @@ int __init cbn_datapath_init(void)
 {
 	parse_module_params();
 	pr_info("Starting KTCP [%d]\n", cbn_pool.pool_size);
+
+	spin_lock_init(&qp_lock);
 	qp_slab = kmem_cache_create("cbn_qp_mdata",
 					sizeof(struct cbn_qp), 0, 0, NULL);
 

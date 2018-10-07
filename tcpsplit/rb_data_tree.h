@@ -94,11 +94,12 @@ static inline struct cbn_qp *search_rb_data(struct rb_root *root, char *string)
 	return NULL;
 }
 
-static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *data)
+static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *data, spinlock_t *lock)
 {
 	struct rb_node **new = &(root->rb_node), *parent = NULL;
 
 	/* Figure out where to put new node */
+	spin_lock_bh(lock);
 	while (*new) {
 		struct cbn_qp *this = container_of(*new, struct cbn_qp, node);
 		int result = strncmp(data->key, this->key, RB_KEY_LENGTH);
@@ -115,6 +116,7 @@ static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *da
 	/* Add new node and rebalance tree. */
 	rb_link_node(&data->node, parent, new);
 	rb_insert_color(&data->node, root);
+	spin_unlock_bh(lock);
 
 	return NULL;
 }
