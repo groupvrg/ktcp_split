@@ -84,8 +84,8 @@ static inline int getorigdst(struct sock *sk, struct sockaddr_in *out)
 			.tuple.dst.u3.ip;
 		memset(sin.sin_zero, 0, sizeof(sin.sin_zero));
 		memcpy(out, &sin, sizeof(struct sockaddr_in));
-		TRACE_PRINT("SO_ORIGINAL_DST: %pI4 %u\n",
-				&sin.sin_addr.s_addr, ntohs(sin.sin_port));
+		TRACE_PRINT("SO_ORIGINAL_DST: "IP4" %u\n",
+				IP4N(&sin.sin_addr.s_addr), ntohs(sin.sin_port));
 		nf_ct_put(ct);
 		return 0;
 	}
@@ -235,7 +235,7 @@ static unsigned int cbn_egress_hook(void *priv,
 	if ((iph->protocol == IPPROTO_UDP) & is_cbn_probe(skb)) {
 		struct addresses *addresses = get_cbn_probe(skb);
 		if (addresses) {
-			//TRACE_PRINT("Next hop is %pI4n\n", &iph->daddr);
+			TRACE_PRINT("Next hop is "IP4"=>"IP4"\n", IP4N(&iph->saddr), IP4N(&iph->daddr));
 			addresses->sin_addr.s_addr = iph->daddr;
 			kthread_pool_run(&cbn_pool, start_new_pre_connection_syn, addresses);
 		}
@@ -542,15 +542,15 @@ int start_new_connection_syn(void *arg)
 	qp = qp_exists(qp, TX_QP);
 	//TODO: add locks to this shit
 	if (unlikely(qp == NULL)) {
-		TRACE_PRINT("connection exists : port %d IP %pI4n mark %d",
-				ntohs(addresses->dest.sin_port), &addresses->dest.sin_addr,
+		TRACE_PRINT("connection exists : port %d IP "IP4" mark %d",
+				ntohs(addresses->dest.sin_port), IP4N(&addresses->dest.sin_addr),
 				addresses->mark);
 		kmem_cache_free(syn_slab, addresses);
 		return  0;
 	}
 	//TRACE_DEBUG("new QP is %p", qp);
 
-	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
+	TRACE_PRINT("connection to port %d IP "IP4, ntohs(qp->port_d), IP4N(&qp->addr_d));
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
 		pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
 		goto connect_fail;
@@ -572,8 +572,8 @@ int start_new_connection_syn(void *arg)
 
 		addresses->src.sin_family = AF_INET;
 		addresses->src.sin_port = 0;
-		//TRACE_PRINT("Binding : port %d IP %pI4n mark %d",
-		//		ntohs(addresses->src.sin_port), &addresses->src.sin_addr,
+		//TRACE_PRINT("Binding : port %d IP "IP4" mark %d",
+		//		ntohs(addresses->src.sin_port), IP4N(&addresses->src.sin_addr),
 		//		addresses->mark);
 		if ((rc = kernel_bind(tx, (struct sockaddr *)&addresses->src, sizeof(struct sockaddr)))) {
 			pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
@@ -691,8 +691,8 @@ static int start_new_connection(void *arg)
 	//line = __LINE__;
 	//if ((rc = kernel_getsockname(rx, (struct sockaddr *)&addr, &size)))
 	//	goto create_fail;
-	TRACE_PRINT("[L] %d IP %pI4n => %d IP %pI4n (%d)", ntohs(cli_addr.sin_port), &cli_addr.sin_addr,
-								ntohs(addr.sin_port), &addr.sin_addr, mark);
+	TRACE_PRINT("[L] %d IP "IP4" => %d IP "IP4" (%d)", ntohs(cli_addr.sin_port), IP4N(&cli_addr.sin_addr),
+								ntohs(addr.sin_port), IP4N(&addr.sin_addr), mark);
 
 	qp->tx = NULL;
 
@@ -712,7 +712,7 @@ static int start_new_connection(void *arg)
 	atomic_inc(&qp->ref_cnt);
 	half_duplex(&sockets, qp);
 out:
-	TRACE_PRINT("closing port %d IP %pI4n", ntohs(addr.sin_port), &addr.sin_addr);
+	TRACE_PRINT("closing port %d IP "IP4, ntohs(addr.sin_port), IP4N(&addr.sin_addr));
 	/* Teardown */
 	/* free both sockets*/
 	rc = line = 0;

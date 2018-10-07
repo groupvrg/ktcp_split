@@ -40,7 +40,7 @@ static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 	pre_conn_list = (preconn) ? &preconn->list : NULL;
 
 	if (unlikely(!pre_conn_list || list_empty(pre_conn_list))) {
-		pr_err("preconn pool is empty! %pI4n, spawning refill...\n", &next_hop_ip);
+		pr_err("preconn pool is empty! "IP4", spawning refill...\n", IP4N(&next_hop_ip));
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		return NULL;
@@ -80,7 +80,7 @@ int start_new_pre_connection_syn(void *arg)
 	line = __LINE__;
 	qp = alloc_prexeisting_conn(addresses->sin_addr.s_addr);
 	if (!qp) {
-		TRACE_PRINT("Couldnt alloc a pre_connection to %pI4n", &addresses->sin_addr.s_addr);
+		TRACE_PRINT("Couldnt alloc a pre_connection to "IP4, IP4N(&addresses->sin_addr.s_addr));
 		start_new_connection_syn(arg);
 		goto out;
 	}
@@ -98,8 +98,8 @@ int start_new_pre_connection_syn(void *arg)
 	}
 	qp->root = &listner->connections_root;
 
-	TRACE_PRINT("connection to port %d IP %pI4n from %d IP %pI4n",
-			ntohs(qp->port_d), &qp->addr_d, ntohs(qp->port_s), &qp->addr_s);
+	TRACE_PRINT("connection to port %d IP "IP4" from %d IP "IP4,
+			ntohs(qp->port_d), IP4N(&qp->addr_d), ntohs(qp->port_s), IP4N(&qp->addr_s));
 
 	tqp = qp_exists(qp, TX_QP);
 	line = __LINE__;
@@ -110,7 +110,7 @@ int start_new_pre_connection_syn(void *arg)
 	}
 	line = __LINE__;
 	if ((rc	= forward_conn_info((struct socket *)qp->tx, addresses)) <= 0) {
-		TRACE_PRINT("Failed to forward pre_connection to %pI4n", &addresses->sin_addr.s_addr);
+		TRACE_PRINT("Failed to forward pre_connection to "IP4, IP4N(&addresses->sin_addr.s_addr));
 		start_new_connection_syn(arg);
 		goto out;
 	}
@@ -151,7 +151,7 @@ static inline int add_preconn_qp(struct cbn_qp *qp, struct rb_root *root)
 	struct cbn_preconnection *precon  = get_rb_preconn(root, qp->addr_d.s_addr,
 								preconn_slab, GFP_KERNEL);
 	if (unlikely(!precon)) {
-		pr_err("Failed to alloc memory for preconn %pI4n\n", &qp->addr_d);
+		pr_err("Failed to alloc memory for preconn "IP4"\n", IP4N(&qp->addr_d));
 		return -1;
 	}
 	list_add(&qp->list, &precon->list);
@@ -176,7 +176,7 @@ static int prealloc_connection(void *arg)
 	qp->addr_d = addresses->dest.sin_addr;
 	qp->port_d = addresses->dest.sin_port;
 
-	TRACE_PRINT("connection to port %d IP %pI4n", ntohs(qp->port_d), &qp->addr_d);
+	TRACE_PRINT("connection to port %d IP "IP4, ntohs(qp->port_d), IP4N(&qp->addr_d));
 	line = __LINE__;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
 		goto out;
@@ -269,11 +269,11 @@ static int start_new_pending_connection(void *arg)
 	}
 
 	/* TODO: allow pipelining  - check if next hop is also preconnected....*/
-	TRACE_PRINT("connection to port %d IP %pI4n from %d IP %pI4n",
+	TRACE_PRINT("connection to port %d IP "IP4" from %d IP "IP4,
 			ntohs(addresses->dest.sin_port),
-			&addresses->dest.sin_addr,
+			IP4N(&addresses->dest.sin_addr),
 			ntohs(addresses->src.sin_port),
-			&addresses->src.sin_addr);
+			IP4N(&addresses->src.sin_addr));
 
 	line = __LINE__;
 	if ((rc = kernel_setsockopt(tx, SOL_TCP, TCP_NODELAY, (char *)&optval, sizeof(optval))) < 0)

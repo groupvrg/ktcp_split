@@ -82,19 +82,21 @@ static inline const char *proto_string(u8 protocol)
 	return "";
 }
 
+#define IP4N(x)	((const unsigned char*)(x))[0], ((const unsigned char*)(x))[1],((const unsigned char*)(x))[2],((const unsigned char*)(x))[3]
+#define IP4	"%u.%u.%u.%u"
 #define dump_iph(iphdr) 	idx += sprintf(&store[idx],"\t\tmark %d secmark %d\n\t\t"  \
 		 "ihl %d ver %d tos %d total len %d\n\t\t"							\
 		 "id %05d frag_off %05lu [%s]\n\t\t"								\
 		 "ttl %d proto %s[%d] csum 0x%x\n\t\t"								\
-		 "saddr %pI4n \n\t\t"										\
-		 "daddr %pI4n \n"										\
+		 "saddr "IP4" \n\t\t"										\
+		 "daddr "IP4" \n"										\
 			,skb->mark, skb->secmark,								\
 			iphdr->ihl, iphdr->version,								\
 			iphdr->tos, ntohs(iphdr->tot_len),							\
 			ntohs(iphdr->id), ntohs(iphdr->frag_off) & (BIT(13) -1),				\
 			iphdr_flag(ntohs(iphdr->frag_off)),							\
 			iphdr->ttl, proto_string(iphdr->protocol), iphdr->protocol,				\
-			iphdr->check, &iphdr->saddr, &iphdr->daddr						\
+			iphdr->check, IP4N(&iphdr->saddr), IP4N(&iphdr->daddr)					\
 			);
 
 #define	dump_udphdr(udphdr)	idx += sprintf(&store[idx],"src : %05d  dst %05d\n"				\
@@ -137,8 +139,10 @@ static inline int trace_iph(struct sk_buff *skb, const char *str)
 {
 	struct iphdr *iphdr = ip_hdr(skb);
 	int rc = 0;
+#ifdef TRACE_PACKETS
 	int idx = 0;
 	char store[512] = {0};
+#endif
 
 	if (iphdr->protocol == 6) {
 		struct tcphdr *tcphdr = (struct tcphdr *)skb_transport_header(skb);
