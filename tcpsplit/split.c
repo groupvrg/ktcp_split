@@ -241,7 +241,7 @@ static unsigned int cbn_egress_hook(void *priv,
 	if ((iph->protocol == IPPROTO_UDP) & is_cbn_probe(skb)) {
 		struct addresses *addresses = get_cbn_probe(skb);
 		if (addresses) {
-			TRACE_PRINT("Next hop is "IP4"=>"IP4"\n", IP4N(&iph->saddr), IP4N(&iph->daddr));
+			//TRACE_PRINT("Next hop is "IP4"=>"IP4"\n", IP4N(&iph->saddr), IP4N(&iph->daddr));
 			addresses->sin_addr.s_addr = iph->daddr;
 			kthread_pool_run(&cbn_pool, start_new_pre_connection_syn, addresses);
 		}
@@ -285,7 +285,7 @@ static unsigned int cbn_ingress_hook(void *priv,
 		memcpy(&probe->tcphdr, tcphdr, sizeof(struct tcphdr));
 		probe->listner = listner;
 
-		TRACE_PRINT("%s scheduling probe process [%x]", __FUNCTION__, skb->mark);
+		//TRACE_PRINT("%s scheduling probe process [%x]", __FUNCTION__, skb->mark);
 		kthread_pool_run(&cbn_pool, start_probe_syn, probe);
 	}
 
@@ -470,17 +470,17 @@ inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 	 * */
 	if (IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1])) {
 		int rc;
-		schedule();
 		/*should return non zero*/
+		TRACE_PRINT("waiting for peer");
 		rc = wait_event_interruptible_timeout(qp->wait,
 							!IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]),
 						       	3 * HZ);
 		if (!rc) {
-			TRACE_PRINT("TIMEOUT %d", rc);
+			TRACE_PRINT("ERROR: TIMEOUT %d", rc);
 			err = 1;
 		}
 	} else {
-		TRACE_DEBUG("QP %p waking peer", qp);
+		TRACE_PRINT("waking peer");
 		wake_up(&qp->wait);
 	}
 

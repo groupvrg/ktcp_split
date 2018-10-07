@@ -16,6 +16,7 @@
 #include "cbn_common.h"
 
 #define PRECONN_PRINT(...)
+#define PRECONN_ERR 		TRACE_PRINT
 
 extern uint32_t ip_transparent;
 
@@ -42,7 +43,7 @@ static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 	pre_conn_list = (preconn) ? &preconn->list : NULL;
 
 	if (unlikely(!pre_conn_list || list_empty(pre_conn_list))) {
-		pr_err("preconn pool is empty! "TCP4", spawning refill...\n", TCP4N(&next_hop_ip, PRECONN_SERVER_PORT));
+		PRECON_PRINT("preconn pool is empty! "TCP4", spawning refill...\n", TCP4N(&next_hop_ip, PRECONN_SERVER_PORT));
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		return NULL;
@@ -64,7 +65,7 @@ static inline int forward_conn_info(struct socket *tx, struct addresses *address
 	kvec[0].iov_len = sizeof(struct addresses);
 
 	if ((rc = kernel_sendmsg(tx, &msg, kvec, 1, sizeof(struct addresses))) <= 0) {
-		pr_err("Failed to forward info to next hop!\n");
+		PRECONN_ERR("Failed to forward info to next hop!\n");
 	}
 	return rc;
 }
@@ -150,7 +151,7 @@ static inline int add_preconn_qp(struct cbn_qp *qp, struct rb_root *root)
 	struct cbn_preconnection *precon  = get_rb_preconn(root, qp->addr_d.s_addr,
 								preconn_slab, GFP_KERNEL);
 	if (unlikely(!precon)) {
-		pr_err("Failed to alloc memory for preconn "IP4"\n", IP4N(&qp->addr_d));
+		PRECONN_ERR("Failed to alloc memory for preconn "IP4"\n", IP4N(&qp->addr_d));
 		return -1;
 	}
 	list_add(&qp->list, &precon->list);
@@ -392,7 +393,7 @@ int start_probe_syn(void *arg)
 				  sizeof(struct tcphdr) +
 				  sizeof(struct iphdr))) <= 0) {
 		/* FIXME: -1 will return if next dev is not gue+*/
-		pr_err("Failed to send next hop %d\n", rc);
+		PRECONN_ERR("Failed to send next hop %d\n", rc);
 	}
 
 	/* tcphdr & iphdr already copied...*/
@@ -461,7 +462,7 @@ static int prec_conn_listner_server(void *arg)
 
 	} while (!kthread_should_stop());
 	error:
-	pr_err("Exiting %d\n", rc);
+	PRECONN_ERR("Exiting %d\n", rc);
 	out:
 	if (sock)
 		sock_release(sock);
@@ -497,7 +498,7 @@ void preconn_write_cb(int *array)
 
 	ip = build_ip(array);
 	if (!ip) {
-		pr_err("ERROR: ip is invalid %d.%d.%d.%d\n",array[0], array[1], array[2], array[3]);
+		PRECONN_ERR("ERROR: ip is invalid %d.%d.%d.%d\n",array[0], array[1], array[2], array[3]);
 		return;
 	}
 
