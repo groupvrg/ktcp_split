@@ -40,9 +40,11 @@ struct cbn_qp {
 	};
 };
 
-static inline void dump_qp(struct cbn_qp *qp)
+static inline void dump_qp(struct cbn_qp *qp, const char *str)
 {
-	TRACE_PRINTK("Key : "TCP4N" => "TCP4"\n", TCP4N(&qp->addr_s, ntohs(qp->port_s)), TCP4N(&qp->addr_d, ntohs(qp->port_d)));
+	TRACE_PRINT("%s :QP %p: "TCP4" => "TCP4, str, qp, 
+			TCP4N(&qp->addr_s, ntohs(qp->port_s)),
+			TCP4N(&qp->addr_d, ntohs(qp->port_d)));
 }
 
 static inline void dump_key(struct cbn_qp *qp)
@@ -104,7 +106,6 @@ static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *da
 	struct rb_node **new = &(root->rb_node), *parent = NULL;
 
 	/* Figure out where to put new node */
-	dump_qp(data);
 	spin_lock_irq(lock);
 	while (*new) {
 		struct cbn_qp *this = container_of(*new, struct cbn_qp, node);
@@ -117,6 +118,7 @@ static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *da
 			new = &((*new)->rb_right);
 		else  {
 			spin_unlock_irq(lock);
+			dump_qp(data, "QP exists.");
 			return this;
 		}
 	}
@@ -124,6 +126,7 @@ static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *da
 	/* Add new node and rebalance tree. */
 	rb_link_node(&data->node, parent, new);
 	rb_insert_color(&data->node, root);
+	dump_qp(data, "QP added.");
 	spin_unlock_irq(lock);
 
 	return NULL;

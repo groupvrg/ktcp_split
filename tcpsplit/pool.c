@@ -88,7 +88,7 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 		--cbn_pool->refil_needed;
 		++cbn_pool->top_count;
 		spin_unlock_irq(&cbn_pool->pool_lock);
-		POOL_ERR("pool thread %d [%p] allocated %llx", cbn_pool->top_count, elem, rdtsc());
+		POOL_PRINT("pool thread %d [%p] allocated %llx", cbn_pool->top_count, elem, rdtsc());
 	}
 }
 

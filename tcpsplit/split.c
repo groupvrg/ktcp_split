@@ -103,7 +103,7 @@ static unsigned int put_qp(struct cbn_qp *qp)
 		// TODO: protect with lock on MC
 		// reusable connections may not have a root
 		if (qp->root) {
-			dump_qp(qp);
+			dump_qp(qp, "remove from tree");
 			spin_lock_irq(&qp_lock);
 			rb_erase(&qp->node, qp->root);
 			spin_unlock_irq(&qp_lock);
@@ -404,16 +404,20 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 	do {
 		struct msghdr msg = { 0 };
 		if ((rc = kernel_recvmsg(sock->rx, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
-			if (put_qp(qp))
+			if (put_qp(qp)) {
+				TRACE_PRINT("shutdown on %d", rc);
 				kernel_sock_shutdown(sock->tx, SHUT_RDWR);
+			}
 			goto err;
 		}
 		bytes += rc;
 		id ^= 1;
 		//use kern_sendpage if flags needed.
 		if ((rc = kernel_sendmsg(sock->tx, &msg, kvec, VEC_SZ, rc)) <= 0) {
-			if (put_qp(qp))
+			if (put_qp(qp)) {
+				TRACE_PRINT("shutdown on %d", rc);
 				kernel_sock_shutdown(sock->rx, SHUT_RDWR);
+			}
 			goto err;
 		}
 		id ^= 1;
@@ -472,16 +476,16 @@ inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 	if (IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1])) {
 		int rc;
 		/*should return non zero*/
-		TRACE_PRINT("waiting for peer");
+		dump_qp(qp, "waiting for peer");
 		rc = wait_event_interruptible_timeout(qp->wait,
 							!IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]),
 						       	3 * HZ);
 		if (!rc) {
-			TRACE_PRINT("ERROR: TIMEOUT %d", rc);
+			TRACE_PRINT("ERROR: TIMEOUT %d (%s)", rc, (IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]) ? "ERR/NULL" : "EXISTS!!"));
 			err = 1;
 		}
 	} else {
-		TRACE_PRINT("waking peer");
+		dump_qp(qp, "waking peer");
 		wake_up(&qp->wait);
 	}
 
