@@ -110,6 +110,8 @@ static unsigned int put_qp(struct cbn_qp *qp)
 		} else {
 			list_del(&qp->list);
 		}
+		sock_release(qp->tx);
+		sock_release(qp->rx);
 		kmem_cache_free(qp_slab, qp);
 	}
 	return rc;
@@ -389,6 +391,10 @@ static inline void stop_sockets(void)
 }
 
 #define VEC_SZ 16
+/*
+ * Warning: Possible race condition, if first thread enters and exits on some error 
+ * before increasing the refcount. Second will panic using released qp context.
+ * */
 int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 {
 	struct kvec kvec[VEC_SZ];
@@ -403,12 +409,19 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 	}
 	do {
 		struct msghdr msg = { 0 };
+		if (unlikely(dir)) {
+			TRACE_PRINT("In recv ");
+		}
 		if ((rc = kernel_recvmsg(sock->rx, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
 			if (put_qp(qp)) {
 				TRACE_PRINT("shutdown on %d", rc);
 				kernel_sock_shutdown(sock->tx, SHUT_RDWR);
 			}
+			TRACE_PRINT("RECV: Bye Bye...");
 			goto err;
+		}
+		if (unlikely(dir)) {
+			TRACE_PRINT("Received rc %d flags [%d]", rc, msg.msg_flags);
 		}
 		bytes += rc;
 		id ^= 1;
@@ -418,20 +431,18 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 				TRACE_PRINT("shutdown on %d", rc);
 				kernel_sock_shutdown(sock->rx, SHUT_RDWR);
 			}
+			TRACE_PRINT("SEND: Bye Bye...");
 			goto err;
 		}
 		id ^= 1;
 	} while (!kthread_should_stop());
 
-	goto out;
 err:
 	if (rc)
 		TRACE_PRINT("%s [%s] stopping on error (%d) at %s with %lld bytes", __FUNCTION__,
 				dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
-out:
-	if (rc)
-		TRACE_PRINT("%s going out (%d)", __FUNCTION__, rc);
-	TRACE_DEBUG("%s [%s] stopping (%d) at %s with %lld bytes", __FUNCTION__,
+
+	TRACE_PRINT("%s [%s] stopping (%d) at %s with %lld bytes", __FUNCTION__,
 			dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 	for (i = 0; i < VEC_SZ; i++)
 		free_page((unsigned long)(kvec[i].iov_base));
@@ -615,6 +626,7 @@ connect_fail:
 	sockets.tx = (struct socket *)qp->rx;
 	sockets.rx = (struct socket *)qp->tx;
 	sockets.dir = 1;
+	tx = NULL;
 	if (IS_ERR_OR_NULL((struct socket *)qp->rx) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
 	atomic_inc(&qp->ref_cnt);
@@ -625,7 +637,7 @@ out:
 	if (tx)
 		sock_release(tx);
 
-	TRACE_PRINT("closing connection <%d>", rc);
+	TRACE_PRINT("connection closed <%d>", rc);
 	return rc;
 }
 /*
@@ -720,6 +732,7 @@ static int start_new_connection(void *arg)
 	sockets.tx = (struct socket *)qp->tx;
 	sockets.rx = (struct socket *)qp->rx;
 	sockets.dir = 0;
+	rx = NULL;
 	if (IS_ERR_OR_NULL((struct socket *)(qp->rx)) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
 	atomic_inc(&qp->ref_cnt);
@@ -733,7 +746,8 @@ out:
 	rc = line = 0;
 
 create_fail:
-	sock_release(rx);
+	if (rx)
+		sock_release(rx);
 	if (rc)
 		TRACE_PRINT("out [%d - %d]", rc, ++line);
 	DUMP_TRACE
@@ -873,6 +887,11 @@ static inline void parse_module_params(void)
 	}
 }
 
+static void qp_ctor(void *elem)
+{
+	memset(elem, 0, sizeof (sizeof(struct cbn_qp)));
+}
+
 int __init cbn_datapath_init(void)
 {
 	parse_module_params();
@@ -880,7 +899,7 @@ int __init cbn_datapath_init(void)
 
 	spin_lock_init(&qp_lock);
 	qp_slab = kmem_cache_create("cbn_qp_mdata",
-					sizeof(struct cbn_qp), 0, 0, NULL);
+					sizeof(struct cbn_qp), 0, 0, qp_ctor);
 
 	listner_slab = kmem_cache_create("cbn_listner",
 					 sizeof(struct cbn_listner), 0, 0, NULL);
