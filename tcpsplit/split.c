@@ -96,10 +96,12 @@ static inline int getorigdst(struct sock *sk, struct sockaddr_in *out)
 }
 #endif
 
-static unsigned int put_qp(struct cbn_qp *qp)
+static inline void get_qp(struct cbn_qp *qp)
 {
 	int rc;
-	if (! (rc = atomic_dec_return(&qp->ref_cnt))) {
+	rc = atomic_inc_return(&qp->ref_cnt);
+	switch  (rc) {
+	case 2:
 		// reusable connections may not have a root
 		if (qp->root) {
 			dump_qp(qp, "remove from tree");
@@ -107,8 +109,24 @@ static unsigned int put_qp(struct cbn_qp *qp)
 			rb_erase(&qp->node, qp->root);
 			spin_unlock_irq(&qp_tree_lock);
 		} else {
+			//TODO: protect this list, also all others
 			list_del(&qp->list);
 		}
+		/*Intentinal falltrough */
+	case 1:
+		break;
+	default:
+		TRACE_ERROR("Impossible QP refcount %d", rc);
+		dump_qp(qp, "IMPOSSIBLE VALUE");
+		break;
+	}
+}
+
+static unsigned int put_qp(struct cbn_qp *qp)
+{
+	int rc;
+	if (! (rc = atomic_dec_return(&qp->ref_cnt))) {
+		//TODO: Consider adding a tree for active QPs + States.
 		sock_release(qp->tx);
 		sock_release(qp->rx);
 		kmem_cache_free(qp_slab, qp);
@@ -619,7 +637,7 @@ connect_fail:
 	tx = NULL;
 	if (IS_ERR_OR_NULL((struct socket *)qp->rx) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
-	atomic_inc(&qp->ref_cnt);
+	get_qp(qp);
 	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	rc = half_duplex(&sockets, qp);
 
@@ -725,7 +743,8 @@ static int start_new_connection(void *arg)
 	rx = NULL;
 	if (IS_ERR_OR_NULL((struct socket *)(qp->rx)) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
-	atomic_inc(&qp->ref_cnt);
+
+	get_qp(qp);
 	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
 out:
