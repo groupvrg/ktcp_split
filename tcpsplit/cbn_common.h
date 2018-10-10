@@ -28,9 +28,14 @@
 
 #ifndef TRACE_PRINT
 #define TRACE_PRINT(fmt, ...) { /*pr_err("%s:%s:"fmt"\n", __FUNCTION__, current->comm,##__VA_ARGS__ );*/\
-				 trace_printk("%d:%s:%s:"fmt"\n", __LINE__, current->comm, __FUNCTION__,##__VA_ARGS__ ); \
+				 trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); \
 				 /*___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d:"fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__); */}
 
+#endif
+#ifndef TRACE_ERROR
+#define TRACE_ERROR(fmt, ...) {  pr_err("%s:%s:"fmt"\n", __FUNCTION__, current->comm,##__VA_ARGS__ );\
+				 trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); \
+				}
 #endif
 #define DUMP_TRACE	 if (___idx) {___buff[___idx] = '\n'; trace_printk(___buff);} ___buff[0] = ___idx = 0;
 
