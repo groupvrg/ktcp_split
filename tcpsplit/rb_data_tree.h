@@ -6,7 +6,6 @@
 #include "cbn_common.h"
 
 #define RB_KEY_LENGTH 12
-static char chars[(RB_KEY_LENGTH << 3)] = {0};
 
 #define TX_QP	0
 #define RX_QP	1
@@ -47,16 +46,6 @@ static inline void dump_qp(struct cbn_qp *qp, const char *str)
 			TCP4N(&qp->addr_d, ntohs(qp->port_d)));
 }
 
-static inline void dump_key(struct cbn_qp *qp)
-{
-	int i;
-	pr_info("%p:\n", qp);
-	for (i = 0; i < RB_KEY_LENGTH; i+=4)
-	{
-		pr_info("> %x%x %x%x <\n", qp->key[i], qp->key[i+1], qp->key[i+2], qp->key[i+3]);
-	}
-}
-
 struct cbn_listner {
 	struct rb_node 	node;
 	struct rb_root  connections_root;
@@ -71,14 +60,6 @@ struct cbn_listner {
  * 1. listner_root
  * 2. unpaird qp root - the syn(tx) side doesnt know which listner is "his" but the "rx" does - move after qp bind
  * */
-
-static inline void show_key(char *key)
-{
-	int i;
-	for (i = 0; i < RB_KEY_LENGTH; ++i)
-		sprintf(&chars[i * 3], "%03x", key[i]);
-	pr_err("%s: \"%s\"\n", __FUNCTION__, chars);
-}
 
 static inline struct cbn_qp *search_rb_data(struct rb_root *root, char *string)
 {

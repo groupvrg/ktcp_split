@@ -71,7 +71,7 @@ static inline int getorigdst(struct sock *sk, struct sockaddr_in *out)
 	/* We only do TCP and SCTP at the moment: is there a better way? */
 	if (unlikely(tuple.dst.protonum != IPPROTO_TCP &&
 			tuple.dst.protonum != IPPROTO_SCTP)) {
-		pr_err("SO_ORIGINAL_DST: Not a TCP/SCTP socket\n");
+		TRACE_ERROR("SO_ORIGINAL_DST: Not a TCP/SCTP socket\n");
 		return -ENOPROTOOPT;
 	}
 
@@ -186,7 +186,7 @@ static inline struct addresses *build_addresses(struct sk_buff *skb)
 
 	struct addresses *addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
 	if (unlikely(!addresses)) {
-		pr_err("Faield to alloc mem %s\n", __FUNCTION__);
+		TRACE_ERROR("Faield to alloc mem\n");
 		return NULL;
 	}
 	//trace_iph(skb, __FUNCTION__);
@@ -243,7 +243,7 @@ static unsigned int cbn_egress_hook(void *priv,
 		if (unlikely((ntohs(tcphdr->source) == CBP_PROBE_PORT))) {
 			struct addresses *addresses = build_addresses(skb);
 			if (!addresses) {
-				pr_err("Faield to alloc mem %s\n", __FUNCTION__);
+				TRACE_ERROR("Faield to alloc mem");
 				goto drop;
 			}
 			addresses->src.sin_port = tcphdr->window;
@@ -297,7 +297,7 @@ static unsigned int cbn_ingress_hook(void *priv,
 
 		probe = kmem_cache_alloc(probe_slab, GFP_ATOMIC);
 		if (unlikely(!probe)) {
-			pr_err("Faield to alloc probe %s\n", __FUNCTION__);
+			TRACE_ERROR("Faield to alloc probe\n");
 			goto out;
 		}
 
@@ -305,7 +305,6 @@ static unsigned int cbn_ingress_hook(void *priv,
 		memcpy(&probe->tcphdr, tcphdr, sizeof(struct tcphdr));
 		probe->listner = listner;
 
-		//TRACE_PRINT("%s scheduling probe process [%x]", __FUNCTION__, skb->mark);
 		kthread_pool_run(&cbn_pool, start_probe_syn, probe);
 	}
 
@@ -520,8 +519,7 @@ static inline struct cbn_qp *sync_qp(struct cbn_qp* qp, uint8_t dir)
 	if ((tx_qp = add_rb_data(qp->root, qp))) { //this means the other conenction is already up
 		tx_qp->qp_dir[dir] = qp->qp_dir[dir ^ 1];
 		if (unlikely(atomic_read(&qp->ref_cnt))) {
-			TRACE_PRINT("ERROR: Active connection pair [%d] exists...", atomic_read(&qp->ref_cnt));
-			pr_err("ERROR: Active connection pair[%d] exists...\n", atomic_read(&qp->ref_cnt));
+			TRACE_ERROR("ERROR: Active connection pair [%d] exists...", atomic_read(&qp->ref_cnt));
 			goto err;
 		}
 		kmem_cache_free(qp_slab, qp);
@@ -657,7 +655,7 @@ static int start_new_connection_syn_ack(int mark, struct cbn_qp *qp)
 	int rc = 0;
 	addresses = kmem_cache_alloc(syn_slab, GFP_ATOMIC);
 	if (unlikely(!addresses)) {
-		pr_err("Faield to alloc mem %s\n", __FUNCTION__);
+		TRACE_ERROR("Faield to alloc mem\n");
 		rc = 1;
 		goto out;
 	}
@@ -697,14 +695,14 @@ static int start_new_connection(void *arg)
 
 	line = __LINE__;
 	if ((rc = kernel_setsockopt(rx, SOL_SOCKET, SO_MARK, (char *)&mark, sizeof(u32))) < 0) {
-		pr_err("%s error (%d)\n", __FUNCTION__, rc);
+		TRACE_ERROR("error (%d)\n", rc);
 		goto create_fail;
 	}
 
 	//if ((rc = getorigdst(rx->sk, &addr))) {
 	line = __LINE__;
 	if ((rc = kernel_getsockopt(rx, SOL_IP, SO_ORIGINAL_DST, (char *)&addr, &size))) {
-		pr_err("%s error (%d)\n", __FUNCTION__, rc);
+		TRACE_ERROR("error (%d)\n", rc);
 		goto create_fail;
 	}
 
@@ -714,7 +712,7 @@ static int start_new_connection(void *arg)
 
 	line = __LINE__;
 	if ((rc = kernel_getpeername(rx, (struct sockaddr *)&cli_addr, &size))) {
-		pr_err("%s error (%d)\n", __FUNCTION__, rc);
+		TRACE_ERROR("error (%d)\n", rc);
 		goto create_fail;
 	}
 
@@ -790,7 +788,7 @@ static int split_server(void *mark_port)
 	void2uint(mark_port, &mark, &port);
 	if (search_rb_listner(&listner_root, mark)) {
 		rc = -EEXIST;
-		pr_err("server exists: %d @ %d", mark, port);
+		TRACE_ERROR("server exists: %d @ %d", mark, port);
 		goto error;
 	}
 

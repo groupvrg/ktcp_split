@@ -66,16 +66,14 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 		struct task_struct *k;
 		struct pool_elem *elem = kmem_cache_alloc(cbn_pool->pool_slab, GFP_ATOMIC);
 		if (unlikely(!elem)) {
-			POOL_ERR("ERROR: elem is NULL");
-			pr_err("ERROR: elem is NULL\n");
+			TRACE_ERROR("ERROR: elem is NULL");
 			return;
 		}
 
 		k = kthread_create(threadfn, elem, "pool-th-%d", cbn_pool->top_count);
 
 		if (unlikely(!k)) {
-			POOL_ERR("ERROR: failed to create kthread %d", cbn_pool->top_count);
-			pr_err("ERROR: failed to create kthread %d\n", cbn_pool->top_count);
+			TRACE_ERROR("ERROR: failed to create kthread %d", cbn_pool->top_count);
 			kmem_cache_free(cbn_pool->pool_slab, elem);
 			return;
 		}
@@ -104,7 +102,7 @@ static int refil_thread(void *data)
 			schedule();
 		__set_current_state(TASK_RUNNING);
 	}
-	pr_warn("%s going out\n", __FUNCTION__);
+	POOL_PRINT("%s going out\n", __FUNCTION__);
 	return 0;
 }
 
@@ -119,7 +117,6 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 
 	refill_task_start(cbn_pool);
 	while (unlikely(list_empty(&cbn_pool->kthread_pool))) {
-		pr_warn("pool is empty refill is to slow\n");
 		POOL_ERR("pool is empty refill is to slow\n");
 		return NULL;
 	}
@@ -137,13 +134,12 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 {
 	struct pool_elem *elem = kthread_pool_alloc(cbn_pool);
 	if (unlikely(!elem)) {
-		pr_err("Failed to alloc elem\n");
+		TRACE_ERROR("Failed to alloc elem\n");
 		return ERR_PTR(-ENOMEM);
 	}
 
 	if (unlikely(elem->pool_task)) {
-		pr_err("ERRORL task allocated twice....!!!! <%s>", elem->task->comm);
-		POOL_ERR("ERRORL task allocated twice....!!!! <%s>", elem->task->comm);
+		TRACE_ERROR("ERRORL task allocated twice....!!!! <%s>", elem->task->comm);
 	}
 
 	elem->pool_task = func;
