@@ -450,7 +450,7 @@ err:
 		TRACE_PRINT("%s [%s] stopping on error (%d) at %s with %lld bytes", __FUNCTION__,
 				dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 	} else {
-		TRACE_PRINT("%s [%s] stopping (%d) at %s with %lld bytes", __FUNCTION__,
+		TRACE_DEBUG("%s [%s] stopping (%d) at %s with %lld bytes", __FUNCTION__,
 				dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 	}
 	for (i = 0; i < VEC_SZ; i++)

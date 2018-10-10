@@ -37,6 +37,9 @@
 				 trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); \
 				}
 #endif
+#ifndef TRACE_DEBUG
+#define TRACE_PRINT(fmt, ...) if (unlikely(0)) {trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ );}
+#endif
 #define DUMP_TRACE	 if (___idx) {___buff[___idx] = '\n'; trace_printk(___buff);} ___buff[0] = ___idx = 0;
 
 
