@@ -1,5 +1,5 @@
 #include <linux/init.h>      // included for __init and __exit macros
-#include <linux/module.h>      // included for __init and __exit macros
+#include <linux/module.h>    // included for __init and __exit macros
 #include <linux/ip.h>
 #include <linux/in.h>
 #include <linux/kthread.h>
@@ -38,7 +38,7 @@ struct kmem_cache *qp_slab;
 struct kmem_cache *syn_slab;
 struct kmem_cache *probe_slab;
 
-spinlock_t qp_lock;
+spinlock_t qp_tree_lock;
 
 
 static struct kmem_cache *listner_slab;
@@ -100,13 +100,12 @@ static unsigned int put_qp(struct cbn_qp *qp)
 {
 	int rc;
 	if (! (rc = atomic_dec_return(&qp->ref_cnt))) {
-		// TODO: protect with lock on MC
 		// reusable connections may not have a root
 		if (qp->root) {
 			dump_qp(qp, "remove from tree");
-			spin_lock_irq(&qp_lock);
+			spin_lock_irq(&qp_tree_lock);
 			rb_erase(&qp->node, qp->root);
-			spin_unlock_irq(&qp_lock);
+			spin_unlock_irq(&qp_tree_lock);
 		} else {
 			list_del(&qp->list);
 		}
@@ -409,41 +408,33 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 	}
 	do {
 		struct msghdr msg = { 0 };
-		if (unlikely(dir)) {
-			TRACE_PRINT("In recv ");
-		}
 		if ((rc = kernel_recvmsg(sock->rx, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
 			if (put_qp(qp)) {
-				TRACE_PRINT("shutdown on %d", rc);
 				kernel_sock_shutdown(sock->tx, SHUT_RDWR);
+				//sock-sk + sk_wake_async if shutdown fails.
 			}
-			TRACE_PRINT("RECV: Bye Bye...");
 			goto err;
-		}
-		if (unlikely(dir)) {
-			TRACE_PRINT("Received rc %d flags [%d]", rc, msg.msg_flags);
 		}
 		bytes += rc;
 		id ^= 1;
 		//use kern_sendpage if flags needed.
 		if ((rc = kernel_sendmsg(sock->tx, &msg, kvec, VEC_SZ, rc)) <= 0) {
 			if (put_qp(qp)) {
-				TRACE_PRINT("shutdown on %d", rc);
 				kernel_sock_shutdown(sock->rx, SHUT_RDWR);
 			}
-			TRACE_PRINT("SEND: Bye Bye...");
 			goto err;
 		}
 		id ^= 1;
 	} while (!kthread_should_stop());
 
 err:
-	if (rc)
+	if (rc) {
 		TRACE_PRINT("%s [%s] stopping on error (%d) at %s with %lld bytes", __FUNCTION__,
 				dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
-
-	TRACE_PRINT("%s [%s] stopping (%d) at %s with %lld bytes", __FUNCTION__,
-			dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
+	} else {
+		TRACE_PRINT("%s [%s] stopping (%d) at %s with %lld bytes", __FUNCTION__,
+				dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
+	}
 	for (i = 0; i < VEC_SZ; i++)
 		free_page((unsigned long)(kvec[i].iov_base));
 
@@ -454,7 +445,7 @@ inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 {
 	struct cbn_qp *qp = pqp;
 
-	if ((qp = add_rb_data(pqp->root, pqp, &qp_lock))) {
+	if ((qp = add_rb_data(pqp->root, pqp, &qp_tree_lock))) {
 		/* QP already exists */
 		if (qp->qp_dir[dir] != NULL) {
 			/* *
@@ -562,21 +553,20 @@ int start_new_connection_syn(void *arg)
 	qp->root = &listner->connections_root;
 
 	qp = qp_exists(qp, TX_QP);
-	//TODO: add locks to this shit
 	if (unlikely(qp == NULL)) {
-		TRACE_PRINT("connection exists : "TCP4" => "TCP4" mark %d",
+		TRACE_PRINT("WARNING : connection exists : "TCP4" => "TCP4" mark %d",
 				TCP4N(&addresses->src.sin_addr, ntohs(addresses->src.sin_port)),
 				TCP4N(&addresses->dest.sin_addr, ntohs(addresses->dest.sin_port)),
 				addresses->mark);
 		kmem_cache_free(syn_slab, addresses);
 		return  0;
 	}
-	//TRACE_DEBUG("new QP is %p", qp);
 
 	TRACE_PRINT("[R] start connection : "TCP4" => "TCP4" mark %d",
 			TCP4N(&addresses->src.sin_addr, ntohs(addresses->src.sin_port)),
 			TCP4N(&addresses->dest.sin_addr, ntohs(addresses->dest.sin_port)),
 			addresses->mark);
+
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
 		pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
 		goto connect_fail;
@@ -897,7 +887,7 @@ int __init cbn_datapath_init(void)
 	parse_module_params();
 	pr_info("Starting KTCP [%d]\n", cbn_pool.pool_size);
 
-	spin_lock_init(&qp_lock);
+	spin_lock_init(&qp_tree_lock);
 	qp_slab = kmem_cache_create("cbn_qp_mdata",
 					sizeof(struct cbn_qp), 0, 0, qp_ctor);
 
