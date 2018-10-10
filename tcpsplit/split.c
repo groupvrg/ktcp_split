@@ -586,21 +586,23 @@ int start_new_connection_syn(void *arg)
 			addresses->mark);
 
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
-		pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
+		TRACE_ERROR("RC = %d", rc);
 		goto connect_fail;
 	}
 
-	if ((rc = kernel_setsockopt(tx, SOL_TCP, TCP_NODELAY, (char *)&T, sizeof(T))) < 0)
+	if ((rc = kernel_setsockopt(tx, SOL_TCP, TCP_NODELAY, (char *)&T, sizeof(T))) < 0) {
+		TRACE_ERROR("RC = %d", rc);
 		goto connect_fail;
+	}
 
 	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0) {
-		pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
+		TRACE_ERROR("RC = %d", rc);
 		goto connect_fail;
 	}
 
 	if (ip_transparent) {
 		if ((rc = kernel_setsockopt(tx, SOL_IP, IP_TRANSPARENT, (char *)&T, sizeof(int)))) {
-			pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
+			TRACE_ERROR("RC = %d", rc);
 			goto connect_fail;
 		}
 
@@ -610,14 +612,14 @@ int start_new_connection_syn(void *arg)
 		//		ntohs(addresses->src.sin_port), IP4N(&addresses->src.sin_addr),
 		//		addresses->mark);
 		if ((rc = kernel_bind(tx, (struct sockaddr *)&addresses->src, sizeof(struct sockaddr)))) {
-			pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
+			TRACE_ERROR("RC = %d", rc);
 			goto connect_fail;
 		}
 	}
 
 	addresses->dest.sin_family = AF_INET;
 	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0))) {
-		pr_err("%s:%d error (%d)\n", __FUNCTION__, __LINE__, rc);
+		TRACE_ERROR("RC = %d", rc);
 		goto connect_fail;
 	}
 
@@ -755,7 +757,7 @@ out:
 	rc = line = 0;
 
 create_fail:
-	if (rx)
+	if (rx) /* Will happen only on Connection fail*/
 		sock_release(rx);
 	if (rc)
 		TRACE_PRINT("out [%d - %d]", rc, ++line);
