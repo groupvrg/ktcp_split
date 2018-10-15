@@ -480,6 +480,7 @@ inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 		qp->qp_dir[dir] = pqp->qp_dir[dir];
 		kmem_cache_free(qp_slab, pqp);
 		pqp = qp;
+		dump_qp(qp, "added info");
 	}
 	return pqp;
 }
@@ -498,7 +499,7 @@ inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 		dump_qp(qp, "waiting for peer");
 		rc = wait_event_interruptible_timeout(qp->wait,
 							!IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]),
-						       	3 * HZ);
+						       	QP_TO * HZ);
 		if (!rc) {
 			TRACE_PRINT("ERROR: TIMEOUT %d (%s)", rc, (IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]) ? "ERR/NULL" : "EXISTS!!"));
 			err = 1;
@@ -755,7 +756,10 @@ out:
 	rc = line = 0;
 
 create_fail:
-	if (rx) /* Will happen only on Connection fail*/
+	if (rx) /* Will happen only on Connection fail: 
+		   1. PANIC: When Wait QP fails, socket released and unmatched peer crushes. - see how qp_get/put api could be used, consider states and GC.
+		   2. TOCTOU BUG is possible culptit, not the same as desirebd as the check always turns our with NULL - Rechek qp_exists.
+		   */
 		sock_release(rx);
 	if (rc)
 		TRACE_PRINT("out [%d - %d]", rc, ++line);

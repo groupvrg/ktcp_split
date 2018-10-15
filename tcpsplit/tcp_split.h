@@ -3,6 +3,7 @@
 
 #include "rb_data_tree.h"
 
+#define QP_TO			90
 #define PRECONN_SERVER_PORT	5565
 #define CBN_CORE_ROUTE_MARK   ((UINT_MAX >> 1) + 1)   //0x80000000U
 

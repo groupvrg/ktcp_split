@@ -35,7 +35,7 @@ struct cbn_qp {
 			struct socket	*tx;
 			struct socket	*rx;
 		};
-		struct socket *qp_dir[2];
+		struct socket *qp_dir[2]; //TODO: volatile
 	};
 };
 
