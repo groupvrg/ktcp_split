@@ -82,7 +82,6 @@ int start_new_pre_connection_syn(void *arg)
 	line = __LINE__;
 	qp = alloc_prexeisting_conn(addresses->sin_addr.s_addr);
 	if (!qp) {
-		PRECONN_PRINT("Couldnt alloc a pre_connection to "TCP4, TCP4N(&addresses->sin_addr.s_addr, PRECONN_SERVER_PORT));
 		start_new_connection_syn(arg);
 		goto out;
 	}
@@ -151,7 +150,7 @@ static inline int add_preconn_qp(struct cbn_qp *qp, struct rb_root *root)
 	struct cbn_preconnection *precon  = get_rb_preconn(root, qp->addr_d.s_addr,
 								preconn_slab, GFP_KERNEL);
 	if (unlikely(!precon)) {
-		PRECONN_ERR("Failed to alloc memory for preconn "IP4"\n", IP4N(&qp->addr_d));
+		PRECONN_ERR("Failed to alloc memory for preconn "IP4, IP4N(&qp->addr_d));
 		return -1;
 	}
 	list_add(&qp->list, &precon->list);

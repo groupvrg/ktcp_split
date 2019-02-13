@@ -73,7 +73,7 @@ static inline struct cbn_preconnection *get_rb_preconn(struct rb_root *root, int
 	preconn->key = key;
 	INIT_LIST_HEAD(&preconn->list);
 	if (add_rb_preconn(root, preconn)) {
-		pr_err("%s found a duplicate\n", __FUNCTION__);
+		TRACE_ERROR("%s found a duplicate\n", __FUNCTION__);
 		kmem_cache_free(cache, preconn);
 		return NULL;
 	}
