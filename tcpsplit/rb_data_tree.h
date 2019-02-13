@@ -41,7 +41,7 @@ struct cbn_qp {
 
 static inline void dump_qp(struct cbn_qp *qp, const char *str)
 {
-	TRACE_PRINT("%s :QP %p: "TCP4" => "TCP4, str, qp, 
+	TRACE_QP("%s :QP %p: "TCP4" => "TCP4, str, qp,
 			TCP4N(&qp->addr_s, ntohs(qp->port_s)),
 			TCP4N(&qp->addr_d, ntohs(qp->port_d)));
 }

@@ -19,29 +19,36 @@
 				pr_err( "%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
 
 #define INIT_TRACE	char ___buff[512] = {0}; int ___idx = 0;
+#define DUMP_TRACE	 if (___idx) {___buff[___idx] = '\n'; trace_printk(___buff);} ___buff[0] = ___idx = 0;
 
 #define ERR_LINE() { pr_err("(%s): %d:%s \n", current->comm, __LINE__, __FUNCTION__);}
 
 #define TRACE_DEBUG(fmt, ...)
 #define TRACE_LINE()
+#define TRACE_QP(...)
 //#define TRACE_LINE() {	 trace_printk("%d:%s (%s)\n", __LINE__, __FUNCTION__, current->comm);/*___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d", __FUNCTION__, __LINE__);*/ }
 
+//////////////////////// Switched TRACES
 #ifndef TRACE_PRINT
 #define TRACE_PRINT(fmt, ...) { /*pr_err("%s:%s:"fmt"\n", __FUNCTION__, current->comm,##__VA_ARGS__ );*/\
 				 trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); \
 				 /*___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d:"fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__); */}
-
 #endif
+
 #ifndef TRACE_ERROR
 #define TRACE_ERROR(fmt, ...) {  pr_err("%s:%s:"fmt"\n", __FUNCTION__, current->comm,##__VA_ARGS__ );\
 				 trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); \
 				}
 #endif
+
+#ifndef TRACE_QP
+#define TRACE_QP(fmt, ...) { trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ ); }
+#endif
+
 #ifndef TRACE_DEBUG
 #define TRACE_PRINT(fmt, ...) if (unlikely(0)) {trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ );}
 #endif
-#define DUMP_TRACE	 if (___idx) {___buff[___idx] = '\n'; trace_printk(___buff);} ___buff[0] = ___idx = 0;
-
+////////////////////////////////////////////
 
 static inline void __cbn_err(const char *fmt, ...)
 {
