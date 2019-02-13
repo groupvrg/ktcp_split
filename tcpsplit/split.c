@@ -127,8 +127,10 @@ static unsigned int put_qp(struct cbn_qp *qp)
 	int rc;
 	if (! (rc = atomic_dec_return(&qp->ref_cnt))) {
 		//TODO: Consider adding a tree for active QPs + States.
-		sock_release(qp->tx);
-		sock_release(qp->rx);
+		if (qp->tx)
+			sock_release(qp->tx);
+		if (qp->rx)
+			sock_release(qp->rx);
 		kmem_cache_free(qp_slab, qp);
 	}
 	return rc;
@@ -408,7 +410,7 @@ static inline void stop_sockets(void)
 
 #define VEC_SZ 16
 /*
- * Warning: Possible race condition, if first thread enters and exits on some error 
+ * Warning: Possible race condition, if first thread enters and exits on some error
  * before increasing the refcount. Second will panic using released qp context.
  * */
 int half_duplex(struct sockets *sock, struct cbn_qp *qp)
@@ -643,8 +645,9 @@ connect_fail:
 	rc = half_duplex(&sockets, qp);
 
 out:
-	if (tx)
+	if (tx) {
 		sock_release(tx);
+	}
 
 	TRACE_PRINT("connection closed <%d>", rc);
 	return rc;
@@ -756,7 +759,7 @@ out:
 	rc = line = 0;
 
 create_fail:
-	if (rx) /* Will happen only on Connection fail: 
+	if (rx) /* Will happen only on Connection fail:
 		   1. PANIC: When Wait QP fails, socket released and unmatched peer crushes. - see how qp_get/put api could be used, consider states and GC.
 		   2. TOCTOU BUG is possible culptit, not the same as desirebd as the check always turns our with NULL - Rechek qp_exists.
 		   */
