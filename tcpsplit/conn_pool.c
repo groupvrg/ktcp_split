@@ -15,8 +15,8 @@
 #include "preconn_rb_tree.h"
 #include "cbn_common.h"
 
-#define PRECONN_PRINT(...)
-#define PRECONN_ERR 		TRACE_PRINT
+#define PRECONN_PRINT		TRACE_PRINT
+#define PRECONN_ERR 		TRACE_ERROR
 
 extern uint32_t ip_transparent;
 
@@ -112,7 +112,7 @@ int start_new_pre_connection_syn(void *arg)
 	}
 	line = __LINE__;
 	if ((rc	= forward_conn_info((struct socket *)qp->tx, addresses)) <= 0) {
-		PRECONN_PRINT("Failed to forward pre_connection to "TCPP4, TCPP4N(&addresses->sin_addr.s_addr, PRECONN_SERVER_PORT));
+		PRECONN_PRINT("Failed to forward pre_connection to "TCP4, TCP4N(&addresses->sin_addr.s_addr, PRECONN_SERVER_PORT));
 		start_new_connection_syn(arg);
 		goto out;
 	}
