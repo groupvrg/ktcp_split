@@ -125,11 +125,10 @@ int start_new_pre_connection_syn(void *arg)
 	TRACE_LINE();
 	sockets.tx 	= (struct socket *)qp->rx;
 	sockets.rx 	= (struct socket *)qp->tx;
-	atomic_inc(&qp->ref_cnt);
+	get_qp(qp);
 	PRECONN_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	rc = half_duplex(&sockets, qp);
 
-	sock_release((struct socket *)qp->tx);
 	if (rc)
 		PRECONN_PRINT("OUT: Error %d on %d", rc, line);
 out:
@@ -201,10 +200,13 @@ static int prealloc_connection(void *arg)
 	qp->rx = NULL;
 
 	line = __LINE__;
-	if (!add_preconn_qp(qp, &preconn_root))
+	if (!add_preconn_qp(qp, &preconn_root)) {
+		//TODO: manage QP in case of failure
 		goto out;
+	}
 
 connect_fail:
+	/*TODO: is this legit? put QP?*/
 	sock_release(tx);
 out:
 	if (rc)
@@ -233,11 +235,10 @@ static int start_half_duplex(void *arg)
 {
 	void **args = arg;
 	struct cbn_qp *qp = args[1];
-	//PRECONN_PRINT("starting half duplex");
+	PRECONN_PRINT("starting half duplex");
+	get_qp(qp);
 	half_duplex(args[0], args[1]);
-	//PRECONN_PRINT("Going out... waking pair");
-	args[0] = NULL;
-	wake_up(&qp->wait);
+	PRECONN_PRINT("Going out... waking pair");
 	return 0;
 }
 
@@ -306,21 +307,21 @@ static int start_new_pending_connection(void *arg)
 
 	ptr_pair[0] = &sockets_tx;
 	ptr_pair[1] = qp;
-	atomic_inc(&qp->ref_cnt);
 	kthread_pool_run(&cbn_pool, start_half_duplex, ptr_pair);
 
-	atomic_inc(&qp->ref_cnt);
+	get_qp(qp);
 	PRECONN_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
-	/* Must wait for the other thread to end...*/
+
+	/* Must wait for the other thread to end...
 	rc = wait_event_interruptible_timeout(qp->wait, (ptr_pair[0] == NULL),5 * HZ);
 	if (!rc)
 		pr_err("T/O waiting on start_half_duplex");
+	*/
+	return rc;
 
 
 connect_fail:
-	sock_release(tx);
-	sock_release((struct socket *)qp->rx);
 create_fail:
 	if (rc < 0)
 		PRECONN_PRINT("OUT: connection failed %d [%d]", rc , line);

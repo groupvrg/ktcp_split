@@ -39,12 +39,56 @@ struct cbn_qp {
 	};
 };
 
+extern struct kmem_cache *qp_slab;
+extern spinlock_t qp_tree_lock; /*percore variable - needed on uc as well */
+
 static inline void dump_qp(struct cbn_qp *qp, const char *str)
 {
 	TRACE_QP("%s :QP %p: "TCP4" => "TCP4, str, qp,
 			TCP4N(&qp->addr_s, ntohs(qp->port_s)),
 			TCP4N(&qp->addr_d, ntohs(qp->port_d)));
 }
+
+static inline void get_qp(struct cbn_qp *qp)
+{
+	int rc;
+	rc = atomic_inc_return(&qp->ref_cnt);
+	switch  (rc) {
+	case 2:
+		// reusable connections may not have a root
+		if (qp->root) {
+			dump_qp(qp, "remove from tree");
+			spin_lock_irq(&qp_tree_lock);
+			rb_erase(&qp->node, qp->root);
+			spin_unlock_irq(&qp_tree_lock);
+		} else {
+			//TODO: protect this list, also all others
+			list_del(&qp->list);
+		}
+		/*Intentinal falltrough */
+	case 1:
+		break;
+	default:
+		TRACE_ERROR("Impossible QP refcount %d", rc);
+		dump_qp(qp, "IMPOSSIBLE VALUE");
+		break;
+	}
+}
+
+static inline unsigned int put_qp(struct cbn_qp *qp)
+{
+	int rc;
+	if (! (rc = atomic_dec_return(&qp->ref_cnt))) {
+		//TODO: Consider adding a tree for active QPs + States.
+		if (qp->tx)
+			sock_release(qp->tx);
+		if (qp->rx)
+			sock_release(qp->rx);
+		kmem_cache_free(qp_slab, qp);
+	}
+	return rc;
+}
+
 
 struct cbn_listner {
 	struct rb_node 	node;
