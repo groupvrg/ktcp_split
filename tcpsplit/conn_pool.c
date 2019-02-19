@@ -210,7 +210,7 @@ connect_fail:
 	sock_release(tx);
 out:
 	if (rc)
-		PRECONN_PRINT("pre-connection out %s <%d @ %d>", __FUNCTION__, rc, line);
+		PRECONN_ERR ("pre-connection out %s <%d @ %d>", __FUNCTION__, rc, line);
 	return rc;
 }
 
@@ -278,14 +278,19 @@ static int start_new_pending_connection(void *arg)
 					SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0)
 		goto connect_fail;
 
-
 	line = __LINE__;
 	if (ip_transparent) {
 		if ((rc = kernel_setsockopt(tx, SOL_IP, IP_TRANSPARENT, (char *)&optval, sizeof(int))))
 			goto connect_fail;
 		/*TODO: set src port to 0*/
-		if ((rc = kernel_bind(tx, (struct sockaddr *)&addresses->src, sizeof(struct sockaddr))))
+		line = __LINE__;
+		addresses->src.sin_family = AF_INET;
+		addresses->src.sin_port = 0;
+		if ((rc = kernel_bind(tx, (struct sockaddr *)&addresses->src, sizeof(struct sockaddr)))) {
 			goto connect_fail;
+		} else {
+			TRACE_DEBUG("[R]Bound to "TCP4, TCP4N(&addresses->src.sin_addr, 0));
+		}
 	}
 
 	addresses->dest.sin_family = AF_INET;
@@ -324,7 +329,7 @@ static int start_new_pending_connection(void *arg)
 connect_fail:
 create_fail:
 	if (rc < 0)
-		PRECONN_PRINT("OUT: connection failed %d [%d]", rc , line);
+		PRECONN_ERR("OUT: connection failed %d [%d]", rc , line);
 	return rc;
 }
 

@@ -46,7 +46,7 @@
 #endif
 
 #ifndef TRACE_DEBUG
-#define TRACE_PRINT(fmt, ...) if (unlikely(0)) {trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ );}
+#define TRACE_DEBUG(fmt, ...) if (unlikely(0)) {trace_printk("%d:%s:"fmt"\n", __LINE__, current->comm,##__VA_ARGS__ );}
 #endif
 ////////////////////////////////////////////
 

@@ -397,6 +397,8 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 		}
 		bytes += rc;
 		id ^= 1;
+		TRACE_DEBUG("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
+				dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 		//use kern_sendpage if flags needed.
 		if ((rc = kernel_sendmsg(sock->tx, &msg, kvec, VEC_SZ, rc)) <= 0) {
 			if (put_qp(qp)) {
@@ -405,6 +407,8 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 			goto err;
 		}
 		id ^= 1;
+		TRACE_DEBUG("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
+				dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 	} while (!kthread_should_stop());
 
 err:
@@ -576,6 +580,8 @@ int start_new_connection_syn(void *arg)
 		if ((rc = kernel_bind(tx, (struct sockaddr *)&addresses->src, sizeof(struct sockaddr)))) {
 			TRACE_ERROR("RC = %d", rc);
 			goto connect_fail;
+		} else {
+			TRACE_DEBUG("[R]Bound to "TCP4, TCP4N(&addresses->src.sin_addr, 0));
 		}
 	}
 
