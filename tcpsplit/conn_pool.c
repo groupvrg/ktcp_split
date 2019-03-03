@@ -98,7 +98,7 @@ int start_new_pre_connection_syn(void *arg)
 		PRECONN_PRINT("Listner missing %d, going out", addresses->mark);
 		goto out;
 	}
-	qp->root = &listner->connections_root;
+	qp->listner = listner;
 
 	PRECONN_PRINT("connection to "TCP4" from "TCP4,
 			TCP4N(&qp->addr_d, ntohs(qp->port_d)), TCP4N(&qp->addr_s, ntohs(qp->port_s)));
@@ -236,9 +236,8 @@ err:
 static int start_half_duplex(void *arg)
 {
 	void **args = arg;
-	struct cbn_qp *qp = args[1];
+
 	PRECONN_PRINT("starting half duplex");
-	get_qp(qp);
 	half_duplex(args[0], args[1]);
 	PRECONN_PRINT("Going out... waking pair");
 	return 0;
@@ -314,6 +313,7 @@ static int start_new_pending_connection(void *arg)
 
 	ptr_pair[0] = &sockets_tx;
 	ptr_pair[1] = qp;
+	get_qp(qp);
 	kthread_pool_run(&cbn_pool, start_half_duplex, ptr_pair);
 
 	get_qp(qp);
@@ -409,7 +409,7 @@ int start_probe_syn(void *arg)
 	return rc;
 }
 
-#define BACKLOG 16
+#define BACKLOG 64
 
 static int prec_conn_listner_server(void *arg)
 {
@@ -461,7 +461,7 @@ static int prec_conn_listner_server(void *arg)
 		init_waitqueue_head(&qp->wait);
 		qp->rx 		= nsock;
 		qp->tid 	= 0;
-		qp->root 	= NULL;
+		qp->listner 	= NULL;
 		INIT_LIST_HEAD(&qp->list);
 
 		list_add(&qp->list, &pre_conn_list_server);

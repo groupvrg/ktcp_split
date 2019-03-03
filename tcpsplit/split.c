@@ -32,14 +32,14 @@ module_param(pool_size, int, 0);
 
 struct kthread_pool cbn_pool = {.pool_size = DEF_CBN_POOL_SIZE};
 
+/*Rarely modified, shared data struct*/
+/* TODO: Add percore R/W lock, hide lock and root inside func*/
+//rwlock_t listner_root_lock = RW_LOCK_UNLOCKED;
 struct rb_root listner_root = RB_ROOT;
 
 struct kmem_cache *qp_slab;
 struct kmem_cache *syn_slab;
 struct kmem_cache *probe_slab;
-
-spinlock_t qp_tree_lock; /* percore variable */
-
 
 static struct kmem_cache *listner_slab;
 
@@ -335,6 +335,7 @@ static struct nf_hook_ops cbn_nf_hooks[] = {
 //TODO: Add LOCAL_IN to mark packets with tennant_id
 };
 
+//TODO: Must hold list (not tree) of active QPs for this.
 static inline void stop_tennat_proxies(struct rb_root *root)
 {
 
@@ -357,7 +358,7 @@ static inline void remove_listner_server(struct cbn_listner *pos)
 {
 	if (pos->sock)
 		kernel_sock_shutdown(pos->sock, SHUT_RDWR);
-	stop_tennat_proxies(&pos->connections_root);
+	//stop_tennat_proxies(&pos->connections_root);
 	rb_erase(&pos->node, &listner_root);
 	kmem_cache_free(listner_slab, pos);
 }
@@ -434,8 +435,9 @@ err:
 inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 {
 	struct cbn_qp *qp = pqp;
+	struct cbn_root_qp *qp_root = this_cpu_ptr(qp->listner->connections_root);
 
-	if ((qp = add_rb_data(pqp->root, pqp, &qp_tree_lock))) {
+	if ((qp = add_rb_data(&qp_root->root, pqp))) {
 		/* QP already exists */
 		if (qp->qp_dir[dir] != NULL) {
 			/* *
@@ -540,7 +542,7 @@ int start_new_connection_syn(void *arg)
 	qp->rx = NULL;
 	qp->tx = ERR_PTR(-EINVAL);
 	listner = search_rb_listner(&listner_root, addresses->mark);
-	qp->root = &listner->connections_root; /* PER CPU*/
+	qp->listner = listner;
 
 	qp = qp_exists(qp, TX_QP);
 	if (unlikely(qp == NULL)) {
@@ -658,7 +660,6 @@ static int start_new_connection(void *arg)
 	struct sockaddr_in cli_addr;
 	struct sockaddr_in addr;
 	struct cbn_qp *qp;
-	struct rb_root *root;
 	struct sockets sockets;
 
 	INIT_TRACE
@@ -666,7 +667,6 @@ static int start_new_connection(void *arg)
 	qp 	= arg;
 	rx 	= (struct socket *)qp->rx;
 	mark 	= qp->tid;
-	root 	= qp->root;
 
 	size = sizeof(addr);
 
@@ -746,13 +746,31 @@ create_fail:
 	return rc;
 }
 
+#define alloc_reserved_percpu(type)                                              \
+	(typeof(type) __percpu *)__alloc_reserved_percpu(sizeof(type),           \
+							__alignof__(type))
+
 static inline struct cbn_listner *register_server_sock(uint32_t tid, struct socket *sock)
 {
+	int cpu;
 	struct cbn_listner *server = kmem_cache_alloc(listner_slab, GFP_KERNEL);
+	if (!server)
+		return NULL;
+
+	server->connections_root = alloc_reserved_percpu(struct cbn_root_qp);
+	if (!server->connections_root) {
+		kmem_cache_free(listner_slab, server);
+		return NULL;
+	}
+
+	for_each_possible_cpu(cpu) {
+		struct cbn_root_qp *root = per_cpu_ptr(server->connections_root, cpu);
+
+		root->root 	= RB_ROOT;
+	}
 
 	server->key			= tid;
 	server->sock 			= sock;
-	server->connections_root 	= RB_ROOT;
 
 	add_rb_listner(&listner_root, server);
 	return server;
@@ -776,6 +794,10 @@ static int split_server(void *mark_port)
 	}
 
 	server = register_server_sock(mark, sock);
+	if (!server) {
+		TRACE_ERROR("Failed to alloc memory for new server!!!!");
+		goto error;
+	}
 
 	server->status = 1;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
@@ -820,7 +842,7 @@ static int split_server(void *mark_port)
 		qp = kmem_cache_alloc(qp_slab, GFP_KERNEL);
 		qp->rx 		= nsock;
 		qp->tid 	= mark;
-		qp->root 	= &server->connections_root;
+		qp->listner 	= server;
 		atomic_set(&qp->ref_cnt, 0);
 		init_waitqueue_head(&qp->wait);
 		kthread_pool_run(&cbn_pool, start_new_connection, qp);
@@ -888,7 +910,6 @@ int __init cbn_datapath_init(void)
 	parse_module_params();
 	pr_info("Starting KTCP [%d]\n", cbn_pool.pool_size);
 
-	spin_lock_init(&qp_tree_lock);
 	qp_slab = kmem_cache_create("cbn_qp_mdata",
 					sizeof(struct cbn_qp), 0, 0, qp_ctor);
 

@@ -6,22 +6,7 @@
 #include "cbn_common.h"
 #include "tcp_split.h"
 
-
-struct cbn_listner {
-	struct rb_node 	node;
-	struct rb_root  connections_root; /* per core variable, sane goes for lock*/
-	int32_t		key; //tid
-	uint16_t	port;
-	uint16_t	status;
-	struct socket	*sock;
-	struct socket	*raw;
-};
 /*
- * Multiple listner support:
- * 1. listner_root
- * 2. unpaird qp root - the syn(tx) side doesnt know which listner is "his" but the "rx" does - move after qp bind
- * */
-
 static inline struct cbn_qp *search_rb_data(struct rb_root *root, char *string)
 {
 	struct rb_node *node = root->rb_node;
@@ -42,13 +27,14 @@ static inline struct cbn_qp *search_rb_data(struct rb_root *root, char *string)
 
 	return NULL;
 }
+*/
 
-static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *data, spinlock_t *lock)
+static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *data)
 {
 	struct rb_node **new = &(root->rb_node), *parent = NULL;
 
 	/* Figure out where to put new node */
-	spin_lock_irq(lock);
+	local_bh_disable();
 	while (*new) {
 		struct cbn_qp *this = container_of(*new, struct cbn_qp, node);
 		int result = strncmp(data->key, this->key, RB_KEY_LENGTH);
@@ -59,7 +45,7 @@ static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *da
 		else if (result > 0)
 			new = &((*new)->rb_right);
 		else  {
-			spin_unlock_irq(lock);
+			local_bh_enable();
 			dump_qp(data, "QP exists.");
 			return this;
 		}
@@ -68,8 +54,8 @@ static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *da
 	/* Add new node and rebalance tree. */
 	rb_link_node(&data->node, parent, new);
 	rb_insert_color(&data->node, root);
+	local_bh_enable();
 	dump_qp(data, "QP added.");
-	spin_unlock_irq(lock);
 
 	return NULL;
 }

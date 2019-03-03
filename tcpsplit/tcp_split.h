@@ -14,6 +14,20 @@
 #define TX_QP	0
 #define RX_QP	1
 
+struct cbn_root_qp {
+	struct rb_root root;
+};
+
+struct cbn_listner {
+	struct rb_node 	node;
+	struct cbn_root_qp __percpu *connections_root; /* per core variable, sane goes for lock*/
+	int32_t		key; //tid
+	uint16_t	port;
+	uint16_t	status;
+	struct socket	*sock;
+	struct socket	*raw;
+};
+
 struct cbn_qp {
 	struct rb_node node;
 	union {
@@ -31,7 +45,7 @@ struct cbn_qp {
 	};
 	atomic_t ref_cnt;
 
-	struct rb_root 		*root;
+	struct cbn_listner 	*listner;
 	struct list_head 	list;
 	wait_queue_head_t	wait;
 	union {
@@ -44,7 +58,6 @@ struct cbn_qp {
 };
 
 extern struct kmem_cache *qp_slab;
-extern spinlock_t qp_tree_lock; /*percore variable - needed on uc as well */
 
 static inline void dump_qp(struct cbn_qp *qp, const char *str)
 {
@@ -60,16 +73,17 @@ static inline void get_qp(struct cbn_qp *qp)
 	switch  (rc) {
 	case 2:
 		// reusable connections may not have a root
-		if (qp->root) {
+		if (qp->listner) {
+			struct cbn_root_qp *qp_root = this_cpu_ptr(qp->listner->connections_root);
 			dump_qp(qp, "remove from tree");
-			spin_lock_irq(&qp_tree_lock);
-			rb_erase(&qp->node, qp->root);
-			spin_unlock_irq(&qp_tree_lock);
+			local_bh_disable();
+			rb_erase(&qp->node, &qp_root->root);
+			local_bh_enable();
 		} else {
 			//TODO: protect this list, also all others
 			list_del(&qp->list);
 		}
-		/*Intentinal falltrough */
+		/*Intentional falltrough */
 	case 1:
 		break;
 	default:
