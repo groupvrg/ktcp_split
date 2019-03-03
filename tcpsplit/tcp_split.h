@@ -1,7 +1,7 @@
 #ifndef __CBN_DATAPATH_H__
 #define __CBN_DATAPATH_H__
 
-#include "rb_data_tree.h"
+#include "cbn_common.h"
 
 #define QP_TO			90
 #define PRECONN_SERVER_PORT	5565
@@ -9,6 +9,89 @@
 
 //Lowest official IANA unassigned port
 #define CBP_PROBE_PORT 	4
+#define RB_KEY_LENGTH 12
+
+#define TX_QP	0
+#define RX_QP	1
+
+struct cbn_qp {
+	struct rb_node node;
+	union {
+		char key[RB_KEY_LENGTH];
+		struct {
+			__be16		port_s;	/* Port number			*/
+			__be16		port_d;	/* Port number			*/
+			struct in_addr	addr_s;	/* Internet address		*/
+			struct in_addr	addr_d;	/* Internet address		*/
+		};
+		struct {
+			int tid;
+
+		};
+	};
+	atomic_t ref_cnt;
+
+	struct rb_root 		*root;
+	struct list_head 	list;
+	wait_queue_head_t	wait;
+	union {
+		struct {
+			struct socket	*tx;
+			struct socket	*rx;
+		};
+		struct socket *qp_dir[2]; //TODO: volatile
+	};
+};
+
+extern struct kmem_cache *qp_slab;
+extern spinlock_t qp_tree_lock; /*percore variable - needed on uc as well */
+
+static inline void dump_qp(struct cbn_qp *qp, const char *str)
+{
+	TRACE_QP("%s :QP %p: "TCP4" => "TCP4, str, qp,
+			TCP4N(&qp->addr_s, ntohs(qp->port_s)),
+			TCP4N(&qp->addr_d, ntohs(qp->port_d)));
+}
+
+static inline void get_qp(struct cbn_qp *qp)
+{
+	int rc;
+	rc = atomic_inc_return(&qp->ref_cnt);
+	switch  (rc) {
+	case 2:
+		// reusable connections may not have a root
+		if (qp->root) {
+			dump_qp(qp, "remove from tree");
+			spin_lock_irq(&qp_tree_lock);
+			rb_erase(&qp->node, qp->root);
+			spin_unlock_irq(&qp_tree_lock);
+		} else {
+			//TODO: protect this list, also all others
+			list_del(&qp->list);
+		}
+		/*Intentinal falltrough */
+	case 1:
+		break;
+	default:
+		TRACE_ERROR("Impossible QP refcount %d", rc);
+		dump_qp(qp, "IMPOSSIBLE VALUE");
+		break;
+	}
+}
+
+static inline unsigned int put_qp(struct cbn_qp *qp)
+{
+	int rc;
+	if (! (rc = atomic_dec_return(&qp->ref_cnt))) {
+		//TODO: Consider adding a tree for active QPs + States.
+		if (qp->tx)
+			sock_release(qp->tx);
+		if (qp->rx)
+			sock_release(qp->rx);
+		kmem_cache_free(qp_slab, qp);
+	}
+	return rc;
+}
 
 struct sockets {
 	struct socket *rx;
@@ -40,6 +123,33 @@ static inline void void2uint(void *ptr, uint32_t *a, uint32_t *b)
 	uint64_t concat = (uint64_t)ptr;
 	*b = ((concat << UINT_SHIFT) >> UINT_SHIFT);
 	*a = (concat >> UINT_SHIFT);
+}
+
+static inline unsigned int qp2cpu(struct cbn_qp *qp)
+{
+	int i = 0;
+	unsigned int core = 0;
+
+	char str[32];
+
+	for (;i < RB_KEY_LENGTH; i++)
+		core ^= qp->key[i];
+	i = num_online_cpus();
+	i = (core/i) * i;
+
+	snprintf(str, 32, "core = %d, i = %d", core, i);
+	dump_qp(qp, str);
+	return core - i;
+}
+
+static inline unsigned int addresses2cpu(struct addresses *addr)
+{
+	struct cbn_qp qp;
+	qp.addr_d = addr->dest.sin_addr;
+	qp.port_s = addr->src.sin_port;
+	qp.port_d = addr->dest.sin_port;
+	qp.addr_s = addr->src.sin_addr;
+	return qp2cpu(&qp);
 }
 
 int half_duplex(struct sockets *sock, struct cbn_qp *qp);

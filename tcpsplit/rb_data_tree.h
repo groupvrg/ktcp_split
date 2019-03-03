@@ -4,95 +4,12 @@
 #include <linux/rbtree.h>
 #include <linux/types.h> //atomic_t
 #include "cbn_common.h"
-
-#define RB_KEY_LENGTH 12
-
-#define TX_QP	0
-#define RX_QP	1
-
-struct cbn_qp {
-	struct rb_node node;
-	union {
-		char key[RB_KEY_LENGTH];
-		struct {
-			__be16		port_s;	/* Port number			*/
-			__be16		port_d;	/* Port number			*/
-			struct in_addr	addr_s;	/* Internet address		*/
-			struct in_addr	addr_d;	/* Internet address		*/
-		};
-		struct {
-			int tid;
-
-		};
-	};
-	atomic_t ref_cnt;
-
-	struct rb_root 		*root;
-	struct list_head 	list;
-	wait_queue_head_t	wait;
-	union {
-		struct {
-			struct socket	*tx;
-			struct socket	*rx;
-		};
-		struct socket *qp_dir[2]; //TODO: volatile
-	};
-};
-
-extern struct kmem_cache *qp_slab;
-extern spinlock_t qp_tree_lock; /*percore variable - needed on uc as well */
-
-static inline void dump_qp(struct cbn_qp *qp, const char *str)
-{
-	TRACE_QP("%s :QP %p: "TCP4" => "TCP4, str, qp,
-			TCP4N(&qp->addr_s, ntohs(qp->port_s)),
-			TCP4N(&qp->addr_d, ntohs(qp->port_d)));
-}
-
-static inline void get_qp(struct cbn_qp *qp)
-{
-	int rc;
-	rc = atomic_inc_return(&qp->ref_cnt);
-	switch  (rc) {
-	case 2:
-		// reusable connections may not have a root
-		if (qp->root) {
-			dump_qp(qp, "remove from tree");
-			spin_lock_irq(&qp_tree_lock);
-			rb_erase(&qp->node, qp->root);
-			spin_unlock_irq(&qp_tree_lock);
-		} else {
-			//TODO: protect this list, also all others
-			list_del(&qp->list);
-		}
-		/*Intentinal falltrough */
-	case 1:
-		break;
-	default:
-		TRACE_ERROR("Impossible QP refcount %d", rc);
-		dump_qp(qp, "IMPOSSIBLE VALUE");
-		break;
-	}
-}
-
-static inline unsigned int put_qp(struct cbn_qp *qp)
-{
-	int rc;
-	if (! (rc = atomic_dec_return(&qp->ref_cnt))) {
-		//TODO: Consider adding a tree for active QPs + States.
-		if (qp->tx)
-			sock_release(qp->tx);
-		if (qp->rx)
-			sock_release(qp->rx);
-		kmem_cache_free(qp_slab, qp);
-	}
-	return rc;
-}
+#include "tcp_split.h"
 
 
 struct cbn_listner {
 	struct rb_node 	node;
-	struct rb_root  connections_root;
+	struct rb_root  connections_root; /* per core variable, sane goes for lock*/
 	int32_t		key; //tid
 	uint16_t	port;
 	uint16_t	status;

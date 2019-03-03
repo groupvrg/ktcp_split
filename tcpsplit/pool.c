@@ -42,7 +42,7 @@ static int pipe_loop_task(void *data)
 			POOL_ERR("ERROR %s: no pool task", __FUNCTION__);
 
 		POOL_PRINT("sleeping %s", current->comm);
-		set_current_state(TASK_INTERRUPTIBLE);
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		if (!kthread_should_stop()) {
 			POOL_PRINT("%s out to reuse <%p>", current->comm, current);
 			elem->pool_task = NULL;
@@ -130,7 +130,7 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 	return elem;
 }
 
-struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(void *), void *data)
+struct pool_elem *__kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(void *), void *data, const struct cpumask * mask)
 {
 	struct pool_elem *elem = kthread_pool_alloc(cbn_pool);
 	if (unlikely(!elem)) {
@@ -139,7 +139,7 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 	}
 
 	if (unlikely(elem->pool_task)) {
-		TRACE_ERROR("ERRORL task allocated twice....!!!! <%s>", elem->task->comm);
+		TRACE_ERROR("ERROR task allocated twice....!!!! <%s>", elem->task->comm);
 	}
 
 	elem->pool_task = func;
@@ -148,8 +148,20 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 	list_add(&elem->list, &cbn_pool->kthread_running);
 	spin_unlock_irq(&cbn_pool->running_lock);
 	POOL_PRINT("staring %s\n", elem->task->comm);
+	kthread_bind_mask(elem->task, mask);
 	wake_up_process(elem->task);
 	return elem;
+}
+
+struct pool_elem *kthread_pool_run_cpu(struct kthread_pool *cbn_pool,
+					int (*func)(void *), void *data, unsigned int cpu)
+{
+	return __kthread_pool_run(cbn_pool, func, data, cpumask_of(cpu));
+}
+
+struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(void *), void *data)
+{
+	return __kthread_pool_run(cbn_pool, func, data, cpu_possible_mask);
 }
 
 int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool)

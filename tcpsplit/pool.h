@@ -26,6 +26,8 @@ struct pool_elem {
 };
 
 struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(void *), void *data);
+struct pool_elem *kthread_pool_run_cpu(struct kthread_pool *cbn_pool,
+					int (*func)(void *), void *data, unsigned int cpu);
 
 int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool);
 void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool);

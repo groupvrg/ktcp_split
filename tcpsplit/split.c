@@ -213,7 +213,10 @@ static unsigned int cbn_egress_hook(void *priv,
 				if (set_cbn_probe(skb, addresses))
 					goto drop;
 			} else {
-				kthread_pool_run(&cbn_pool, start_new_connection_syn, addresses);
+				unsigned int cpu = addresses2cpu(addresses);
+				kthread_pool_run_cpu(&cbn_pool,
+							start_new_connection_syn,
+							addresses, cpu);
 				goto drop;
 			}
 		}
@@ -380,6 +383,9 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 	int rc = -ENOMEM;
 	uint64_t bytes = 0;
 
+	/*Allow to run on any core...*/
+	sched_setaffinity(0, cpu_possible_mask);
+
 	for (i = 0; i < VEC_SZ; i++) {
 		kvec[i].iov_len = PAGE_SIZE;
 		/*TODO: In case of alloc failure put_qp is needed */
@@ -534,7 +540,7 @@ int start_new_connection_syn(void *arg)
 	qp->rx = NULL;
 	qp->tx = ERR_PTR(-EINVAL);
 	listner = search_rb_listner(&listner_root, addresses->mark);
-	qp->root = &listner->connections_root;
+	qp->root = &listner->connections_root; /* PER CPU*/
 
 	qp = qp_exists(qp, TX_QP);
 	if (unlikely(qp == NULL)) {
@@ -691,6 +697,9 @@ static int start_new_connection(void *arg)
 	qp->port_s = cli_addr.sin_port;
 	qp->port_d = addr.sin_port;
 	qp->addr_s = cli_addr.sin_addr;
+	sched_setaffinity(0, cpumask_of(qp2cpu(qp)));
+	//TODO: cond_resched() ?!
+	yield();
 	/*rp->root/qp->mark no longer valid, qp is a union*/
 
 	//line = __LINE__;
@@ -814,7 +823,6 @@ static int split_server(void *mark_port)
 		qp->root 	= &server->connections_root;
 		atomic_set(&qp->ref_cnt, 0);
 		init_waitqueue_head(&qp->wait);
-		//TRACE_PRINT("%s scheduling start_new_connection [%d]", __FUNCTION__, mark);
 		kthread_pool_run(&cbn_pool, start_new_connection, qp);
 
 	} while (!kthread_should_stop());
