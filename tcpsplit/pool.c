@@ -150,6 +150,7 @@ struct pool_elem *__kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(
 	spin_unlock_irq(&cbn_pool->running_lock);
 	POOL_PRINT("staring %s\n", elem->task->comm);
 	kthread_bind_mask(elem->task, mask);
+	elem->task->flags &= ~PF_NO_SETAFFINITY;
 	wake_up_process(elem->task);
 	return elem;
 }

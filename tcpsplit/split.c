@@ -252,8 +252,10 @@ static unsigned int cbn_egress_hook(void *priv,
 		struct addresses *addresses = get_cbn_probe(skb);
 		if (addresses) {
 			//TRACE_PRINT("Next hop is "IP4"=>"IP4"\n", IP4N(&iph->saddr), IP4N(&iph->daddr));
+			unsigned int cpu = addresses2cpu(addresses);
 			addresses->sin_addr.s_addr = iph->daddr;
-			kthread_pool_run(&cbn_pool, start_new_pre_connection_syn, addresses);
+			kthread_pool_run_cpu(&cbn_pool, start_new_pre_connection_syn,
+						addresses, cpu);
 		}
 		goto drop;
 	}
@@ -406,12 +408,13 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 {
 	struct kvec kvec[VEC_SZ];
 	int id = 0, i ,dir = sock->dir;
-	int rc = -ENOMEM;
+	int rc;
 	uint64_t bytes = 0;
 
 	/*Allow to run on any core...*/
-	sched_setaffinity(0, cpu_possible_mask);
-
+	if (rc = sched_setaffinity(0, cpu_possible_mask))
+		TRACE_ERROR("Failed to sched_setaffinity! [%d]", rc);
+	rc = -ENOMEM;
 	for (i = 0; i < VEC_SZ; i++) {
 		kvec[i].iov_len = PAGE_SIZE;
 		/*TODO: In case of alloc failure put_qp is needed */
@@ -722,7 +725,10 @@ static int start_new_connection(void *arg)
 	qp->port_s = cli_addr.sin_port;
 	qp->port_d = addr.sin_port;
 	qp->addr_s = cli_addr.sin_addr;
-	sched_setaffinity(0, cpumask_of(qp2cpu(qp)));
+	if ((rc = sched_setaffinity(0, cpumask_of(qp2cpu(qp))))) {
+		TRACE_ERROR("Failed to set affinity error (%d)\n", rc);
+		goto create_fail;
+	}
 	//TODO: cond_resched() ?!
 	yield();
 	/*rp->root/qp->mark no longer valid, qp is a union*/
@@ -730,7 +736,7 @@ static int start_new_connection(void *arg)
 	//line = __LINE__;
 	//if ((rc = kernel_getsockname(rx, (struct sockaddr *)&addr, &size)))
 	//	goto create_fail;
-	TRACE_PRINT("[L] "TCP4" => "TCP4" (%d)", TCP4N(&cli_addr.sin_addr, ntohs(cli_addr.sin_port)),
+	TRACE_PRINT("[L] "TCP4" => "TCP4" [m=%d]", TCP4N(&cli_addr.sin_addr, ntohs(cli_addr.sin_port)),
 						TCP4N(&addr.sin_addr, ntohs(addr.sin_port)), mark);
 
 	qp->tx = NULL;

@@ -78,7 +78,7 @@ extern struct kmem_cache *qp_slab;
 
 static inline void dump_qp(struct cbn_qp *qp, const char *str)
 {
-	TRACE_QP("%s :QP %p: "TCP4" => "TCP4, str, qp,
+	TRACE_QP("<%s> %s :QP %p: "TCP4" => "TCP4, __FUNCTION__, str, qp,
 			TCP4N(&qp->addr_s, ntohs(qp->port_s)),
 			TCP4N(&qp->addr_d, ntohs(qp->port_d)));
 }
@@ -158,7 +158,7 @@ static inline void void2uint(void *ptr, uint32_t *a, uint32_t *b)
 
 static inline unsigned int qp2cpu(struct cbn_qp *qp)
 {
-	int i = 0;
+	unsigned int i = 0;
 	unsigned int core = 0;
 
 	char str[32];
@@ -168,7 +168,7 @@ static inline unsigned int qp2cpu(struct cbn_qp *qp)
 	i = num_online_cpus();
 	i = (core/i) * i;
 
-	snprintf(str, 32, "core = %d, i = %d", core, i);
+	snprintf(str, 32, "core = %u, i = %u => %u", core, i, core - i);
 	dump_qp(qp, str);
 	return core - i;
 }
