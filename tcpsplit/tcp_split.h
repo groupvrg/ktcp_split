@@ -14,6 +14,23 @@
 #define TX_QP	0
 #define RX_QP	1
 
+#define VANILA_KERNEL
+#ifdef VANILA_KERNEL
+#include <linux/kallsyms.h>
+
+typedef long (*setaffinity_func)(pid_t, const struct cpumask *);
+typedef void (*bind_mask_func)(struct task_struct *, const struct cpumask *);
+typedef void __percpu *(*alloc_percpu_func)(size_t , size_t);
+
+extern setaffinity_func psched_setaffinity;
+extern bind_mask_func  pkthread_bind_mask;
+extern alloc_percpu_func  p__alloc_reserved_per_cpu;
+
+#define sched_setaffinity(...)		(*psched_setaffinity)(__VA_ARGS__)
+#define kthread_bind_mask(...)		(*pkthread_bind_mask)(__VA_ARGS__)
+#define __alloc_reserved_percpu(...)	(*p__alloc_reserved_percpu)(__VA_ARGS__)
+#endif
+
 struct cbn_root_qp {
 	struct rb_root root;
 };

@@ -5,6 +5,7 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include "cbn_common.h"
+#include "tcp_split.h"	//kthread_bind define
 #include "pool.h"
 
 #define POOL_PRINT(...)

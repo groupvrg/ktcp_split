@@ -47,6 +47,31 @@ uint32_t ip_transparent = 1;
 
 int start_new_pre_connection_syn(void *arg);
 
+#ifdef VANILA_KERNEL
+
+setaffinity_func 	psched_setaffinity;
+bind_mask_func 		pkthread_bind_mask;
+alloc_percpu_func 	p__alloc_reserved_percpu;
+
+#endif
+
+/*
+ * Config ptrs for non exported functions. return non zero on error.
+ */
+static int init_kallsyms(void)
+{
+	int rc = 0;
+#ifdef VANILA_KERNEL
+	psched_setaffinity = (void *)kallsyms_lookup_name("sched_setaffinity");
+	rc = !(unsigned long)psched_setaffinity;
+	pkthread_bind_mask = (void *)kallsyms_lookup_name("kthread_bind_mask");
+	rc |= !(unsigned long)pkthread_bind_mask;
+	p__alloc_reserved_percpu = (void *)kallsyms_lookup_name("__alloc_reserved_percpu");
+	rc |= !(unsigned long)p__alloc_reserved_percpu;
+#endif
+	return rc;
+}
+
 #if 0
 // Due to MARK being part of CT this call might fail, modifed getorigdist is needed then
 // one isse - it can compile only against kernels with the CT patches.
@@ -745,10 +770,9 @@ create_fail:
 	DUMP_TRACE
 	return rc;
 }
-
-#define alloc_reserved_percpu(type)                                              \
-	(typeof(type) __percpu *)__alloc_reserved_percpu(sizeof(type),           \
-							__alignof__(type))
+#define alloc_reserved_percpu(type)					\
+	(typeof(type) __percpu *)__alloc_reserved_percpu(sizeof(type),	\
+					__alignof__(type))
 
 static inline struct cbn_listner *register_server_sock(uint32_t tid, struct socket *sock)
 {
@@ -909,6 +933,11 @@ int __init cbn_datapath_init(void)
 {
 	parse_module_params();
 	pr_info("Starting KTCP [%d]\n", cbn_pool.pool_size);
+
+	if (init_kallsyms()) {
+		TRACE_ERROR("Failed to init kallsyms ptrs");
+		return -1;
+	}
 
 	qp_slab = kmem_cache_create("cbn_qp_mdata",
 					sizeof(struct cbn_qp), 0, 0, qp_ctor);
