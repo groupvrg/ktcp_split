@@ -412,7 +412,7 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 	uint64_t bytes = 0;
 
 	/*Allow to run on any core...*/
-	if (rc = sched_setaffinity(0, cpu_possible_mask))
+	if ((rc = sched_setaffinity(0, cpu_possible_mask)))
 		TRACE_ERROR("Failed to sched_setaffinity! [%d]", rc);
 	rc = -ENOMEM;
 	for (i = 0; i < VEC_SZ; i++) {
@@ -500,15 +500,18 @@ inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 		int rc;
 		/*should return non zero*/
 		dump_qp(qp, "waiting for peer");
+		get_qp(qp);
 		rc = wait_event_interruptible_timeout(qp->wait,
 							!IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]),
 						       	QP_TO * HZ);
 		if (!rc) {
 			TRACE_PRINT("ERROR: TIMEOUT %d (%s)", rc, (IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]) ? "ERR/NULL" : "EXISTS!!"));
+			put_qp(qp);
 			err = 1;
 		}
 	} else {
 		dump_qp(qp, "waking peer");
+		get_qp(qp);
 		wake_up(&qp->wait);
 	}
 
@@ -641,9 +644,11 @@ connect_fail:
 	sockets.rx = (struct socket *)qp->tx;
 	sockets.dir = 1;
 	tx = NULL;
-	if (IS_ERR_OR_NULL((struct socket *)qp->rx) || IS_ERR_OR_NULL((struct socket *)qp->tx))
+	if (unlikely(IS_ERR_OR_NULL((struct socket *)qp->rx) || IS_ERR_OR_NULL((struct socket *)qp->tx))) {
+		TRACE_ERROR("One of QP the dirs is NULL! <%p,%p>", qp->rx, qp->tx);
+		put_qp(qp);
 		goto out;
-	get_qp(qp);
+	}
 	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	rc = half_duplex(&sockets, qp);
 
@@ -755,7 +760,6 @@ static int start_new_connection(void *arg)
 	if (IS_ERR_OR_NULL((struct socket *)(qp->rx)) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
 
-	get_qp(qp);
 	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
 out:

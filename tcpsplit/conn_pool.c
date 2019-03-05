@@ -127,7 +127,6 @@ int start_new_pre_connection_syn(void *arg)
 	TRACE_LINE();
 	sockets.tx 	= (struct socket *)qp->rx;
 	sockets.rx 	= (struct socket *)qp->tx;
-	get_qp(qp);
 	PRECONN_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	rc = half_duplex(&sockets, qp);
 
