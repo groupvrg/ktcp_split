@@ -89,16 +89,14 @@ static inline void get_qp(struct cbn_qp *qp)
 	rc = atomic_inc_return(&qp->ref_cnt);
 	switch  (rc) {
 	case 2:
-		// reusable connections may not have a root
+		dump_qp(qp, "remove from tree");
 		if (qp->listner) {
 			struct cbn_root_qp *qp_root = this_cpu_ptr(qp->listner->connections_root);
-			dump_qp(qp, "remove from tree");
 			local_bh_disable();
 			rb_erase(&qp->node, &qp_root->root);
 			local_bh_enable();
 		} else {
-			//TODO: protect this list, also all others
-			list_del(&qp->list);
+			TRACE_ERROR("NO LISTNER!!!!");
 		}
 		/*Intentional falltrough */
 	case 1:

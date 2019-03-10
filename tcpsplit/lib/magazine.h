@@ -5,9 +5,13 @@
 #include <linux/spinlock.h>
 #include <linux/types.h>
 
-#define MAG_DEPTH	1
+#define MAG_DEPTH	4
 #define MAG_COUNT	2
 
+//TODO:
+//	1) Percpu
+//	2) use list instead of array.
+//
 struct magazine {
 	struct list_head 	list;
 	void 			*stack[MAG_DEPTH];

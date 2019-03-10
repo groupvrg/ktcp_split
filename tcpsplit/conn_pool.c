@@ -9,7 +9,7 @@
 #include <linux/netfilter_ipv4.h>
 #include <net/sock.h>  //sock->to
 #include "tcp_split.h"
-#include "pool.h"
+#include "thread_pool.h"
 #include "proc.h"
 #include "rb_data_tree.h"
 #include "preconn_rb_tree.h"
@@ -44,6 +44,7 @@ static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 
 	if (unlikely(!pre_conn_list || list_empty(pre_conn_list))) {
 		PRECONN_PRINT("preconn pool is empty! "TCP4", spawning refill...\n", TCP4N(&next_hop_ip, PRECONN_SERVER_PORT));
+		//watremark here...
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		return NULL;
