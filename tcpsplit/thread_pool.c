@@ -21,13 +21,7 @@
 
 static void kthread_pool_reuse(struct kthread_pool *cbn_pool, struct pool_elem *elem)
 {
-	spin_lock_irq(&cbn_pool->running_lock);
-	list_del(&elem->list);
-	spin_unlock_irq(&cbn_pool->running_lock);
-	spin_lock_irq(&cbn_pool->pool_lock);
-	list_add(&elem->list, &cbn_pool->kthread_pool);
-	--cbn_pool->refil_needed;
-	spin_unlock_irq(&cbn_pool->pool_lock);
+	mag_free_elem(&cbn_pool->allocator, elem);
 }
 
 static int pipe_loop_task(void *data)
@@ -57,9 +51,10 @@ static int pipe_loop_task(void *data)
 
 static int (*threadfn)(void *data) = pipe_loop_task;
 
-static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
+static inline void refill_pool(struct kthread_pool *cbn_pool)
 {
-	count = (count) ? count : cbn_pool->refil_needed;
+	int top_count = atomic_read(&cbn_pool->top_count);
+	int count = (cbn_pool->pool_size - (cbn_pool->allocator.full_count << 2));
 
 	POOL_PRINT("pool %p count %d", cbn_pool, count);
 	count = (count < 0) ? 0 : count;
@@ -71,10 +66,10 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 			return;
 		}
 
-		k = kthread_create(threadfn, elem, "pool-th-%d", cbn_pool->top_count);
+		k = kthread_create(threadfn, elem, "pool-th-%d", top_count);
 
 		if (unlikely(!k)) {
-			TRACE_ERROR("ERROR: failed to create kthread %d", cbn_pool->top_count);
+			TRACE_ERROR("ERROR: failed to create kthread %d", top_count);
 			kmem_cache_free(cbn_pool->pool_slab, elem);
 			return;
 		}
@@ -82,12 +77,10 @@ static inline void refill_pool(struct kthread_pool *cbn_pool, int count)
 		elem->task = k;
 		elem->pool = cbn_pool;
 		elem->pool_task = NULL;
-		spin_lock_irq(&cbn_pool->pool_lock);
-		list_add(&elem->list, &cbn_pool->kthread_pool);
-		--cbn_pool->refil_needed;
-		++cbn_pool->top_count;
-		spin_unlock_irq(&cbn_pool->pool_lock);
-		POOL_PRINT("pool thread %d [%p] allocated %llx", cbn_pool->top_count, elem, rdtsc());
+		mag_free_elem(&cbn_pool->allocator, elem);
+		//TODO: change to atomic
+		POOL_PRINT("pool thread %d [%p] allocated %llx", top_count, elem, rdtsc());
+		atomic_inc(&cbn_pool->top_count);
 	}
 }
 
@@ -96,7 +89,7 @@ static int refil_thread(void *data)
 	struct kthread_pool *cbn_pool = data;
 
 	while (!kthread_should_stop()) {
-		refill_pool(cbn_pool, 0);
+		refill_pool(cbn_pool);
 
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!kthread_should_stop())
@@ -117,16 +110,13 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 	struct pool_elem *elem = NULL;
 
 	refill_task_start(cbn_pool);
-	while (unlikely(list_empty(&cbn_pool->kthread_pool))) {
+	elem = mag_alloc_elem(&cbn_pool->allocator);
+	while (unlikely(!elem)) {
 		POOL_ERR("pool is empty refill is to slow\n");
 		return NULL;
 	}
 
-	spin_lock_irq(&cbn_pool->pool_lock);
-	elem = list_first_entry(&cbn_pool->kthread_pool, struct pool_elem, list);
-	list_del(&elem->list);
-	++cbn_pool->refil_needed;
-	spin_unlock_irq(&cbn_pool->pool_lock);
+
 	POOL_PRINT("allocated %p [%p]\n", elem, elem->task);
 	return elem;
 }
@@ -145,9 +135,8 @@ struct pool_elem *__kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(
 
 	elem->pool_task = func;
 	elem->data = data;
-	spin_lock_irq(&cbn_pool->running_lock);
-	list_add(&elem->list, &cbn_pool->kthread_running);
-	spin_unlock_irq(&cbn_pool->running_lock);
+//TODO: percore list	list_add(&elem->list, &cbn_pool->kthread_running);
+//
 	POOL_PRINT("staring %s\n", elem->task->comm);
 	kthread_bind_mask(elem->task, mask);
 	elem->task->flags &= ~PF_NO_SETAFFINITY;
@@ -169,16 +158,14 @@ struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(vo
 int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool)
 {
 	TRACE_PRINT("starting: %s", __FUNCTION__);
-	INIT_LIST_HEAD(&cbn_pool->kthread_pool);
-	INIT_LIST_HEAD(&cbn_pool->kthread_running);
+//	INIT_LIST_HEAD(&cbn_pool->kthread_running);
 
-	spin_lock_init(&cbn_pool->pool_lock);
-	spin_lock_init(&cbn_pool->running_lock);
+	atomic_set(&cbn_pool->top_count, 0);
+	mag_allocator_init(&cbn_pool->allocator);
 
 	cbn_pool->pool_slab = kmem_cache_create("pool-thread-cache",
 						sizeof(struct pool_elem), 0, 0, NULL);
 
-	cbn_pool->refil_needed = cbn_pool->pool_size;
 	cbn_pool->refil = kthread_run(refil_thread, cbn_pool, "pool-cache-refill");
 
 	//set_user_nice(cbn_pool->refil, MAX_NICE);
@@ -187,11 +174,12 @@ int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool)
 
 void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool)
 {
-	struct list_head *itr, *tmp;
+//	struct list_head *itr, *tmp;
 	TRACE_PRINT("stopping: %s", __FUNCTION__);
 
 	kthread_stop(cbn_pool->refil);
 
+/* FIXME:
 	list_for_each_safe(itr, tmp, &cbn_pool->kthread_pool) {
 		struct pool_elem *task = container_of(itr, struct pool_elem, list);
 		list_del(itr);
@@ -199,7 +187,6 @@ void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool)
 		kthread_stop(task->task);
 		kmem_cache_free(cbn_pool->pool_slab, task);
 	}
-
 	list_for_each_safe(itr, tmp, &cbn_pool->kthread_running) {
 		struct pool_elem *task = container_of(itr, struct pool_elem, list);
 		list_del(itr);
@@ -207,6 +194,7 @@ void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool)
 		kthread_stop(task->task);
 		kmem_cache_free(cbn_pool->pool_slab, task);
 	}
+*/
 	kmem_cache_destroy(cbn_pool->pool_slab);
 	TRACE_PRINT("stopping: elements freed");
 }

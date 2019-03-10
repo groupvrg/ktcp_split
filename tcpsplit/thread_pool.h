@@ -1,16 +1,20 @@
 #ifndef __CBN_KTHREAD_POOL__
 #define __CBN_KTHREAD_POOL__
 
+#include "lib/magazine.h"
+
 struct kthread_pool {
-	int top_count;				//TODO: add spin_lock - need to protect lists and counters
+	atomic_t top_count;				//TODO: add spin_lock - need to protect lists and counters
 	int refil_needed;
 	int pool_size;				// TODO:Modify with debugfs or module param
 	struct kmem_cache *pool_slab;
 	struct task_struct *refil;
-	struct list_head kthread_pool;
-	spinlock_t pool_lock;
+	//
+	struct mag_allocator allocator;
+/* FIXME:
 	struct list_head kthread_running;
 	spinlock_t running_lock;
+*/
 };
 
 struct pool_elem {
