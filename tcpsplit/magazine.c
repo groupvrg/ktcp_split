@@ -1,7 +1,7 @@
-#include <linux/magazine.h>
 #include <linux/smp.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
+#include "lib/magazine.h"
 
 #ifndef assert
 #define assert(expr) 	do { \
@@ -35,11 +35,13 @@ static inline u32 mag_pair_count(struct mag_pair *pair)
 
 static inline struct mag_pair *get_cpu_mag_pair(struct mag_allocator *allocator)
 {
-	int cpu	= get_cpu();
-	int idx = cpu << 1| ((in_softirq()) ? 1 : 0);
+	struct percpu_mag_pair *pcp;
+	int idx;
+	get_cpu();
+	idx = ((in_softirq()) ? 1 : 0);
 
-	assert(idx < NR_CPUS);
-	return &allocator->pair[idx];
+	pcp = this_cpu_ptr(allocator->pcp_pair);
+	return &pcp->pair[idx];
 }
 
 static inline void swap_mags(struct mag_pair *pair)
@@ -168,13 +170,15 @@ static inline void init_mag_pair(struct mag_pair *pair)
 
 void mag_allocator_init(struct mag_allocator *allocator)
 {
-	int idx;
-	assert(!((u64)allocator & CACHE_MASK));
+	int cpu;
 //1.	alloc_struct + pair per core x 2;
 //2.	alloc empty mag x2 per idx (init mag_pair, init_mag)
-	for (idx = 0 ; idx < num_online_cpus() * 2; idx++) {
-		assert(idx < NR_CPUS);
-		init_mag_pair(&allocator->pair[idx]);
+
+	allocator->pcp_pair = alloc_percpu(struct percpu_mag_pair);
+	for_each_possible_cpu(cpu) {
+		struct percpu_mag_pair *pcp = per_cpu_ptr(allocator->pcp_pair, cpu);
+		init_mag_pair(&pcp->pair[0]);
+		init_mag_pair(&pcp->pair[1]);
 	}
 
 //3.	init spin lock.

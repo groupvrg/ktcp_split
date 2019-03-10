@@ -23,16 +23,20 @@ struct mag_pair {
 		uint64_t 	mag_ptr[MAG_COUNT];
 	};
 	u32		count[MAG_COUNT];
-} ____cacheline_aligned_in_smp;
+};
+
+struct percpu_mag_pair {
+	struct mag_pair	pair[2]; //Per Core instance x 2 (normal , and _bh)
+};
 
 struct mag_allocator {
-	spinlock_t 		lock;
-	u64 lock_state;
-	struct list_head 	empty_list;
-	struct list_head 	full_list;
-	uint16_t 		empty_count;
-	uint16_t 		full_count;
-	struct mag_pair		pair[NR_CPUS] ____cacheline_aligned_in_smp; //Per Core instance x 2 (normal , and _bh)
+	spinlock_t 				lock;
+	u64 					lock_state;
+	struct list_head 			empty_list;
+	struct list_head 			full_list;
+	uint16_t 				empty_count;
+	uint16_t 				full_count;
+	struct percpu_mag_pair	__percpu 	*pcp_pair; //Per Core instance x 2 (normal , and _bh)
 };
 
 void *mag_alloc_elem(struct mag_allocator *allocator);
