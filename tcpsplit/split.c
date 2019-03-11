@@ -649,7 +649,7 @@ connect_fail:
 		put_qp(qp);
 		goto out;
 	}
-	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
+	TRACE_DEBUG("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	rc = half_duplex(&sockets, qp);
 
 out:
@@ -759,7 +759,7 @@ static int start_new_connection(void *arg)
 	if (IS_ERR_OR_NULL((struct socket *)(qp->rx)) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
 
-	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
+	TRACE_DEBUG("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
 out:
 	rx = NULL;

@@ -8,8 +8,8 @@
 #include "tcp_split.h"	//kthread_bind define
 #include "thread_pool.h"
 
-//#define POOL_PRINT(...)
-#define POOL_PRINT TRACE_PRINT
+#define POOL_PRINT(...)
+//#define POOL_PRINT TRACE_PRINT
 #define POOL_ERR TRACE_PRINT
 
 #define cbn_list_del(x) {POOL_PRINT("list_del(%d:%s): %p {%p, %p}", __LINE__, current->comm, x, (x)->next, (x)->prev); list_del((x));}

@@ -95,9 +95,9 @@ static inline void get_qp(struct cbn_qp *qp)
 			local_bh_disable();
 			rb_erase(&qp->node, &qp_root->root);
 			local_bh_enable();
-		} else {
-			TRACE_ERROR("NO LISTNER!!!!");
 		}
+		/* else is legitamate in start_new_pending_connection
+		 */
 		/*Intentional falltrough */
 	case 1:
 		break;

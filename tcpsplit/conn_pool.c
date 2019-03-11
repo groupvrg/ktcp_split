@@ -16,6 +16,7 @@
 #include "cbn_common.h"
 
 #define PRECONN_PRINT		TRACE_PRINT
+#define PRECONN_DEBUG		TRACE_DEBUG
 #define PRECONN_ERR 		TRACE_ERROR
 
 extern uint32_t ip_transparent;
@@ -128,7 +129,7 @@ int start_new_pre_connection_syn(void *arg)
 	TRACE_LINE();
 	sockets.tx 	= (struct socket *)qp->rx;
 	sockets.rx 	= (struct socket *)qp->tx;
-	PRECONN_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
+	PRECONN_DEBUG("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	rc = half_duplex(&sockets, qp);
 
 	if (rc)
@@ -237,7 +238,7 @@ static int start_half_duplex(void *arg)
 {
 	void **args = arg;
 
-	PRECONN_PRINT("starting half duplex");
+	PRECONN_DEBUG("starting half duplex");
 	half_duplex(args[0], args[1]);
 	PRECONN_PRINT("Going out... waking pair");
 	return 0;
@@ -317,7 +318,7 @@ static int start_new_pending_connection(void *arg)
 	kthread_pool_run(&cbn_pool, start_half_duplex, ptr_pair);
 
 	get_qp(qp);
-	PRECONN_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
+	PRECONN_DEBUG("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
 
 	/* Must wait for the other thread to end...
