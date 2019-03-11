@@ -250,7 +250,7 @@ static int start_new_pending_connection(void *arg)
 	struct cbn_qp *qp = arg;
 	struct addresses addresses_s;
 	struct addresses *addresses;
-	struct sockets sockets, sockets_tx;
+	struct sockets sockets_rx, sockets_tx;
 	struct socket *tx;
 	void *ptr_pair[2];
 
@@ -303,22 +303,23 @@ static int start_new_pending_connection(void *arg)
 
 	TRACE_LINE();
 
-	sockets.tx = (struct socket *)qp->rx;
-	sockets.rx = (struct socket *)qp->tx;
-	sockets.dir = 0;
+	sockets_rx.tx = (struct socket *)qp->rx;
+	sockets_rx.rx = (struct socket *)qp->tx;
+	sockets_rx.dir = 0;
 
 	sockets_tx.rx = (struct socket *)qp->rx;
 	sockets_tx.tx = (struct socket *)qp->tx;
 	sockets_tx.dir = 1;
 
-	ptr_pair[0] = &sockets_tx;
+	/* TODO: Change back, sock TX should be inline - no need to add more usec delays...*/
+	ptr_pair[0] = &sockets_rx;
 	ptr_pair[1] = qp;
 	get_qp(qp);
 	get_qp(qp);
 	kthread_pool_run(&cbn_pool, start_half_duplex, ptr_pair);
 
 	PRECONN_DEBUG("starting half duplex %d", atomic_read(&qp->ref_cnt));
-	half_duplex(&sockets, qp);
+	half_duplex(&sockets_tx, qp);
 
 	/* Must wait for the other thread to end...
 	rc = wait_event_interruptible_timeout(qp->wait, (ptr_pair[0] == NULL),5 * HZ);

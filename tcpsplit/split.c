@@ -425,31 +425,34 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 			if (put_qp(qp)) {
 				//FIXME: Add per QP lock for shutdown sync.
 				//TOCTOU bug on sock_shutdown
-				//kernel_sock_shutdown(sock->tx, SHUT_RDWR);
+				kernel_sock_shutdown(sock->tx, SHUT_RDWR);
 				//kernel_sock_shutdown(sock->rx, SHUT_RDWR);
 				//sock-sk + sk_wake_async if shutdown fails.
-				sk_wake_async(sock->tx->sk, SOCK_WAKE_URG, POLL_HUP);
+				//sk_wake_async(sock->tx->sk, SOCK_WAKE_URG, POLL_HUP);
 			}
 			goto err;
 		}
 		bytes += rc;
 		id ^= 1;
-		TRACE_DEBUG("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
-				dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
+		if (msg.msg_flags)
+			TRACE_PRINT("[%s] GOT A FUCKING FLAG %d", id ? "Send" : "Rcv", msg.msg_flags);
+
 		//use kern_sendpage if flags needed.
 		if ((rc = kernel_sendmsg(sock->tx, &msg, kvec, VEC_SZ, rc)) <= 0) {
 			TRACE_PRINT("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
 					dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 			if (put_qp(qp)) {
-				sk_wake_async(sock->rx->sk, SOCK_WAKE_URG, POLL_HUP);
-				//kernel_sock_shutdown(sock->rx, SHUT_RDWR);
+				TRACE_PRINT("Well, wtf? do I do now?");
+				//sk_wake_async(sock->rx->sk, SOCK_WAKE_URG, POLL_HUP);
+				kernel_sock_shutdown(sock->rx, SHUT_RDWR);
 				//kernel_sock_shutdown(sock->tx, SHUT_RDWR);
 			}
 			goto err;
 		}
 		id ^= 1;
-		TRACE_DEBUG("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
-				dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
+		if (msg.msg_flags)
+			TRACE_PRINT("[%s] GOT A FUCKING FLAG %d", id ? "Send" : "Rcv", msg.msg_flags);
+
 	} while (!kthread_should_stop());
 
 err:

@@ -87,6 +87,7 @@ static inline void get_qp(struct cbn_qp *qp)
 {
 	int rc;
 	rc = atomic_inc_return(&qp->ref_cnt);
+	TRACE_PRINT("%s : (%p->[%p][%p]) %d", __FUNCTION__, qp, qp->tx, qp->rx, rc);
 	switch  (rc) {
 	case 2:
 		dump_qp(qp, "remove from tree");
@@ -109,7 +110,6 @@ static inline void get_qp(struct cbn_qp *qp)
 		dump_qp(qp, "IMPOSSIBLE VALUE");
 		break;
 	}
-	TRACE_PRINT("%s : (%p) %d", __FUNCTION__, qp, rc);
 }
 
 static inline unsigned int put_qp(struct cbn_qp *qp)
@@ -123,7 +123,7 @@ static inline unsigned int put_qp(struct cbn_qp *qp)
 			sock_release(qp->rx);
 		kmem_cache_free(qp_slab, qp);
 	}
-	TRACE_PRINT("%s : (%p) %d", __FUNCTION__, qp, rc);
+	TRACE_PRINT("%s : (%p->[%p][%p]) %d", __FUNCTION__, qp, qp->tx, qp->rx, rc);
 	return rc;
 }
 
