@@ -92,9 +92,12 @@ static inline void get_qp(struct cbn_qp *qp)
 		dump_qp(qp, "remove from tree");
 		if (qp->listner) {
 			struct cbn_root_qp *qp_root = this_cpu_ptr(qp->listner->connections_root);
-			local_bh_disable();
+			//TODO: Consider get_cpu instead
+			//local_bh_disable();
+			get_cpu();
 			rb_erase(&qp->node, &qp_root->root);
-			local_bh_enable();
+			put_cpu();
+			//local_bh_enable();
 		}
 		/* else is legitamate in start_new_pending_connection
 		 */
@@ -106,6 +109,7 @@ static inline void get_qp(struct cbn_qp *qp)
 		dump_qp(qp, "IMPOSSIBLE VALUE");
 		break;
 	}
+	TRACE_PRINT("%s : (%p) %d", __FUNCTION__, qp, rc);
 }
 
 static inline unsigned int put_qp(struct cbn_qp *qp)
@@ -119,6 +123,7 @@ static inline unsigned int put_qp(struct cbn_qp *qp)
 			sock_release(qp->rx);
 		kmem_cache_free(qp_slab, qp);
 	}
+	TRACE_PRINT("%s : (%p) %d", __FUNCTION__, qp, rc);
 	return rc;
 }
 

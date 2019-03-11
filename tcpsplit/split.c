@@ -400,10 +400,6 @@ static inline void stop_sockets(void)
 }
 
 #define VEC_SZ 16
-/*
- * Warning: Possible race condition, if first thread enters and exits on some error
- * before increasing the refcount. Second will panic using released qp context.
- * */
 int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 {
 	struct kvec kvec[VEC_SZ];
@@ -424,9 +420,15 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 	do {
 		struct msghdr msg = { 0 };
 		if ((rc = kernel_recvmsg(sock->rx, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
+			TRACE_PRINT("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
+					dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 			if (put_qp(qp)) {
-				kernel_sock_shutdown(sock->tx, SHUT_RDWR);
+				//FIXME: Add per QP lock for shutdown sync.
+				//TOCTOU bug on sock_shutdown
+				//kernel_sock_shutdown(sock->tx, SHUT_RDWR);
+				//kernel_sock_shutdown(sock->rx, SHUT_RDWR);
 				//sock-sk + sk_wake_async if shutdown fails.
+				sk_wake_async(sock->tx->sk, SOCK_WAKE_URG, POLL_HUP);
 			}
 			goto err;
 		}
@@ -436,8 +438,12 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 				dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 		//use kern_sendpage if flags needed.
 		if ((rc = kernel_sendmsg(sock->tx, &msg, kvec, VEC_SZ, rc)) <= 0) {
+			TRACE_PRINT("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
+					dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 			if (put_qp(qp)) {
-				kernel_sock_shutdown(sock->rx, SHUT_RDWR);
+				sk_wake_async(sock->rx->sk, SOCK_WAKE_URG, POLL_HUP);
+				//kernel_sock_shutdown(sock->rx, SHUT_RDWR);
+				//kernel_sock_shutdown(sock->tx, SHUT_RDWR);
 			}
 			goto err;
 		}
@@ -631,11 +637,11 @@ int start_new_connection_syn(void *arg)
 	}
 
 	qp->tx = tx;
+	tx = NULL;
 connect_fail:
 
 	//TRACE_PRINT("%s qp %p listner %p mark %d", __FUNCTION__, qp, listner, addresses->mark);
 	kmem_cache_free(syn_slab, addresses);
-
 	if (wait_qp_ready(qp, TX_QP))
 		goto out;
 
@@ -643,7 +649,6 @@ connect_fail:
 	sockets.tx = (struct socket *)qp->rx;
 	sockets.rx = (struct socket *)qp->tx;
 	sockets.dir = 1;
-	tx = NULL;
 	if (unlikely(IS_ERR_OR_NULL((struct socket *)qp->rx) || IS_ERR_OR_NULL((struct socket *)qp->tx))) {
 		TRACE_ERROR("One of QP the dirs is NULL! <%p,%p>", qp->rx, qp->tx);
 		put_qp(qp);
@@ -654,6 +659,7 @@ connect_fail:
 
 out:
 	if (tx) {
+		TRACE_PRINT("RELEASING SOCK!");
 		sock_release(tx);
 	}
 
@@ -770,11 +776,13 @@ out:
 	rc = line = 0;
 
 create_fail:
-	if (rx) /* Will happen only on Connection fail:
+	if (rx)  {/* Will happen only on Connection fail:
 		   1. PANIC: When Wait QP fails, socket released and unmatched peer crushes. - see how qp_get/put api could be used, consider states and GC.
 		   2. TOCTOU BUG is possible culptit, not the same as desirebd as the check always turns our with NULL - Rechek qp_exists.
 		   */
+		TRACE_PRINT("RELEASING SOCK!");
 		sock_release(rx);
+	}
 	if (rc)
 		TRACE_PRINT("out [%d - %d]", rc, ++line);
 	DUMP_TRACE

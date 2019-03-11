@@ -179,7 +179,7 @@ static int prealloc_connection(void *arg)
 	PRECONN_PRINT("connection to "TCP4, TCP4N(&qp->addr_d, ntohs(qp->port_d)));
 	line = __LINE__;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
-		goto out;
+		goto connect_fail;
 
 	addresses->mark = CBN_CORE_ROUTE_MARK;
 
@@ -203,17 +203,16 @@ static int prealloc_connection(void *arg)
 	qp->rx = NULL;
 
 	line = __LINE__;
-	if (!add_preconn_qp(qp, &preconn_root)) {
-		//TODO: manage QP in case of failure
-		goto out;
-	}
+	rc = add_preconn_qp(qp, &preconn_root);
 
 connect_fail:
-	/*TODO: is this legit? put QP?*/
-	sock_release(tx);
-out:
-	if (rc)
+	if (rc) {
 		PRECONN_ERR ("pre-connection out %s <%d @ %d>", __FUNCTION__, rc, line);
+		if (tx) {
+			TRACE_PRINT("RELEASING SOCK!");
+			sock_release(tx);
+		}
+	}
 	return rc;
 }
 
@@ -238,7 +237,7 @@ static int start_half_duplex(void *arg)
 {
 	void **args = arg;
 
-	PRECONN_DEBUG("starting half duplex");
+	PRECONN_PRINT("starting half duplex");
 	half_duplex(args[0], args[1]);
 	PRECONN_PRINT("Going out... waking pair");
 	return 0;
@@ -315,9 +314,9 @@ static int start_new_pending_connection(void *arg)
 	ptr_pair[0] = &sockets_tx;
 	ptr_pair[1] = qp;
 	get_qp(qp);
+	get_qp(qp);
 	kthread_pool_run(&cbn_pool, start_half_duplex, ptr_pair);
 
-	get_qp(qp);
 	PRECONN_DEBUG("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
 
