@@ -2,6 +2,7 @@
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include "lib/magazine.h"
+#include "cbn_common.h"
 
 #ifndef assert
 #define assert(expr) 	do { \
@@ -133,6 +134,7 @@ void *mag_alloc_elem(struct mag_allocator *allocator)
 
 	if (unlikely(mag_pair_count(pair) == 0 )) {
 		/*may fail, it's ok.*/
+		TRACE_PRINT("MAG: %s| pair %p [%d:%d] :: %d", __FUNCTION__, pair, smp_processor_id(), in_softirq() ? 1 : 0, mag_pair_count(pair));
 		mag_allocator_switch_empty(allocator, pair);
 	}
 
@@ -149,6 +151,7 @@ void mag_free_elem(struct mag_allocator *allocator, void *elem)
 
 	/* If both mags are full */
 	if (unlikely(mag_pair_count(pair) == (MAG_DEPTH << 1))) {
+		TRACE_PRINT("MAG: %s| pair %p [%d:%d] :: %d", __FUNCTION__, pair, smp_processor_id(), in_softirq() ? 1 : 0, mag_pair_count(pair));
 		mag_allocator_switch_full(allocator, pair);
 	}
 	put_cpu();

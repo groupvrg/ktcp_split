@@ -44,7 +44,7 @@ static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 
 	if (unlikely(!pre_conn_list || list_empty(pre_conn_list))) {
 		PRECONN_PRINT("preconn pool is empty! "TCP4", spawning refill...\n", TCP4N(&next_hop_ip, PRECONN_SERVER_PORT));
-		//watremark here...
+		// REPLACE with refill task and magazine: watremark here...
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		return NULL;

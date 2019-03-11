@@ -8,8 +8,8 @@
 #include "tcp_split.h"	//kthread_bind define
 #include "thread_pool.h"
 
-#define POOL_PRINT(...)
-//#define POOL_PRINT TRACE_PRINT
+//#define POOL_PRINT(...)
+#define POOL_PRINT TRACE_PRINT
 #define POOL_ERR TRACE_PRINT
 
 #define cbn_list_del(x) {POOL_PRINT("list_del(%d:%s): %p {%p, %p}", __LINE__, current->comm, x, (x)->next, (x)->prev); list_del((x));}
@@ -53,12 +53,12 @@ static int (*threadfn)(void *data) = pipe_loop_task;
 
 static inline void refill_pool(struct kthread_pool *cbn_pool)
 {
-	int top_count = atomic_read(&cbn_pool->top_count);
 	int count = (cbn_pool->pool_size - (cbn_pool->allocator.full_count << 2));
 
-	POOL_PRINT("pool %p count %d", cbn_pool, count);
+	POOL_PRINT("pool %p count %d[%d]", cbn_pool, count, cbn_pool->pool_size);
 	count = (count < 0) ? 0 : count;
 	while (count--) {
+		int top_count;
 		struct task_struct *k;
 		struct pool_elem *elem = kmem_cache_alloc(cbn_pool->pool_slab, GFP_ATOMIC);
 		if (unlikely(!elem)) {
@@ -66,6 +66,7 @@ static inline void refill_pool(struct kthread_pool *cbn_pool)
 			return;
 		}
 
+		top_count = atomic_read(&cbn_pool->top_count);
 		k = kthread_create(threadfn, elem, "pool-th-%d", top_count);
 
 		if (unlikely(!k)) {
@@ -79,7 +80,7 @@ static inline void refill_pool(struct kthread_pool *cbn_pool)
 		elem->pool_task = NULL;
 		mag_free_elem(&cbn_pool->allocator, elem);
 		//TODO: change to atomic
-		POOL_PRINT("pool thread %d [%p] allocated %llx", top_count, elem, rdtsc());
+		POOL_PRINT("pool thread %d [%p]", top_count, elem);
 		atomic_inc(&cbn_pool->top_count);
 	}
 }

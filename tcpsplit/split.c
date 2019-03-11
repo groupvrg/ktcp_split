@@ -756,13 +756,13 @@ static int start_new_connection(void *arg)
 	sockets.tx = (struct socket *)qp->tx;
 	sockets.rx = (struct socket *)qp->rx;
 	sockets.dir = 0;
-	rx = NULL;
 	if (IS_ERR_OR_NULL((struct socket *)(qp->rx)) || IS_ERR_OR_NULL((struct socket *)qp->tx))
 		goto out;
 
 	TRACE_PRINT("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	half_duplex(&sockets, qp);
 out:
+	rx = NULL;
 	TRACE_PRINT(" Closing [L] "TCP4" => "TCP4" (%d)", TCP4N(&cli_addr.sin_addr, ntohs(cli_addr.sin_port)),
 						TCP4N(&addr.sin_addr, ntohs(addr.sin_port)), mark);
 	/* Teardown */
