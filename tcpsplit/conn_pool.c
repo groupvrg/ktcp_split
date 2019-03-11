@@ -237,9 +237,9 @@ static int start_half_duplex(void *arg)
 {
 	void **args = arg;
 
-	PRECONN_PRINT("starting half duplex");
+	PRECONN_DEBUG("starting half duplex");
 	half_duplex(args[0], args[1]);
-	PRECONN_PRINT("Going out... waking pair");
+	PRECONN_DEBUG("Going out... waking pair");
 	return 0;
 }
 

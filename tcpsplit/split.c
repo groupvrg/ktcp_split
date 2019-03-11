@@ -420,8 +420,10 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 	do {
 		struct msghdr msg = { 0 };
 		if ((rc = kernel_recvmsg(sock->rx, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
-			TRACE_PRINT("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
+			TRACE_DEBUG("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
 					dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
+			put_qp(qp);
+			/*
 			if (put_qp(qp)) {
 				//FIXME: Add per QP lock for shutdown sync.
 				//TOCTOU bug on sock_shutdown
@@ -430,6 +432,7 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 				//sock-sk + sk_wake_async if shutdown fails.
 				//sk_wake_async(sock->tx->sk, SOCK_WAKE_URG, POLL_HUP);
 			}
+			*/
 			goto err;
 		}
 		bytes += rc;
@@ -441,12 +444,14 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 		if ((rc = kernel_sendmsg(sock->tx, &msg, kvec, VEC_SZ, rc)) <= 0) {
 			TRACE_PRINT("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
 					dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
+			put_qp(qp);
+			/*
 			if (put_qp(qp)) {
-				TRACE_PRINT("Well, wtf? do I do now?");
 				//sk_wake_async(sock->rx->sk, SOCK_WAKE_URG, POLL_HUP);
 				kernel_sock_shutdown(sock->rx, SHUT_RDWR);
 				//kernel_sock_shutdown(sock->tx, SHUT_RDWR);
 			}
+			*/
 			goto err;
 		}
 		id ^= 1;

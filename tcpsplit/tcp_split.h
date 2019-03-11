@@ -65,6 +65,7 @@ struct cbn_qp {
 	struct cbn_listner 	*listner;
 	struct list_head 	list;
 	wait_queue_head_t	wait;
+	spinlock_t 		lock;
 	union {
 		struct {
 			struct socket	*tx;
@@ -87,7 +88,7 @@ static inline void get_qp(struct cbn_qp *qp)
 {
 	int rc;
 	rc = atomic_inc_return(&qp->ref_cnt);
-	TRACE_PRINT("%s : (%p->[%p][%p]) %d", __FUNCTION__, qp, qp->tx, qp->rx, rc);
+	TRACE_DEBUG("%s : (%p->[%p][%p]) %d", __FUNCTION__, qp, qp->tx, qp->rx, rc);
 	switch  (rc) {
 	case 2:
 		dump_qp(qp, "remove from tree");
@@ -104,6 +105,7 @@ static inline void get_qp(struct cbn_qp *qp)
 		 */
 		/*Intentional falltrough */
 	case 1:
+		spin_lock_init(&qp->lock);
 		break;
 	default:
 		TRACE_ERROR("Impossible QP refcount %d", rc);
@@ -115,6 +117,12 @@ static inline void get_qp(struct cbn_qp *qp)
 static inline unsigned int put_qp(struct cbn_qp *qp)
 {
 	int rc;
+
+	/**
+	 * This whole section must to be atomic, due to enumerable TOCTOU(Race condition) issues...
+	 *	spin_lock is enough irq/bh contexts dont work with QPs.
+	 */
+	spin_lock(&qp->lock);
 	if (! (rc = atomic_dec_return(&qp->ref_cnt))) {
 		//TODO: Consider adding a tree for active QPs + States.
 		if (qp->tx)
@@ -122,8 +130,14 @@ static inline unsigned int put_qp(struct cbn_qp *qp)
 		if (qp->rx)
 			sock_release(qp->rx);
 		kmem_cache_free(qp_slab, qp);
+	} else {
+		if (qp->tx)
+			kernel_sock_shutdown(qp->tx, SHUT_RDWR);
+		if (qp->rx)
+			kernel_sock_shutdown(qp->rx, SHUT_RDWR);
 	}
-	TRACE_PRINT("%s : (%p->[%p][%p]) %d", __FUNCTION__, qp, qp->tx, qp->rx, rc);
+	spin_unlock(&qp->lock);
+	TRACE_DEBUG("%s : (%p->[%p][%p]) %d", __FUNCTION__, qp, qp->tx, qp->rx, rc);
 	return rc;
 }
 
