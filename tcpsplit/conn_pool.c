@@ -207,9 +207,8 @@ static int prealloc_connection(void *arg)
 
 connect_fail:
 	if (rc) {
-		PRECONN_ERR ("pre-connection out %s <%d @ %d>", __FUNCTION__, rc, line);
+		PRECONN_PRINT("pre-connection out %s <%d @ %d>", __FUNCTION__, rc, line);
 		if (tx) {
-			TRACE_PRINT("RELEASING SOCK!");
 			sock_release(tx);
 		}
 	}
@@ -397,13 +396,8 @@ int start_probe_syn(void *arg)
 	msg.msg_namelen = sizeof(struct sockaddr_in);
 	msg.msg_name = &addr;
 
-	if ((rc = kernel_sendmsg(probe->listner->raw, &msg, kvec, 2,
-				  sizeof(struct tcphdr) +
-				  sizeof(struct iphdr))) <= 0) {
-		/* FIXME: -1 will return if next dev is not gue+*/
-		PRECONN_DEBUG("Failed to send next hop %d\n", rc);
-	}
-
+	rc = kernel_sendmsg(probe->listner->raw, &msg, kvec, 2,
+				sizeof(struct tcphdr) + sizeof(struct iphdr));
 	/* tcphdr & iphdr already copied...*/
 	kmem_cache_free(probe_slab, probe);
 
