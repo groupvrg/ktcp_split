@@ -605,23 +605,23 @@ int start_new_connection_syn(void *arg)
 			addresses->mark);
 
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
-		TRACE_ERROR("RC = %d", rc);
+		TRACE_ERROR("RC = %d (%d)", rc, __LINE__);
 		goto connect_fail;
 	}
 
 	if ((rc = kernel_setsockopt(tx, SOL_TCP, TCP_NODELAY, (char *)&T, sizeof(T))) < 0) {
-		TRACE_ERROR("RC = %d", rc);
+		TRACE_ERROR("RC = %d (%d)", rc, __LINE__);
 		goto connect_fail;
 	}
 
 	if ((rc = kernel_setsockopt(tx, SOL_SOCKET, SO_MARK, (char *)&addresses->mark, sizeof(u32))) < 0) {
-		TRACE_ERROR("RC = %d", rc);
+		TRACE_ERROR("RC = %d (%d)", rc, __LINE__);
 		goto connect_fail;
 	}
 
 	if (ip_transparent) {
 		if ((rc = kernel_setsockopt(tx, SOL_IP, IP_TRANSPARENT, (char *)&T, sizeof(int)))) {
-			TRACE_ERROR("RC = %d", rc);
+			TRACE_ERROR("RC = %d (%d)", rc, __LINE__);
 			goto connect_fail;
 		}
 
@@ -631,7 +631,7 @@ int start_new_connection_syn(void *arg)
 		//		ntohs(addresses->src.sin_port), IP4N(&addresses->src.sin_addr),
 		//		addresses->mark);
 		if ((rc = kernel_bind(tx, (struct sockaddr *)&addresses->src, sizeof(struct sockaddr)))) {
-			TRACE_ERROR("RC = %d", rc);
+			TRACE_ERROR("RC = %d (%d)", rc, __LINE__);
 			goto connect_fail;
 		} else {
 			TRACE_DEBUG("[R]Bound to "TCP4, TCP4N(&addresses->src.sin_addr, 0));
@@ -640,33 +640,32 @@ int start_new_connection_syn(void *arg)
 
 	addresses->dest.sin_family = AF_INET;
 	if ((rc = kernel_connect(tx, (struct sockaddr *)&addresses->dest, sizeof(struct sockaddr), 0))) {
-		TRACE_ERROR("RC = %d", rc);
+		TRACE_ERROR("RC = %d (%d)", rc, __LINE__);
 		goto connect_fail;
 	}
 
 	qp->tx = tx;
 	tx = NULL;
-connect_fail:
 
 	//TRACE_PRINT("%s qp %p listner %p mark %d", __FUNCTION__, qp, listner, addresses->mark);
 	kmem_cache_free(syn_slab, addresses);
 	if (wait_qp_ready(qp, TX_QP))
-		goto out;
+		goto connect_fail;
 
 	DUMP_TRACE
 	sockets.tx = (struct socket *)qp->rx;
 	sockets.rx = (struct socket *)qp->tx;
 	sockets.dir = 1;
 	if (unlikely(IS_ERR_OR_NULL((struct socket *)qp->rx) || IS_ERR_OR_NULL((struct socket *)qp->tx))) {
-		TRACE_ERROR("One of QP the dirs is NULL! <%p,%p>", qp->rx, qp->tx);
+		TRACE_ERROR("One of the QP dirs is NULL! <%p,%p>", qp->rx, qp->tx);
 		put_qp(qp);
-		goto out;
+		goto connect_fail;
 	}
 	TRACE_DEBUG("starting half duplex %d", atomic_read(&qp->ref_cnt));
 	rc = half_duplex(&sockets, qp);
 
-out:
-	if (tx) {
+connect_fail:
+	if ( ! IS_ERR_OR_NULL(tx)) {
 		TRACE_PRINT("RELEASING SOCK!");
 		sock_release(tx);
 	}

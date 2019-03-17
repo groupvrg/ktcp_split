@@ -401,7 +401,7 @@ int start_probe_syn(void *arg)
 				  sizeof(struct tcphdr) +
 				  sizeof(struct iphdr))) <= 0) {
 		/* FIXME: -1 will return if next dev is not gue+*/
-		PRECONN_ERR("Failed to send next hop %d\n", rc);
+		PRECONN_DEBUG("Failed to send next hop %d\n", rc);
 	}
 
 	/* tcphdr & iphdr already copied...*/
