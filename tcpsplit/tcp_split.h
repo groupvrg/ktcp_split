@@ -119,12 +119,13 @@ static inline unsigned int put_qp(struct cbn_qp *qp)
 	int rc;
 
 	/**
-	 * This whole section must to be atomic, due to enumerable TOCTOU(Race condition) issues...
+	 * TODO: This whole section must to be atomic, due to enumerable TOCTOU(Race condition) issues...
 	 *	spin_lock is enough irq/bh contexts dont work with QPs.
 	 */
-	spin_lock(&qp->lock);
+	//spin_lock(&qp->lock);
 	if (! (rc = atomic_dec_return(&qp->ref_cnt))) {
 		//TODO: Consider adding a tree for active QPs + States.
+		//TODO: Add waitqueue here...
 		if (qp->tx)
 			sock_release(qp->tx);
 		if (qp->rx)
@@ -136,7 +137,7 @@ static inline unsigned int put_qp(struct cbn_qp *qp)
 		if (qp->rx)
 			kernel_sock_shutdown(qp->rx, SHUT_RDWR);
 	}
-	spin_unlock(&qp->lock);
+	//spin_unlock(&qp->lock);
 	TRACE_DEBUG("%s : (%p->[%p][%p]) %d", __FUNCTION__, qp, qp->tx, qp->rx, rc);
 	return rc;
 }
