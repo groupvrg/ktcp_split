@@ -505,6 +505,7 @@ inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 {
 	int err = 0;
+	struct cbn_root_qp *qp_root = this_cpu_ptr(qp->listner->connections_root);
 
 	/*
 	 * You shouldnt be here unless your dir sock is valid.
@@ -515,6 +516,7 @@ inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 		/*should return non zero*/
 		dump_qp(qp, "waiting for peer");
 		get_qp(qp);
+		/*IMPORTANT: Make sure core doesnt change - may mess up other core root!!!*/
 		rc = wait_event_interruptible_timeout(qp->wait,
 							!IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]),
 						       	QP_TO * HZ);
