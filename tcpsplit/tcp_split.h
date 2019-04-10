@@ -1,6 +1,7 @@
 #ifndef __CBN_DATAPATH_H__
 #define __CBN_DATAPATH_H__
 
+#include <linux/percpu-rwsem.h>
 #include "cbn_common.h"
 
 #define QP_TO			90
@@ -38,6 +39,7 @@ struct cbn_root_qp {
 struct cbn_listner {
 	struct rb_node 	node;
 	struct cbn_root_qp __percpu *connections_root; /* per core variable, sane goes for lock*/
+	struct percpu_rw_semaphore rb_lock;
 	int32_t		key; //tid
 	uint16_t	port;
 	uint16_t	status;

@@ -24,7 +24,7 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Markuze Alex");
 MODULE_DESCRIPTION("CBN TCP Split Module");
 
-#define BACKLOG     64
+#define BACKLOG     128
 
 static int pool_size = 0;
 module_param(pool_size, int, 0);
@@ -479,7 +479,7 @@ inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 	struct cbn_qp *qp = pqp;
 	struct cbn_root_qp *qp_root = this_cpu_ptr(qp->listner->connections_root);
 
-	if ((qp = add_rb_data(&qp_root->root, pqp))) {
+	if ((qp = add_rb_data(&qp_root->root, pqp, &qp->listner->rb_lock))) {
 		/* QP already exists */
 		if (qp->qp_dir[dir] != NULL) {
 			/* *
@@ -801,17 +801,22 @@ create_fail:
 
 static inline struct cbn_listner *register_server_sock(uint32_t tid, struct socket *sock)
 {
-	int cpu;
+	int cpu, err;
 	struct cbn_listner *server = kmem_cache_alloc(listner_slab, GFP_KERNEL);
 	if (!server)
 		return NULL;
 
 	server->connections_root = alloc_reserved_percpu(struct cbn_root_qp);
-	if (!server->connections_root) {
+	if (unlikely( ! server->connections_root)) {
+		TRACE_ERROR("Failed to register listner %u [%d]", tid, -ENOMEM);
 		kmem_cache_free(listner_slab, server);
 		return NULL;
 	}
-
+	if (unlikely(err = percpu_init_rwsem(&server->rb_lock))) {
+		TRACE_ERROR("Failed to register listner %u [%d]", tid, err);
+		kmem_cache_free(listner_slab, server);
+		return NULL;
+	}
 	for_each_possible_cpu(cpu) {
 		struct cbn_root_qp *root = per_cpu_ptr(server->connections_root, cpu);
 
