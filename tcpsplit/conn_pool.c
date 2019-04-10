@@ -35,18 +35,27 @@ static struct kmem_cache *preconn_slab;
 static struct rb_root preconn_root = RB_ROOT;
 rwlock_t preconn_root_lock;
 
+static int prealloc_connection(void *arg);
 static int prealloc_connection_pool(void *arg)
 {
 	int cpu;
+	long ip = (long) arg;
+	struct cbn_preconnection *preconn = search_rb_preconn(&preconn_root, ip, &preconn_root_lock);
 
 	for_each_possible_cpu(cpu) {
 		int i = 0;
-		struct percpu_list *pcpl = per_cpu_ptr(preconn->pcp_list, cpu);
+		int len = 0;
 
-		if (pcpl->len < PER_CORE_POOL_MIN)
+		if (preconn) {
+			struct percpu_list *pcpl = per_cpu_ptr(preconn->pcp_list, cpu);
+			len = pcpl->len;
+		}
+
+		if (len < PER_CORE_POOL_MIN)
 			for (;i < PER_CORE_POOL_MIN; i++)
-				kthread_pool_run_cpu(&cbn_pool, prealloc_connection, (void *)arg, cpu);
+				kthread_pool_run_cpu(&cbn_pool, prealloc_connection, arg, cpu);
 	}
+	return 0;
 }
 
 static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
@@ -64,7 +73,6 @@ static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 
 	if (unlikely(!pre_conn_list || list_empty(pre_conn_list))) {
 		PRECONN_PRINT("preconn pool is empty! "TCP4", spawning refill...\n", TCP4N(&next_hop_ip, PRECONN_SERVER_PORT));
-		// REPLACE with refill task and magazine: watremark here...
 		kthread_pool_run(&cbn_pool, prealloc_connection_pool, (void *)next_hop_ip);
 		return NULL;
 	}
