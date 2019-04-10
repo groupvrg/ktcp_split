@@ -282,7 +282,7 @@ static int start_new_pending_connection(void *arg)
 	if (ip_transparent) {
 		if ((rc = kernel_setsockopt(tx, SOL_IP, IP_TRANSPARENT, (char *)&optval, sizeof(int))))
 			goto connect_fail;
-		/*TODO: set src port to 0*/
+
 		line = __LINE__;
 		addresses->src.sin_family = AF_INET;
 		addresses->src.sin_port = 0;
@@ -299,8 +299,6 @@ static int start_new_pending_connection(void *arg)
 		goto connect_fail;
 
 	qp->tx = tx;
-
-	TRACE_LINE();
 
 	sockets_rx.tx = (struct socket *)qp->rx;
 	sockets_rx.rx = (struct socket *)qp->tx;

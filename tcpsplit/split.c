@@ -505,12 +505,11 @@ inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 {
 	int err = 0;
-	struct cbn_root_qp *qp_root = this_cpu_ptr(qp->listner->connections_root);
-
 	/*
 	 * You shouldnt be here unless your dir sock is valid.
 	 * TODO: TOCTOU bug ahead.
 	 * */
+
 	if (IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1])) {
 		int rc;
 		/*should return non zero*/
@@ -521,8 +520,16 @@ inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 							!IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]),
 						       	QP_TO * HZ);
 		if (!rc) {
-			TRACE_PRINT("ERROR: TIMEOUT %d (%s)", rc, (IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]) ? "ERR/NULL" : "EXISTS!!"));
-			de_tree_qp(&qp->node, &qp_root->root, &qp->listner->rb_lock);
+			TRACE_PRINT("ERROR: TIMEOUT %d (%s)", rc,
+					(IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1])
+					 ? "ERR/NULL" : "EXISTS!!"));
+			if (qp->listner) {
+				struct cbn_root_qp *qp_root =
+					this_cpu_ptr(qp->listner->connections_root);
+
+				de_tree_qp(&qp->node, &qp_root->root, &qp->listner->rb_lock);
+			}
+
 			put_qp(qp);
 			err = 1;
 		}

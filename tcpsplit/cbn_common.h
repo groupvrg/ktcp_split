@@ -25,7 +25,7 @@
 
 #define TRACE_DEBUG(fmt, ...)
 #define TRACE_LINE()
-#define TRACE_QP(...)
+//#define TRACE_QP(...)
 //#define TRACE_LINE() {	 trace_printk("%d:%s (%s)\n", __LINE__, __FUNCTION__, current->comm);/*___idx += sprintf(&___buff[___idx], "\n\t\t%s:%d", __FUNCTION__, __LINE__);*/ }
 
 //////////////////////// Switched TRACES

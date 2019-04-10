@@ -5,7 +5,8 @@ extern struct kmem_cache *qp_slab;
 
 inline void dump_qp(struct cbn_qp *qp, const char *str)
 {
-	TRACE_QP("<%s> %s :QP %p: "TCP4" => "TCP4, __FUNCTION__, str, qp,
+	TRACE_QP("[cpu = %d]<%s> %s :QP %p: "TCP4" => "TCP4,
+			smp_processor_id(), __FUNCTION__, str, qp,
 			TCP4N(&qp->addr_s, ntohs(qp->port_s)),
 			TCP4N(&qp->addr_d, ntohs(qp->port_d)));
 }
