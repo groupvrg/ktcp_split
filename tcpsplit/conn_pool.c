@@ -111,7 +111,7 @@ int start_new_pre_connection_syn(void *arg)
 	struct sockets sockets;
 
 	line = __LINE__;
-	qp = alloc_prexeisting_conn(addresses->sin_addr.s_addr);
+	qp = NULL;//alloc_prexeisting_conn(addresses->sin_addr.s_addr);
 	if (!qp) {
 		start_new_connection_syn(arg);
 		goto out;
