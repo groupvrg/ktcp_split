@@ -30,7 +30,10 @@ extern struct rb_root listner_root;
 static struct list_head pre_conn_list_server;
 static struct list_head pre_conn_list_client;
 static struct kmem_cache *preconn_slab;
+
+//This is shared between tennats.
 static struct rb_root preconn_root = RB_ROOT;
+rwlock_t preconn_root_lock;
 
 static int prealloc_connection(void *arg);
 
@@ -39,14 +42,13 @@ static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 	struct cbn_qp *elem;
 	struct list_head *pre_conn_list;
 	unsigned long next_hop_ip = ip;
-	struct cbn_preconnection *preconn = search_rb_preconn(&preconn_root, ip);
+	struct cbn_preconnection *preconn = search_rb_preconn(&preconn_root, ip, &preconn_root_lock);
 
 	pre_conn_list = (preconn) ? &preconn->list : NULL;
 
 	if (unlikely(!pre_conn_list || list_empty(pre_conn_list))) {
 		PRECONN_PRINT("preconn pool is empty! "TCP4", spawning refill...\n", TCP4N(&next_hop_ip, PRECONN_SERVER_PORT));
 		// REPLACE with refill task and magazine: watremark here...
-		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		return NULL;
 	}
@@ -149,7 +151,7 @@ static inline void fill_preconn_address(__be32 ip, struct addresses *addresses)
 
 static inline int add_preconn_qp(struct cbn_qp *qp, struct rb_root *root)
 {
-	struct cbn_preconnection *precon  = get_rb_preconn(root, qp->addr_d.s_addr,
+	struct cbn_preconnection *precon  = get_rb_preconn(root, qp->addr_d.s_addr, &preconn_root_lock,
 								preconn_slab, GFP_KERNEL);
 	if (unlikely(!precon)) {
 		PRECONN_ERR("Failed to alloc memory for preconn "IP4, IP4N(&qp->addr_d));
@@ -515,8 +517,11 @@ void preconn_write_cb(int *array)
 int __init cbn_pre_connect_init(void)
 {
 	long port = PRECONN_SERVER_PORT;
+	//TODO: WHAT AM I DOING WITH THESE?!
 	INIT_LIST_HEAD(&pre_conn_list_client);
 	INIT_LIST_HEAD(&pre_conn_list_server);
+
+	rwlock_init(&preconn_root_lock);
 
 	preconn_slab = kmem_cache_create("cbn_preconn_slab",
 					 sizeof(struct cbn_preconnection), 0, 0, NULL);

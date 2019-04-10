@@ -11,10 +11,12 @@ struct cbn_preconnection {
 	int32_t			key;
 };
 
-static inline struct cbn_preconnection *search_rb_preconn(struct rb_root *root, int32_t key)
+static inline struct cbn_preconnection *search_rb_preconn(struct rb_root *root,
+								int32_t key, rwlock_t *rw_lock)
 {
 	struct rb_node *node = root->rb_node;
 
+	read_lock(rw_lock);
 	while (node) {
 		struct cbn_preconnection *this = container_of(node, struct cbn_preconnection, node);
 
@@ -24,18 +26,21 @@ static inline struct cbn_preconnection *search_rb_preconn(struct rb_root *root, 
 			node = node->rb_left;
 		else if (result > 0)
 			node = node->rb_right;
-		else
+		else {
+			read_unlock(rw_lock);
 			return this;
+		}
 	}
-
+	read_unlock(rw_lock);
 	return NULL;
 }
 
-static inline struct cbn_preconnection *add_rb_preconn(struct rb_root *root,
+static inline struct cbn_preconnection *add_rb_preconn(struct rb_root *root, rwlock_t *rw_lock,
 							struct cbn_preconnection *data)
 {
 	struct rb_node **new = &(root->rb_node), *parent = NULL;
 
+	write_lock(rw_lock);
 	while (*new) {
 		struct cbn_preconnection *this = container_of(*new, struct cbn_preconnection, node);
 		int32_t result = data->key - this->key;
@@ -45,23 +50,26 @@ static inline struct cbn_preconnection *add_rb_preconn(struct rb_root *root,
 			new = &((*new)->rb_left);
 		else if (result > 0)
 			new = &((*new)->rb_right);
-		else
+		else {
+			write_unlock(rw_lock);
 			return this; //Return the duplicat
+		}
 	}
 
 	/* Add new node and rebalance tree. */
 	rb_link_node(&data->node, parent, new);
 	rb_insert_color(&data->node, root);
 
+	write_unlock(rw_lock);
 	return NULL;
 }
 /*
  * TODO: R/W lock will be needed.
  * */
-static inline struct cbn_preconnection *get_rb_preconn(struct rb_root *root, int32_t key,
+static inline struct cbn_preconnection *get_rb_preconn(struct rb_root *root, int32_t key,  rwlock_t *rw_lock,
 							struct kmem_cache *cache, gfp_t flags)
 {
-	struct cbn_preconnection *preconn = search_rb_preconn(root, key);
+	struct cbn_preconnection *preconn = search_rb_preconn(root, key, rw_lock);
 	if (likely(preconn)) {
 		return preconn;
 	}
@@ -72,7 +80,7 @@ static inline struct cbn_preconnection *get_rb_preconn(struct rb_root *root, int
 
 	preconn->key = key;
 	INIT_LIST_HEAD(&preconn->list);
-	if (add_rb_preconn(root, preconn)) {
+	if (add_rb_preconn(root, rw_lock, preconn)) {
 		TRACE_ERROR("%s found a duplicate\n", __FUNCTION__);
 		kmem_cache_free(cache, preconn);
 		return NULL;
