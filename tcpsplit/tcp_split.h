@@ -128,15 +128,15 @@ static inline unsigned int put_qp(struct cbn_qp *qp)
 	if (! (rc = atomic_dec_return(&qp->ref_cnt))) {
 		//TODO: Consider adding a tree for active QPs + States.
 		//TODO: Add waitqueue here...
-		if (qp->tx)
+		if (!IS_ERR_OR_NULL(qp->tx))
 			sock_release(qp->tx);
-		if (qp->rx)
+		if (!IS_ERR_OR_NULL(qp->rx))
 			sock_release(qp->rx);
 		kmem_cache_free(qp_slab, qp);
 	} else {
-		if (qp->tx)
+		if (!IS_ERR_OR_NULL(qp->tx))
 			kernel_sock_shutdown(qp->tx, SHUT_RDWR);
-		if (qp->rx)
+		if (!IS_ERR_OR_NULL(qp->rx))
 			kernel_sock_shutdown(qp->rx, SHUT_RDWR);
 	}
 	//spin_unlock(&qp->lock);
