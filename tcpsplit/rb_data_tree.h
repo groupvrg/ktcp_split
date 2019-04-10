@@ -32,6 +32,7 @@ static inline struct cbn_qp *search_rb_data(struct rb_root *root, char *string)
 static inline void de_tree_qp(struct rb_node *node, struct rb_root *root,
 					struct percpu_rw_semaphore *sem)
 {
+	unsigned long flags;
 	local_irq_save(flags);
 	percpu_down_write(sem);
 
