@@ -520,6 +520,7 @@ inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 						       	QP_TO * HZ);
 		if (!rc) {
 			TRACE_PRINT("ERROR: TIMEOUT %d (%s)", rc, (IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1]) ? "ERR/NULL" : "EXISTS!!"));
+			de_tree_qp(&qp->node, &qp_root->root, &qp->listner->rb_lock);
 			put_qp(qp);
 			err = 1;
 		}

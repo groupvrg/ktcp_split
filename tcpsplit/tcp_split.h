@@ -96,12 +96,8 @@ static inline void get_qp(struct cbn_qp *qp)
 		dump_qp(qp, "remove from tree");
 		if (qp->listner) {
 			struct cbn_root_qp *qp_root = this_cpu_ptr(qp->listner->connections_root);
-			//TODO: Consider get_cpu instead
-			//local_bh_disable();
-			get_cpu();
-			rb_erase(&qp->node, &qp_root->root);
-			put_cpu();
-			//local_bh_enable();
+
+			de_tree_qp(&qp->node, &qp_root->root, &qp->listner->rb_lock);
 		}
 		/* else is legitamate in start_new_pending_connection
 		 */
