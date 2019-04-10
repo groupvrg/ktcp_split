@@ -5,11 +5,33 @@
 #include <linux/types.h> //atomic_t
 #include "cbn_common.h"
 
-struct cbn_preconnection {
-	struct rb_node		node;
-	struct list_head 	list;
-	int32_t			key;
+struct percpu_list {
+	struct list_head 		list;
+	uint32_t 			len;
 };
+
+struct cbn_preconnection {
+	struct rb_node			node;
+	struct percpu_list __percpu	*pcp_list;
+	int32_t				key;
+};
+
+static inline int init_preconn(struct cbn_preconnection *preconn, int32_t key)
+{
+	int cpu;
+
+	preconn->key = key;
+	preconn->pcp_list = alloc_reserved_percpu(struct percpu_list);
+	if (!preconn->pcp_list)
+		return -ENOMEM;
+
+	for_each_possible_cpu(cpu) {
+		struct percpu_list *pcpl = per_cpu_ptr(preconn->pcp_list, cpu);
+		INIT_LIST_HEAD(&pcpl->list);
+		pcpl->len = 0;
+	}
+	return 0;
+}
 
 static inline struct cbn_preconnection *search_rb_preconn(struct rb_root *root,
 								int32_t key, rwlock_t *rw_lock)
@@ -73,13 +95,14 @@ static inline struct cbn_preconnection *get_rb_preconn(struct rb_root *root, int
 	if (likely(preconn)) {
 		return preconn;
 	}
-	preconn = kmem_cache_alloc(cache, flags);
 
+	preconn = kmem_cache_alloc(cache, flags);
 	if (unlikely(!preconn))
 		return NULL;
 
-	preconn->key = key;
-	INIT_LIST_HEAD(&preconn->list);
+	if (init_preconn(preconn, key))
+		kmem_cache_free(cache, preconn);
+
 	if (add_rb_preconn(root, rw_lock, preconn)) {
 		TRACE_ERROR("%s found a duplicate\n", __FUNCTION__);
 		kmem_cache_free(cache, preconn);

@@ -25,13 +25,16 @@ typedef void __percpu *(*alloc_percpu_func)(size_t , size_t);
 
 extern setaffinity_func psched_setaffinity;
 extern bind_mask_func  pkthread_bind_mask;
-extern alloc_percpu_func  p__alloc_reserved_per_cpu;
+extern alloc_percpu_func  p__alloc_reserved_percpu;
 
 #define sched_setaffinity(...)		(*psched_setaffinity)(__VA_ARGS__)
 #define kthread_bind_mask(...)		(*pkthread_bind_mask)(__VA_ARGS__)
 #define __alloc_reserved_percpu(...)	(*p__alloc_reserved_percpu)(__VA_ARGS__)
 #endif
 
+#define alloc_reserved_percpu(type)					\
+	(typeof(type) __percpu *)__alloc_reserved_percpu(sizeof(type),	\
+					__alignof__(type))
 struct cbn_root_qp {
 	struct rb_root root;
 };

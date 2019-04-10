@@ -805,9 +805,6 @@ create_fail:
 	DUMP_TRACE
 	return rc;
 }
-#define alloc_reserved_percpu(type)					\
-	(typeof(type) __percpu *)__alloc_reserved_percpu(sizeof(type),	\
-					__alignof__(type))
 
 static inline struct cbn_listner *register_server_sock(uint32_t tid, struct socket *sock)
 {

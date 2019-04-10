@@ -40,11 +40,15 @@ static int prealloc_connection(void *arg);
 static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 {
 	struct cbn_qp *elem;
-	struct list_head *pre_conn_list;
+	struct percpu_list *pcpl;
+	struct list_head *pre_conn_list = NULL;
 	unsigned long next_hop_ip = ip;
 	struct cbn_preconnection *preconn = search_rb_preconn(&preconn_root, ip, &preconn_root_lock);
 
-	pre_conn_list = (preconn) ? &preconn->list : NULL;
+	if (preconn) {
+		pcpl = this_cpu_ptr(preconn->pcp_list);
+		pre_conn_list = &pcpl->list;
+	}
 
 	if (unlikely(!pre_conn_list || list_empty(pre_conn_list))) {
 		PRECONN_PRINT("preconn pool is empty! "TCP4", spawning refill...\n", TCP4N(&next_hop_ip, PRECONN_SERVER_PORT));
@@ -52,9 +56,11 @@ static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 		kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 		return NULL;
 	}
-
+	preempt_disable();
 	elem = list_first_entry(pre_conn_list, struct cbn_qp, list);
+	pcpl->len--;
 	list_del(&elem->list);
+	preempt_enable();
 	kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
 	return elem;
 }
@@ -151,13 +157,18 @@ static inline void fill_preconn_address(__be32 ip, struct addresses *addresses)
 
 static inline int add_preconn_qp(struct cbn_qp *qp, struct rb_root *root)
 {
-	struct cbn_preconnection *precon  = get_rb_preconn(root, qp->addr_d.s_addr, &preconn_root_lock,
+	struct percpu_list *pcpl;
+	struct cbn_preconnection *preconn  = get_rb_preconn(root, qp->addr_d.s_addr, &preconn_root_lock,
 								preconn_slab, GFP_KERNEL);
-	if (unlikely(!precon)) {
+	if (unlikely(!preconn)) {
 		PRECONN_ERR("Failed to alloc memory for preconn "IP4, IP4N(&qp->addr_d));
 		return -1;
 	}
-	list_add(&qp->list, &precon->list);
+	pcpl = this_cpu_ptr(preconn->pcp_list);
+	preempt_disable();
+	list_add(&qp->list, &pcpl->list);
+	pcpl->len++;
+	preempt_enable();
 	return 0;
 }
 
