@@ -5,6 +5,8 @@
 #include <linux/types.h> //atomic_t
 #include "cbn_common.h"
 
+#define PER_CORE_POOL_MIN 4
+
 struct percpu_list {
 	struct list_head 		list;
 	uint32_t 			len;
