@@ -51,7 +51,7 @@ static int prealloc_connection_pool(void *arg)
 			len = pcpl->len;
 		}
 
-		if (len < PER_CORE_POOL_MIN)
+		if (len < PER_CORE_POOL_MAX)
 			for (;i < PER_CORE_POOL_MIN; i++)
 				kthread_pool_run_cpu(&cbn_pool, prealloc_connection, arg, cpu);
 	}
@@ -81,7 +81,7 @@ static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 	pcpl->len--;
 	list_del(&elem->list);
 	preempt_enable();
-	kthread_pool_run(&cbn_pool, prealloc_connection, (void *)next_hop_ip);
+	kthread_pool_run(&cbn_pool, prealloc_connection_pool, (void *)next_hop_ip);
 	return elem;
 }
 

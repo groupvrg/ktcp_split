@@ -6,6 +6,7 @@
 #include "cbn_common.h"
 
 #define PER_CORE_POOL_MIN 4
+#define PER_CORE_POOL_MAX 16
 
 struct percpu_list {
 	struct list_head 		list;
