@@ -80,6 +80,7 @@ static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 	elem = list_first_entry(pre_conn_list, struct cbn_qp, list);
 	pcpl->len--;
 	list_del(&elem->list);
+	PRECONN_PRINT("[%d]allocated %p from %p [%d]\n",smp_processor_id(),  elem, pre_conn_list, pcpl->len);
 	preempt_enable();
 	kthread_pool_run(&cbn_pool, prealloc_connection_pool, (void *)next_hop_ip);
 	return elem;
@@ -111,8 +112,9 @@ int start_new_pre_connection_syn(void *arg)
 	struct sockets sockets;
 
 	line = __LINE__;
-	qp = NULL;//alloc_prexeisting_conn(addresses->sin_addr.s_addr);
+	qp = alloc_prexeisting_conn(addresses->sin_addr.s_addr);
 	if (!qp) {
+		PRECONN_PRINT("starting new connection...");
 		start_new_connection_syn(arg);
 		goto out;
 	}
@@ -130,7 +132,7 @@ int start_new_pre_connection_syn(void *arg)
 	}
 	qp->listner = listner;
 
-	PRECONN_PRINT("connection to "TCP4" from "TCP4,
+	PRECONN_DEBUG("connection to "TCP4" from "TCP4,
 			TCP4N(&qp->addr_d, ntohs(qp->port_d)), TCP4N(&qp->addr_s, ntohs(qp->port_s)));
 
 	tqp = qp_exists(qp, TX_QP);
@@ -209,7 +211,7 @@ static int prealloc_connection(void *arg)
 	qp->addr_d = addresses->dest.sin_addr;
 	qp->port_d = addresses->dest.sin_port;
 
-	PRECONN_PRINT("connection to "TCP4, TCP4N(&qp->addr_d, ntohs(qp->port_d)));
+	//PRECONN_PRINT("connection to "TCP4, TCP4N(&qp->addr_d, ntohs(qp->port_d)));
 	line = __LINE__;
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx)))
 		goto connect_fail;

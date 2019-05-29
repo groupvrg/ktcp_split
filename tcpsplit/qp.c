@@ -5,7 +5,7 @@ extern struct kmem_cache *qp_slab;
 
 inline void dump_qp(struct cbn_qp *qp, const char *str)
 {
-	TRACE_QP("[cpu = %d]<%s> %s :QP %p: "TCP4" => "TCP4,
+	TRACE_DEBUG("[cpu = %d]<%s> %s :QP %p: "TCP4" => "TCP4,
 			smp_processor_id(), __FUNCTION__, str, qp,
 			TCP4N(&qp->addr_s, ntohs(qp->port_s)),
 			TCP4N(&qp->addr_d, ntohs(qp->port_d)));
@@ -22,7 +22,7 @@ inline void get_qp(struct cbn_qp *qp)
 		if (qp->listner) {
 			struct cbn_root_qp *qp_root = this_cpu_ptr(qp->listner->connections_root);
 
-			de_tree_qp(&qp->node, &qp_root->root, &qp->listner->rb_lock);
+			de_tree_qp(&qp->node, &qp_root->root, &qp_root->rb_lock);
 		}
 		/* else is legitamate in start_new_pending_connection
 		 */
@@ -91,6 +91,7 @@ inline unsigned int qp2cpu(struct cbn_qp *qp)
 	i = (core/i) * i;
 
 	snprintf(str, 32, "core = %u, i = %u => %u", core, i, core - i);
+	TRACE_PRINT("%s", str);
 	dump_qp(qp, str);
 	return core - i;
 }

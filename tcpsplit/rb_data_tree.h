@@ -30,27 +30,24 @@ static inline struct cbn_qp *search_rb_data(struct rb_root *root, char *string)
 */
 
 static inline void de_tree_qp(struct rb_node *node, struct rb_root *root,
-					struct percpu_rw_semaphore *sem)
+				spinlock_t *lock)
 {
 	unsigned long flags;
-	local_irq_save(flags);
-	percpu_down_write(sem);
+	spin_lock_irqsave(lock, flags);
 
 	rb_erase(node, root);
 
-	percpu_up_write(sem);
-	local_irq_restore(flags);
+	spin_unlock_irqrestore(lock, flags);
 }
 
 static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *data,
-						struct percpu_rw_semaphore *sem)
+						spinlock_t *lock)
 {
 	struct rb_node **new = &(root->rb_node), *parent = NULL;
 	unsigned long flags;
 
 	/* Figure out where to put new node */
-	local_irq_save(flags);
-	percpu_down_write(sem);
+	spin_lock_irqsave(lock, flags);
 	while (*new) {
 		struct cbn_qp *this = container_of(*new, struct cbn_qp, node);
 		int result = strncmp(data->key, this->key, RB_KEY_LENGTH);
@@ -61,8 +58,7 @@ static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *da
 		else if (result > 0)
 			new = &((*new)->rb_right);
 		else  {
-			percpu_up_write(sem);
-			local_irq_restore(flags);
+			spin_unlock_irqrestore(lock, flags);
 			dump_qp(data, "QP exists.");
 			return this;
 		}
@@ -71,8 +67,7 @@ static inline struct cbn_qp *add_rb_data(struct rb_root *root, struct cbn_qp *da
 	/* Add new node and rebalance tree. */
 	rb_link_node(&data->node, parent, new);
 	rb_insert_color(&data->node, root);
-	percpu_up_write(sem);
-	local_irq_restore(flags);
+	spin_unlock_irqrestore(lock, flags);
 	dump_qp(data, "QP added.");
 
 	return NULL;

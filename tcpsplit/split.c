@@ -252,7 +252,9 @@ static unsigned int cbn_egress_hook(void *priv,
 		struct addresses *addresses = get_cbn_probe(skb);
 		if (addresses) {
 			//TRACE_PRINT("Next hop is "IP4"=>"IP4"\n", IP4N(&iph->saddr), IP4N(&iph->daddr));
-			unsigned int cpu = addresses2cpu(addresses);
+			unsigned int cpu;
+			cpu = addresses2cpu(addresses);
+
 			addresses->sin_addr.s_addr = iph->daddr;
 			kthread_pool_run_cpu(&cbn_pool, start_new_pre_connection_syn,
 						addresses, cpu);
@@ -479,7 +481,7 @@ inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 	struct cbn_qp *qp = pqp;
 	struct cbn_root_qp *qp_root = this_cpu_ptr(qp->listner->connections_root);
 
-	if ((qp = add_rb_data(&qp_root->root, pqp, &qp->listner->rb_lock))) {
+	if ((qp = add_rb_data(&qp_root->root, pqp, &qp_root->rb_lock))) {
 		/* QP already exists */
 		if (qp->qp_dir[dir] != NULL) {
 			/* *
@@ -527,7 +529,7 @@ inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 				struct cbn_root_qp *qp_root =
 					this_cpu_ptr(qp->listner->connections_root);
 
-				de_tree_qp(&qp->node, &qp_root->root, &qp->listner->rb_lock);
+				de_tree_qp(&qp->node, &qp_root->root, &qp_root->rb_lock);
 			}
 
 			put_qp(qp);
@@ -808,7 +810,7 @@ create_fail:
 
 static inline struct cbn_listner *register_server_sock(uint32_t tid, struct socket *sock)
 {
-	int cpu, err;
+	int cpu;
 	struct cbn_listner *server = kmem_cache_alloc(listner_slab, GFP_KERNEL);
 	if (!server)
 		return NULL;
@@ -819,14 +821,9 @@ static inline struct cbn_listner *register_server_sock(uint32_t tid, struct sock
 		kmem_cache_free(listner_slab, server);
 		return NULL;
 	}
-	if (unlikely(err = percpu_init_rwsem(&server->rb_lock))) {
-		TRACE_ERROR("Failed to register listner %u [%d]", tid, err);
-		kmem_cache_free(listner_slab, server);
-		return NULL;
-	}
 	for_each_possible_cpu(cpu) {
 		struct cbn_root_qp *root = per_cpu_ptr(server->connections_root, cpu);
-
+		spin_lock_init(&root->rb_lock);
 		root->root 	= RB_ROOT;
 	}
 
