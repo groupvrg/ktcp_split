@@ -72,7 +72,7 @@ static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 	}
 
 	if (unlikely(!pre_conn_list || list_empty(pre_conn_list))) {
-		PRECONN_PRINT("preconn pool is empty! "TCP4", spawning refill...\n", TCP4N(&next_hop_ip, PRECONN_SERVER_PORT));
+		PRECONN_PRINT("preconn pool is empty! "TCP4", spawning refill...", TCP4N(&next_hop_ip, PRECONN_SERVER_PORT));
 		kthread_pool_run(&cbn_pool, prealloc_connection_pool, (void *)next_hop_ip);
 		return NULL;
 	}
@@ -80,7 +80,7 @@ static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 	elem = list_first_entry(pre_conn_list, struct cbn_qp, list);
 	pcpl->len--;
 	list_del(&elem->list);
-	PRECONN_PRINT("[%d]allocated %p from %p [%d]\n",smp_processor_id(),  elem, pre_conn_list, pcpl->len);
+	PRECONN_DEBUG("[%d]allocated %p from %p [%d]",smp_processor_id(),  elem, pre_conn_list, pcpl->len);
 	preempt_enable();
 	kthread_pool_run(&cbn_pool, prealloc_connection_pool, (void *)next_hop_ip);
 	return elem;
@@ -132,13 +132,13 @@ int start_new_pre_connection_syn(void *arg)
 	}
 	qp->listner = listner;
 
-	PRECONN_PRINT("connection to "TCP4" => "TCP4,
-			TCP4N(&qp->addr_d, ntohs(qp->port_d)), TCP4N(&qp->addr_s, ntohs(qp->port_s)));
+	PRECONN_PRINT("[R] connection to "TCP4" => "TCP4,
+			TCP4N(&qp->addr_s, ntohs(qp->port_s)), TCP4N(&qp->addr_d, ntohs(qp->port_d)));
 
 	tqp = qp_exists(qp, TX_QP);
 	line = __LINE__;
 	if (unlikely(tqp == NULL)) {
-		PRECONN_PRINT("Double ack... going out...\n");
+		PRECONN_PRINT("Double ack... going out...");
 		/*TODO: free qp...*/
 		goto out;
 	}

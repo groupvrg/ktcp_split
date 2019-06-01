@@ -8,6 +8,7 @@
 #include "cbn_common.h"
 #include "tcp_split.h"
 #include "proc.h"
+#include "debug.h"
 
 extern uint32_t ip_transparent;
 
@@ -163,19 +164,10 @@ static ssize_t cbn_transparent_command(struct file *file, const char __user *buf
 static ssize_t connections_read(struct file *file, char __user *buf,
 		                             size_t len, loff_t *ppos)
 {
-	size_t cnt = 0;
-
 	if (!buf)
 		return -EINVAL;
 
-	while (cnt < len) {
-		int width;
-
-		if (copy_to_user(buf + cnt, buf, width))
-			return -EFAULT;
-		cnt =+ width;
-	}
-	return cnt;
+	return dump_connections(buf, len);
 }
 
 static const struct file_operations connections = {

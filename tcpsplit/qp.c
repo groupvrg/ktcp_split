@@ -83,15 +83,15 @@ inline unsigned int qp2cpu(struct cbn_qp *qp)
 	unsigned int i = 0;
 	unsigned int core = 0;
 
-	char str[32];
+	char str[64];
 
 	for (;i < RB_KEY_LENGTH; i++)
 		core ^= qp->key[i];
 	i = num_online_cpus();
 	i = (core/i) * i;
 
-	snprintf(str, 32, "core = %u, i = %u => %u", core, i, core - i);
-	TRACE_PRINT("%s", str);
+	snprintf(str, 64, "%d->%d core %u", ntohs(qp->port_s), ntohs(qp->port_d), core - i);
+	//TRACE_PRINT("%s", str);
 	dump_qp(qp, str);
 	return core - i;
 }

@@ -9,6 +9,16 @@
 
 extern struct rb_root listner_root;
 
+static inline int printout(char __user *buff, const char *str, int len)
+{
+	if (buff) {
+		return copy_to_user(buff, str, len);
+	} else {
+		TRACE_PRINT("%s", str);
+	}
+	return 0;
+}
+
 static inline int dump_qp2user(char *str, struct cbn_qp *qp)
 {
 	return scnprintf(str, STRLEN,
@@ -21,7 +31,7 @@ static inline int dump_qp2user(char *str, struct cbn_qp *qp)
 				TCP4N(&qp->addr_d, ntohs(qp->port_d)));
 }
 
-int dump_pending_connections(char __user *buff, size_t len, int loc, struct cbn_root_qp *qp_root)
+static int dump_pending_connections(char __user *buff, size_t len, int loc, struct cbn_root_qp *qp_root)
 {
 	int rc = 0;
 	struct rb_node *node = rb_first(&qp_root->root);
@@ -31,7 +41,7 @@ int dump_pending_connections(char __user *buff, size_t len, int loc, struct cbn_
 		struct cbn_qp *this = container_of(node, struct cbn_qp, node);
 
 		rc = dump_qp2user(str, this);
-		if (copy_to_user(buff + loc, str, rc))
+		if (printout(buff + loc, str, rc))
 			return -EFAULT;
 
 		loc += rc;
@@ -40,7 +50,7 @@ int dump_pending_connections(char __user *buff, size_t len, int loc, struct cbn_
 	return loc;
 }
 
-int dump_connections_per_tennat(char __user *buff, size_t len, int loc, struct cbn_listner *listner)
+static int dump_connections_per_tennat(char __user *buff, size_t len, int loc, struct cbn_listner *listner)
 {
 	int cpu = 0, rc = 0;
 
@@ -68,7 +78,7 @@ int dump_connections(char __user *buff, size_t len)
 				"Tennat %d:\n--------------------------------------\n",
 				listner->key);
 
-		if (copy_to_user(buff + width, str, rc))
+		if (printout(buff + width, str, rc))
 			return -EFAULT;
 
 		if ((rc = dump_connections_per_tennat(buff, len, width, listner)) < 0)

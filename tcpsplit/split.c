@@ -14,6 +14,7 @@
 #include "proc.h"
 #include "rb_data_tree.h"
 #include "cbn_common.h"
+#include "debug.h"
 
 //getorigdst
 #include <net/inet_sock.h>
@@ -525,6 +526,7 @@ inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir)
 			TRACE_PRINT("ERROR: TIMEOUT %d (%s)", rc,
 					(IS_ERR_OR_NULL(qp->qp_dir[dir ^ 1])
 					 ? "ERR/NULL" : "EXISTS!!"));
+			trace_connections();
 			if (qp->listner) {
 				struct cbn_root_qp *qp_root =
 					this_cpu_ptr(qp->listner->connections_root);
@@ -611,7 +613,7 @@ int start_new_connection_syn(void *arg)
 		return  0;
 	}
 
-	TRACE_PRINT("[R] start connection : "TCP4" => "TCP4" mark %d",
+	TRACE_PRINT("[R] %s : "TCP4" => "TCP4" mark %d", __FUNCTION__,
 			TCP4N(&addresses->src.sin_addr, ntohs(addresses->src.sin_port)),
 			TCP4N(&addresses->dest.sin_addr, ntohs(addresses->dest.sin_port)),
 			addresses->mark);
