@@ -26,7 +26,7 @@ inline void get_qp(struct cbn_qp *qp)
 		}
 		/* else is legitamate in start_new_pending_connection
 		 */
-		/*Intentional falltrough */
+		break;
 	case 1:
 		spin_lock_init(&qp->lock);
 		break;

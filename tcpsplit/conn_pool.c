@@ -132,7 +132,7 @@ int start_new_pre_connection_syn(void *arg)
 	}
 	qp->listner = listner;
 
-	PRECONN_DEBUG("connection to "TCP4" from "TCP4,
+	PRECONN_PRINT("connection to "TCP4" => "TCP4,
 			TCP4N(&qp->addr_d, ntohs(qp->port_d)), TCP4N(&qp->addr_s, ntohs(qp->port_s)));
 
 	tqp = qp_exists(qp, TX_QP);

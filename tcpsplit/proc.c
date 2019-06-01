@@ -160,6 +160,33 @@ static ssize_t cbn_transparent_command(struct file *file, const char __user *buf
 	return size;
 }
 
+static ssize_t connections_read(struct file *file, char __user *buf,
+		                             size_t len, loff_t *ppos)
+{
+	size_t cnt = 0;
+
+	if (!buf)
+		return -EINVAL;
+
+	while (cnt < len) {
+		int width;
+
+		if (copy_to_user(buf + cnt, buf, width))
+			return -EFAULT;
+		cnt =+ width;
+	}
+	return cnt;
+}
+
+static const struct file_operations connections = {
+	.owner		= THIS_MODULE,
+	.open		= cbn_proc_open,
+	.read 		= connections_read,
+	//write		= noop_write,
+	.llseek 	= seq_lseek,
+	.release 	= single_release,
+};
+
 static const struct file_operations preconn_proc_fops = {
 	.owner		= THIS_MODULE,
 	.open		= cbn_proc_open,
