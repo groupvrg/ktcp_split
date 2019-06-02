@@ -14,7 +14,7 @@ inline void dump_qp(struct cbn_qp *qp, const char *str)
 inline void get_qp(struct cbn_qp *qp)
 {
 	int rc;
-	unsigned long flags;
+	//unsigned long flags;
 	rc = atomic_inc_return(&qp->ref_cnt);
 	TRACE_DEBUG("%s : (%p->[%p][%p]) %d", __FUNCTION__, qp, qp->tx, qp->rx, rc);
 	switch  (rc) {
@@ -25,9 +25,12 @@ inline void get_qp(struct cbn_qp *qp)
 			struct cbn_list_qp *qp_list = this_cpu_ptr(qp->listner->connections_list);
 
 			de_tree_qp(&qp->node, &qp_root->root, &qp_root->rb_lock);
-			spin_lock_irqsave(&qp->list_lock, lock);
-			list_add()
-			spin_unlock_irqrestore(&qp->list_lock, lock);
+			//spin_lock_irqsave(&qp_list->list_lock, lock);
+			preempt_disable();
+			//TODO: connections via start_new_pending_connection will not be added
+			list_add(&qp->list, &qp_list->list);
+			preempt_enable();
+			//spin_unlock_irqrestore(&qp_list->list_lock, lock);
 
 		}
 		/* else is legitamate in start_new_pending_connection (target proxy of preconn)
