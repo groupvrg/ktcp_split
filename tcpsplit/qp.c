@@ -14,6 +14,7 @@ inline void dump_qp(struct cbn_qp *qp, const char *str)
 inline void get_qp(struct cbn_qp *qp)
 {
 	int rc;
+	unsigned long flags;
 	rc = atomic_inc_return(&qp->ref_cnt);
 	TRACE_DEBUG("%s : (%p->[%p][%p]) %d", __FUNCTION__, qp, qp->tx, qp->rx, rc);
 	switch  (rc) {
@@ -21,10 +22,15 @@ inline void get_qp(struct cbn_qp *qp)
 		dump_qp(qp, "remove from tree");
 		if (qp->listner) {
 			struct cbn_root_qp *qp_root = this_cpu_ptr(qp->listner->connections_root);
+			struct cbn_list_qp *qp_list = this_cpu_ptr(qp->listner->connections_list);
 
 			de_tree_qp(&qp->node, &qp_root->root, &qp_root->rb_lock);
+			spin_lock_irqsave(&qp->list_lock, lock);
+			list_add()
+			spin_unlock_irqrestore(&qp->list_lock, lock);
+
 		}
-		/* else is legitamate in start_new_pending_connection
+		/* else is legitamate in start_new_pending_connection (target proxy of preconn)
 		 */
 		break;
 	case 1:

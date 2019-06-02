@@ -35,6 +35,11 @@ extern alloc_percpu_func  p__alloc_reserved_percpu;
 #define alloc_reserved_percpu(type)					\
 	(typeof(type) __percpu *)__alloc_reserved_percpu(sizeof(type),	\
 					__alignof__(type))
+struct cbn_list_qp {
+	struct list_head 	list;
+	spinlock_t 		list_lock;
+};
+
 struct cbn_root_qp {
 	struct rb_root  root;
 	spinlock_t 	rb_lock;
@@ -42,8 +47,8 @@ struct cbn_root_qp {
 
 struct cbn_listner {
 	struct rb_node 	node;
-	struct cbn_root_qp __percpu *connections_root; /* per core variable, sane goes for lock*/
-	//struct percpu_rw_semaphore rb_lock;
+	struct cbn_root_qp __percpu *connections_root; /* per core variable*/
+	struct cbn_list_qp __percpu *connections_list; /* per core variable*/
 	int32_t		key; //tid
 	uint16_t	port;
 	uint16_t	status;

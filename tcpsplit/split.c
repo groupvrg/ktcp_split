@@ -825,8 +825,13 @@ static inline struct cbn_listner *register_server_sock(uint32_t tid, struct sock
 	}
 	for_each_possible_cpu(cpu) {
 		struct cbn_root_qp *root = per_cpu_ptr(server->connections_root, cpu);
+		struct cbn_list_qp *list = per_cpu_ptr(server->connections_list, cpu);
+
 		spin_lock_init(&root->rb_lock);
+		spin_lock_init(&list->list_lock);
+
 		root->root 	= RB_ROOT;
+		INIT_LIST_HEAD(&list->list);
 	}
 
 	server->key			= tid;
@@ -968,7 +973,7 @@ static void qp_ctor(void *elem)
 int __init cbn_datapath_init(void)
 {
 	parse_module_params();
-	pr_info("Starting KTCP [%d]\n", cbn_pool.pool_size);
+	pr_info("Starting KTCP [%d] KTCP_VERSION\n", cbn_pool.pool_size);
 
 	if (init_kallsyms()) {
 		TRACE_ERROR("Failed to init kallsyms ptrs");
