@@ -12,10 +12,12 @@ if [ "$?" != 0 ]; then
 	exit
 fi
 
+pool_size=512
+
 if [ -n "$1" ]; then
 	pool_size=$1
 fi
-exit
+
 sudo insmod cbn_split.ko pool_size=$pool_size
 
 sudo sh -c 'echo 0 > /proc/sys/kernel/hung_task_timeout_secs'
