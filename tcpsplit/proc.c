@@ -164,13 +164,22 @@ static ssize_t cbn_transparent_command(struct file *file, const char __user *buf
 static ssize_t connections_read(struct file *file, char __user *buf,
 		                             size_t len, loff_t *ppos)
 {
+	int rc = 0;
+
 	if (!buf)
 		return -EINVAL;
 
-	return dump_connections(buf, len);
+	if (file->f_pos)
+		goto out;
+
+	rc =  dump_connections(buf, len);
+out:
+	*ppos ^= 1;
+
+	return rc;
 }
 
-static const struct file_operations connections = {
+static const struct file_operations connections_fops = {
 	.owner		= THIS_MODULE,
 	.open		= cbn_proc_open,
 	.read 		= connections_read,
@@ -219,6 +228,7 @@ static struct proc_dir_entry *cbn_dir;
 int __init cbn_proc_init(void)
 {
 	cbn_dir = proc_mkdir_mode("cbn", 00555, NULL);
+	proc_create("connections", 00666, cbn_dir, &connections_fops);
 	proc_create("cbn_proc", 00666, cbn_dir, &cbn_add_fops);
 	proc_create("cbn_del", 00666, cbn_dir, &cbn_del_fops);
 	proc_create("conn_pool", 00666, cbn_dir, &preconn_proc_fops);
