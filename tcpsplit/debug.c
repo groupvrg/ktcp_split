@@ -41,8 +41,8 @@ static int dump_pending_connections(char __user *buff, size_t len, int loc, stru
 		struct cbn_qp *this = container_of(node, struct cbn_qp, node);
 
 		rc = dump_qp2user(str, this);
-		if (printout(buff + loc, str, rc))
-			return -EFAULT;
+		if ((rc = printout(buff + loc, str, rc)) < 0 )
+			return rc;
 
 		loc += rc;
 		node = rb_next(node);
@@ -71,6 +71,12 @@ int dump_connections(char __user *buff, size_t len)
 	char str[STRLEN];
 	struct rb_node *node = rb_first(&listner_root);
 
+	rc = scnprintf(str, STRLEN,
+			"<<<<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
+	if ((rc = printout(buff + width, str, rc)) < 0 )
+		return rc;
+	width += rc;
+
 	while (node) {
 		struct cbn_listner *listner = rb_entry(node, struct cbn_listner, node);
 
@@ -78,8 +84,9 @@ int dump_connections(char __user *buff, size_t len)
 				"Tennat %d:\n--------------------------------------\n",
 				listner->key);
 
-		if (printout(buff + width, str, rc))
-			return -EFAULT;
+		if ((rc = printout(buff + width, str, rc)) < 0)
+			return rc;
+		width += rc;
 
 		if ((rc = dump_connections_per_tennat(buff, len, width, listner)) < 0)
 			return rc;

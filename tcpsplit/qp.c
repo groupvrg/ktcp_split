@@ -11,6 +11,28 @@ inline void dump_qp(struct cbn_qp *qp, const char *str)
 			TCP4N(&qp->addr_d, ntohs(qp->port_d)));
 }
 
+static inline void fin_connected_qp(struct cbn_qp *qp)
+{
+		if (qp->listner) {
+			struct cbn_root_qp *qp_root = this_cpu_ptr(qp->listner->connections_root);
+#if 0
+			struct cbn_list_qp *qp_list = this_cpu_ptr(qp->listner->connections_list);
+
+			//TODO: connections via start_new_pending_connection will not be added
+			// Removing is an issue, as delete may occure from any core -- now percore GC is needed...
+			//spin_lock_irqsave(&qp_list->list_lock, lock);
+			preempt_disable();
+			list_add(&qp->list, &qp_list->list);
+			preempt_enable();
+			//spin_unlock_irqrestore(&qp_list->list_lock, lock);
+#endif
+			de_tree_qp(&qp->node, &qp_root->root, &qp_root->rb_lock);
+
+		}
+		/* else is legitamate in start_new_pending_connection (target proxy of preconn)
+		 */
+}
+
 inline void get_qp(struct cbn_qp *qp)
 {
 	int rc;
@@ -20,21 +42,7 @@ inline void get_qp(struct cbn_qp *qp)
 	switch  (rc) {
 	case 2:
 		dump_qp(qp, "remove from tree");
-		if (qp->listner) {
-			struct cbn_root_qp *qp_root = this_cpu_ptr(qp->listner->connections_root);
-			struct cbn_list_qp *qp_list = this_cpu_ptr(qp->listner->connections_list);
-
-			de_tree_qp(&qp->node, &qp_root->root, &qp_root->rb_lock);
-			//spin_lock_irqsave(&qp_list->list_lock, lock);
-			preempt_disable();
-			//TODO: connections via start_new_pending_connection will not be added
-			list_add(&qp->list, &qp_list->list);
-			preempt_enable();
-			//spin_unlock_irqrestore(&qp_list->list_lock, lock);
-
-		}
-		/* else is legitamate in start_new_pending_connection (target proxy of preconn)
-		 */
+		fin_connected_qp(qp);
 		break;
 	case 1:
 		spin_lock_init(&qp->lock);
@@ -57,8 +65,8 @@ inline unsigned int put_qp(struct cbn_qp *qp)
 	 */
 	spin_lock_irqsave(&qp->lock, flags);
 	if (! (rc = atomic_dec_return(&qp->ref_cnt))) {
-		//TODO: Consider adding a tree for active QPs + States.
-		//TODO: Add waitqueue here...
+		//TODO: Consider adding a list for active QPs + States.
+		//TODO: Add waitqueue here... for possible gentler sync w/o spin over sock ops
 		if (!IS_ERR_OR_NULL(qp->tx))
 			sock_release(qp->tx);
 		if (!IS_ERR_OR_NULL(qp->rx))
