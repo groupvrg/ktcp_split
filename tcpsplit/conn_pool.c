@@ -108,7 +108,7 @@ int start_new_pre_connection_syn(void *arg)
 	int line = __LINE__;
 	struct addresses *addresses = arg;
 	struct cbn_listner *listner;
-	struct cbn_qp *qp, *tqp;
+	struct cbn_qp *qp;
 	struct sockets sockets;
 
 	line = __LINE__;
@@ -135,9 +135,9 @@ int start_new_pre_connection_syn(void *arg)
 	PRECONN_PRINT("[R] connection to "TCP4" => "TCP4,
 			TCP4N(&qp->addr_s, ntohs(qp->port_s)), TCP4N(&qp->addr_d, ntohs(qp->port_d)));
 
-	tqp = qp_exists(qp, TX_QP);
+	qp = qp_exists(qp, TX_QP);
 	line = __LINE__;
-	if (unlikely(tqp == NULL)) {
+	if (unlikely(qp == NULL)) {
 		PRECONN_PRINT("Double ack... going out...");
 		/*TODO: free qp...*/
 		goto out;

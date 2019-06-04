@@ -22,8 +22,8 @@ static inline int printout(char __user *buff, const char *str, int len)
 static inline int dump_qp2user(char *str, int cpu, struct cbn_qp *qp)
 {
 	return scnprintf(str, STRLEN,
-				"[cpu = %d]:QP [%s:%s] %p: "TCP4" => "TCP4"\n",
-				cpu,
+				"[cpu = %d, rc  = %u]:QP [%s:%s] %p: "TCP4" => "TCP4"\n",
+				cpu, atomic_read(&qp->ref_cnt),
 				qp->qp_dir[TX_QP] ? "TX" : "",
 				qp->qp_dir[RX_QP] ? "RX" : "",
 				qp,

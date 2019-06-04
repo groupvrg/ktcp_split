@@ -768,14 +768,14 @@ static int start_new_connection(void *arg)
 	//line = __LINE__;
 	//if ((rc = kernel_getsockname(rx, (struct sockaddr *)&addr, &size)))
 	//	goto create_fail;
-	TRACE_PRINT("[L] "TCP4" => "TCP4" [m=%d]", TCP4N(&cli_addr.sin_addr, ntohs(cli_addr.sin_port)),
-						TCP4N(&addr.sin_addr, ntohs(addr.sin_port)), mark);
+	TRACE_PRINT("[L] "TCP4" => "TCP4" [m=%d]",
+			TCP4N(&cli_addr.sin_addr, ntohs(cli_addr.sin_port)),
+			TCP4N(&addr.sin_addr, ntohs(addr.sin_port)), mark);
 
 	qp->tx = NULL;
 
 	/* consolidate into one qp */
 	qp = qp_exists(qp, RX_QP);
-	TRACE_DEBUG("QP is %p", qp);
 	if (wait_qp_ready(qp, RX_QP))
 		goto out;
 
@@ -790,8 +790,9 @@ static int start_new_connection(void *arg)
 	half_duplex(&sockets, qp);
 out:
 	rx = NULL;
-	TRACE_PRINT(" Closing [L] "TCP4" => "TCP4" (%d)", TCP4N(&cli_addr.sin_addr, ntohs(cli_addr.sin_port)),
-						TCP4N(&addr.sin_addr, ntohs(addr.sin_port)), mark);
+	TRACE_PRINT(" Closing [L] "TCP4" => "TCP4" (%d)",
+			TCP4N(&cli_addr.sin_addr, ntohs(cli_addr.sin_port)),
+			TCP4N(&addr.sin_addr, ntohs(addr.sin_port)), mark);
 	/* Teardown */
 	/* free both sockets*/
 	rc = line = 0;
