@@ -19,11 +19,11 @@ static inline int printout(char __user *buff, const char *str, int len)
 	return 0;
 }
 
-static inline int dump_qp2user(char *str, struct cbn_qp *qp)
+static inline int dump_qp2user(char *str, int cpu, struct cbn_qp *qp)
 {
 	return scnprintf(str, STRLEN,
-				"[cpu = %d]:QP [%s:%s] %p: "TCP4" => "TCP4,
-				smp_processor_id(),
+				"[cpu = %d]:QP [%s:%s] %p: "TCP4" => "TCP4"\n",
+				cpu,
 				qp->qp_dir[TX_QP] ? "TX" : "",
 				qp->qp_dir[RX_QP] ? "RX" : "",
 				qp,
@@ -31,7 +31,8 @@ static inline int dump_qp2user(char *str, struct cbn_qp *qp)
 				TCP4N(&qp->addr_d, ntohs(qp->port_d)));
 }
 
-static int dump_pending_connections(char __user *buff, size_t len, int loc, struct cbn_root_qp *qp_root)
+static int dump_pending_connections(char __user *buff, size_t len,
+					int loc, struct cbn_root_qp *qp_root, int cpu)
 {
 	int rc = 0, add = 0;
 	struct rb_node *node = rb_first(&qp_root->root);
@@ -40,7 +41,7 @@ static int dump_pending_connections(char __user *buff, size_t len, int loc, stru
 	while (node) {
 		struct cbn_qp *this = container_of(node, struct cbn_qp, node);
 
-		add = dump_qp2user(str, this);
+		add = dump_qp2user(str, cpu, this);
 		if ((rc = printout(buff + loc, str, add)))
 			return rc;
 
@@ -57,7 +58,7 @@ static int dump_connections_per_tennat(char __user *buff, size_t len, int loc, s
 	for_each_online_cpu(cpu) {
 		struct cbn_root_qp *qp_root = per_cpu_ptr(listner->connections_root, cpu);
 		//Print Pending QPs
-		if ((rc = dump_pending_connections(buff, len, loc, qp_root)) < 0)
+		if ((rc = dump_pending_connections(buff, len, loc, qp_root, cpu)) < 0)
 			return rc;
 		loc += rc;
 		//Add percore list and show paired QPs
