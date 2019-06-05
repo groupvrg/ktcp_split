@@ -482,6 +482,7 @@ inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir)
 	struct cbn_qp *qp = pqp;
 	struct cbn_root_qp *qp_root = this_cpu_ptr(qp->listner->connections_root);
 
+	//FIXME: In case both L and R fail. Connection will stay in tree...
 	if ((qp = add_rb_data(&qp_root->root, pqp, &qp_root->rb_lock))) {
 		/* QP already exists */
 		if (qp->qp_dir[dir] != NULL) {

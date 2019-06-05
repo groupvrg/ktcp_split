@@ -66,17 +66,18 @@ static inline struct cbn_qp *alloc_prexeisting_conn(__be32 ip)
 	unsigned long next_hop_ip = ip;
 	struct cbn_preconnection *preconn = search_rb_preconn(&preconn_root, ip, &preconn_root_lock);
 
+	preempt_disable();
 	if (preconn) {
 		pcpl = this_cpu_ptr(preconn->pcp_list);
 		pre_conn_list = &pcpl->list;
 	}
 
 	if (unlikely(!pre_conn_list || list_empty(pre_conn_list))) {
+		preempt_enable();
 		PRECONN_PRINT("preconn pool is empty! "TCP4", spawning refill...", TCP4N(&next_hop_ip, PRECONN_SERVER_PORT));
 		kthread_pool_run(&cbn_pool, prealloc_connection_pool, (void *)next_hop_ip);
 		return NULL;
 	}
-	preempt_disable();
 	elem = list_first_entry(pre_conn_list, struct cbn_qp, list);
 	pcpl->len--;
 	list_del(&elem->list);
@@ -492,7 +493,7 @@ static int prec_conn_listner_server(void *arg)
 		qp->listner 	= NULL;
 		INIT_LIST_HEAD(&qp->list);
 
-		list_add(&qp->list, &pre_conn_list_server);
+		//list_add(&qp->list, &pre_conn_list_server); : TODO: protect with lock, needed on teardown
 		kthread_pool_run(&cbn_pool, start_new_pending_connection, qp);
 
 	} while (!kthread_should_stop());
