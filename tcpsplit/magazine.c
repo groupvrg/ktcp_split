@@ -34,15 +34,24 @@ static inline u32 mag_pair_count(struct mag_pair *pair)
 	return pair->count[0] + pair->count[1];
 }
 
-static inline struct mag_pair *get_cpu_mag_pair(struct mag_allocator *allocator)
+static inline struct mag_pair *get_cpu_mag_pair(struct mag_allocator *allocator,
+						unsigned long *flags)
 {
 	struct percpu_mag_pair *pcp;
 	int idx;
+	local_irq_save(*flags);
 	get_cpu();
 	idx = ((in_softirq()) ? 1 : 0);
 
 	pcp = this_cpu_ptr(allocator->pcp_pair);
+//TODO: Make sure idx is used correctly and remove irq_save
 	return &pcp->pair[idx];
+}
+
+static inline void put_cpu_mag_pair(unsigned long flags)
+{
+	put_cpu();
+	local_irq_restore(flags);
 }
 
 static inline void swap_mags(struct mag_pair *pair)
@@ -135,7 +144,8 @@ static void mag_allocator_switch_empty(struct mag_allocator *allocator, struct m
 
 void *mag_alloc_elem(struct mag_allocator *allocator)
 {
-	struct mag_pair	*pair = get_cpu_mag_pair(allocator);
+	unsigned long flags;
+	struct mag_pair	*pair = get_cpu_mag_pair(allocator, &flags);
 	void 		*elem;
 
 	if (unlikely(mag_pair_count(pair) == 0 )) {
@@ -145,13 +155,14 @@ void *mag_alloc_elem(struct mag_allocator *allocator)
 	}
 
 	elem = mag_pair_alloc(pair);
-	put_cpu();
+	put_cpu_mag_pair(flags);
 	return elem;
 }
 
 void mag_free_elem(struct mag_allocator *allocator, void *elem)
 {
-	struct mag_pair	*pair = get_cpu_mag_pair(allocator);
+	unsigned long flags;
+	struct mag_pair	*pair = get_cpu_mag_pair(allocator, &flags);
 
 	mag_pair_free(pair, elem);
 
@@ -160,7 +171,7 @@ void mag_free_elem(struct mag_allocator *allocator, void *elem)
 		TRACE_DEBUG("MAG: %s| pair %p [%d:%d] :: %d", __FUNCTION__, pair, smp_processor_id(), in_softirq() ? 1 : 0, mag_pair_count(pair));
 		mag_allocator_switch_full(allocator, pair);
 	}
-	put_cpu();
+	put_cpu_mag_pair(flags);
 }
 
 /*Allocating a new pair of empty magazines*/
