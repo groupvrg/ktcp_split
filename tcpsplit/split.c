@@ -25,7 +25,8 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Markuze Alex");
 MODULE_DESCRIPTION("CBN TCP Split Module");
 
-#define BACKLOG     128
+#define BACKLOG     	128
+#define KTCP_VERSION 	"__KTCP_VERSION__"
 
 static int pool_size = 0;
 module_param(pool_size, int, 0);
@@ -975,7 +976,7 @@ static void qp_ctor(void *elem)
 int __init cbn_datapath_init(void)
 {
 	parse_module_params();
-	pr_info("Starting KTCP [%d] KTCP_VERSION\n", cbn_pool.pool_size);
+	pr_info("Starting KTCP [%d] %s\n", cbn_pool.pool_size, KTCP_VERSION);
 
 	if (init_kallsyms()) {
 		TRACE_ERROR("Failed to init kallsyms ptrs");
