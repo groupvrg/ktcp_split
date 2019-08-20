@@ -1,8 +1,21 @@
+#!/bin/bash
 
-sed -i "s/KTCP_VERSION/`git rev-parse --short HEAD`/g" split.c
+[ -z "$pool_size" ] && pool_size=512
+
+git rev-parse --git-dir 2>/dev/null
+
+[ "$?" -eq 0 ] && git=1
+[ -z "$git" ] || version=`git rev-parse --short HEAD`
+
+if [ -n "$1" ]; then
+	version=$1
+fi
+
+[ -z "$version" ] && version='debug'
+
+sed -i "s/__KTCP_VERSION__/$version/g" split.c
 
 make
-git checkout split.c
 if [ "$?" != 0 ]; then
 	RED='\033[1;31m'
 	NC='\033[0m' # No Color
@@ -12,11 +25,7 @@ if [ "$?" != 0 ]; then
 	exit
 fi
 
-pool_size=512
-
-if [ -n "$1" ]; then
-	pool_size=$1
-fi
+[ -z "$git" ] || git checkout split.c
 
 sudo insmod cbn_split.ko pool_size=$pool_size
 
