@@ -919,7 +919,9 @@ static int split_server(void *mark_port)
 	server->status = 6;
 error:
 	TRACE_PRINT("Exiting %d <%d>\n", rc, (server) ? server->status : -1);
-	remove_listner_server(server);
+	if(server != NULL){
+		remove_listner_server(server);
+	}
 out:
 	if (sock)
 		sock_release(sock);
