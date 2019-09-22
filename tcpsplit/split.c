@@ -826,9 +826,25 @@ static inline struct cbn_listner *register_server_sock(uint32_t tid, struct sock
 		kmem_cache_free(listner_slab, server);
 		return NULL;
 	}
-	for_each_possible_cpu(cpu) {
-		struct cbn_root_qp *root = per_cpu_ptr(server->connections_root, cpu);
-		struct cbn_list_qp *list = per_cpu_ptr(server->connections_list, cpu);
+	server->connections_list = alloc_reserved_percpu(struct cbn_list_qp);
+        if (unlikely( ! server->connections_list)) {
+                TRACE_ERROR("Failed to register listner %u [%d], list qp alloc", tid, -ENOMEM);
+                kmem_cache_free(listner_slab, server);
+                return NULL;
+        }
+        for_each_possible_cpu(cpu) {
+                struct cbn_root_qp *root = per_cpu_ptr(server->connections_root, cpu);
+                if(!root){
+                        TRACE_ERROR("Failed to get per cpu ptr for connection root. tid: %u cpu: [%d]", tid, cpu);
+                        kmem_cache_free(listner_slab, server);
+                        return NULL;
+                }
+                struct cbn_list_qp *list = per_cpu_ptr(server->connections_list, cpu);
+                if(!list){
+                        TRACE_ERROR("Failed to get per cpu ptr for connection list. tid: %u cpu: [%d]", tid, cpu);
+                        kmem_cache_free(listner_slab, server);
+                        return NULL;
+                }
 
 		spin_lock_init(&root->rb_lock);
 		spin_lock_init(&list->list_lock);

@@ -9,6 +9,7 @@ git rev-parse --git-dir 2>/dev/null
 
 if [ -n "$1" ]; then
 	version=$1
+	echo "found version parameter: $version"
 fi
 
 [ -z "$version" ] && version='debug'
@@ -31,3 +32,5 @@ sudo insmod cbn_split.ko pool_size=$pool_size
 
 sudo sh -c 'echo 0 > /proc/sys/kernel/hung_task_timeout_secs'
 sudo sh -c 'echo 1 > /proc/sys/kernel/ftrace_dump_on_oops'
+
+echo "ktcp installation complete"
