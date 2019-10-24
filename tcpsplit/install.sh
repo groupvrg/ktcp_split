@@ -14,7 +14,7 @@ fi
 
 [ -z "$version" ] && version='debug'
 
-sed -i "s/__KTCP_VERSION__/$version/g" split.c
+sed -i "s/__KTCP_VERSION__/$version/g" cbn_common.h
 
 make
 if [ "$?" != 0 ]; then
