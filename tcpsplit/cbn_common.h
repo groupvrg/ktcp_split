@@ -10,6 +10,8 @@
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 
+#define KTCP_VERSION 	"__KTCP_VERSION__"
+
 #define ALWAYS_FRESH		1
 #define OPTIMISTIC_SYN_OFF 	2
 

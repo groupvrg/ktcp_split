@@ -24,9 +24,9 @@
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Markuze Alex");
 MODULE_DESCRIPTION("CBN TCP Split Module");
+MODULE_VERSION(KTCP_VERSION);
 
 #define BACKLOG     	128
-#define KTCP_VERSION 	"__KTCP_VERSION__"
 
 static int pool_size = 0;
 module_param(pool_size, int, 0);
@@ -826,20 +826,23 @@ static inline struct cbn_listner *register_server_sock(uint32_t tid, struct sock
 		kmem_cache_free(listner_slab, server);
 		return NULL;
 	}
+
 	server->connections_list = alloc_reserved_percpu(struct cbn_list_qp);
         if (unlikely( ! server->connections_list)) {
                 TRACE_ERROR("Failed to register listner %u [%d], list qp alloc", tid, -ENOMEM);
                 kmem_cache_free(listner_slab, server);
                 return NULL;
         }
+
         for_each_possible_cpu(cpu) {
+		struct cbn_list_qp *list;
                 struct cbn_root_qp *root = per_cpu_ptr(server->connections_root, cpu);
                 if(!root){
                         TRACE_ERROR("Failed to get per cpu ptr for connection root. tid: %u cpu: [%d]", tid, cpu);
                         kmem_cache_free(listner_slab, server);
                         return NULL;
                 }
-                struct cbn_list_qp *list = per_cpu_ptr(server->connections_list, cpu);
+                list = per_cpu_ptr(server->connections_list, cpu);
                 if(!list){
                         TRACE_ERROR("Failed to get per cpu ptr for connection list. tid: %u cpu: [%d]", tid, cpu);
                         kmem_cache_free(listner_slab, server);

@@ -119,11 +119,23 @@ static ssize_t preconn_proc_command(struct file *file, const char __user *buf,
 	ERR_LINE();
 	return size;
 }
+static int cbn_version_show(struct seq_file *m, void *v)
+{
+	pr_info("%d\n", ip_transparent);
+	seq_printf(m, "%s\n", KTCP_VERSION);
+	ERR_LINE();
+	return 0;
+}
+
+static int cbn_version_open(struct inode *inode, struct  file *file)
+{
+	return single_open(file, cbn_version_show, NULL);
+}
 
 static int cbn_transparent_show(struct seq_file *m, void *v)
 {
 	pr_info("%d\n", ip_transparent);
-	seq_printf(m, "%u", ip_transparent);
+	seq_printf(m, "%u\n", ip_transparent);
 	ERR_LINE();
 	return 0;
 }
@@ -223,6 +235,14 @@ static const struct file_operations cbn_transparent_fops = {
 	.llseek 	= seq_lseek,
 	.release 	= single_release,
 };
+
+static const struct file_operations cbn_version_fops = {
+	.owner		= THIS_MODULE,
+	.open		= cbn_version_open,
+	.read 		= seq_read,
+	.release 	= single_release,
+};
+
 static struct proc_dir_entry *cbn_dir;
 
 int __init cbn_proc_init(void)
@@ -233,6 +253,7 @@ int __init cbn_proc_init(void)
 	proc_create("cbn_del", 00666, cbn_dir, &cbn_del_fops);
 	proc_create("conn_pool", 00666, cbn_dir, &preconn_proc_fops);
 	proc_create("cbn_transparent", 00666, cbn_dir, &cbn_transparent_fops);
+	proc_create("version", 00444, cbn_dir, &cbn_version_fops);
 	return 0;
 }
 
