@@ -6,7 +6,11 @@
 if=`ifconfig|head -1|cut -d: -f1`
 
 function usage() {
-	echo "usage: $0 -p <port> -i [<ip>]"
+	echo "usage: sudo $0 -p <port> -i [<ip>] -h
+		 port: both sender and receiver udp port
+		 ip : listner ip
+		 h  : only high level messages sent"
+
 	exit -1
 }
 
