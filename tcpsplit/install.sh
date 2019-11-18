@@ -26,7 +26,7 @@ if [ "$?" != 0 ]; then
 	exit
 fi
 
-[ -z "$git" ] || git checkout split.c
+[ -z "$git" ] || git checkout cbn_common.h
 
 sudo insmod cbn_split.ko pool_size=$pool_size
 
