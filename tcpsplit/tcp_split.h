@@ -109,14 +109,14 @@ struct probe {
 #define UINT_SHIFT	32
 
 int half_duplex(struct sockets *sock, struct cbn_qp *qp);
-inline unsigned int put_qp(struct cbn_qp *qp);
-inline void get_qp(struct cbn_qp *qp);
-inline void dump_qp(struct cbn_qp *qp, const char *str);
+unsigned int put_qp(struct cbn_qp *qp);
+void get_qp(struct cbn_qp *qp);
+void dump_qp(struct cbn_qp *qp, const char *str);
 
 void add_server_cb(int tid, int port);
 void del_server_cb(int tid);
 void preconn_write_cb(int *);
-inline char* proc_read_string(int *);
+char* proc_read_string(int *);
 
 struct socket *craete_prec_conn_probe(u32 mark);
 
@@ -125,10 +125,10 @@ int __exit cbn_pre_connect_end(void);
 
 int start_probe_syn(void *arg);
 int start_new_connection_syn(void *arg);
-inline int wait_qp_ready(struct cbn_qp* qp, uint8_t dir);
-inline struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir);
-inline unsigned int addresses2cpu(struct addresses *addr);
-inline void* uint2void(uint32_t a, uint32_t b);
-inline void void2uint(void *ptr, uint32_t *a, uint32_t *b);
-inline unsigned int qp2cpu(struct cbn_qp *qp);
+int wait_qp_ready(struct cbn_qp* qp, uint8_t dir);
+struct cbn_qp *qp_exists(struct cbn_qp* pqp, uint8_t dir);
+unsigned int addresses2cpu(struct addresses *addr);
+void* uint2void(uint32_t a, uint32_t b);
+void void2uint(void *ptr, uint32_t *a, uint32_t *b);
+unsigned int qp2cpu(struct cbn_qp *qp);
 #endif /*__CBN_DATAPATH_H__*/

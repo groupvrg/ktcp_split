@@ -994,7 +994,7 @@ static void qp_ctor(void *elem)
 	memset(elem, 0, sizeof (sizeof(struct cbn_qp)));
 }
 
-int __init cbn_datapath_init(void)
+static int __init cbn_datapath_init(void)
 {
 	parse_module_params();
 	pr_info("Starting KTCP [%d] %s\n", cbn_pool.pool_size, KTCP_VERSION);
@@ -1021,7 +1021,7 @@ int __init cbn_datapath_init(void)
 	return 0;
 }
 
-void __exit cbn_datapath_clean(void)
+static void __exit cbn_datapath_clean(void)
 {
 	TRACE_PRINT("Removing proc");
 	cbn_proc_clean();

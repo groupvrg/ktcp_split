@@ -122,7 +122,7 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 	return elem;
 }
 
-struct pool_elem *__kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(void *), void *data, const struct cpumask * mask)
+static struct pool_elem *__kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(void *), void *data, const struct cpumask * mask)
 {
 	struct pool_elem *elem = kthread_pool_alloc(cbn_pool);
 	if (unlikely(!elem)) {
