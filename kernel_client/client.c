@@ -196,8 +196,8 @@ static __init int client_init(void)
 	proc_dir = proc_mkdir_mode(POLLER_DIR_NAME, 00555, NULL);
 	pkthread_bind_mask = (void *)kallsyms_lookup_name("kthread_bind_mask");
 
-	udp_client_task  = kthread_create(poll_thread, NULL, "udp_client_thread");
-	tcp_client_task  = kthread_create(poll_thread, NULL, "tcp_client_thread");
+	udp_client_task  = kthread_create(poll_thread, 0, "udp_client_thread");
+	tcp_client_task  = kthread_create(poll_thread, 1, "tcp_client_thread");
 
 	//pkthread_bind_mask(client_task, cpumask_of(0));
 
