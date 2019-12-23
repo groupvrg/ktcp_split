@@ -22,7 +22,7 @@ MODULE_LICENSE("GPL");
 MODULE_VERSION("0.1");
 
 #define POLLER_DIR_NAME "io_client"
-#define procname "udp_client"
+#define procname "client"
 
 typedef void (*bind_mask_func)(struct task_struct *, const struct cpumask *);
 bind_mask_func pkthread_bind_mask;
@@ -115,6 +115,7 @@ static inline void tcp_client(void)
                 trace_printk("RC = %d (%d)", rc, __LINE__);
 		goto err;
         }
+	trace_printk("Connected, sending...\n");
 
 	for (i = 0; i < (1<<19); i++) {
 	      kernel_sendmsg(tx, &msg, kvec, 16, (16 << PAGE_SHIFT));
@@ -174,8 +175,10 @@ static int poll_thread(void *data)
 		schedule();
 		__set_current_state(TASK_RUNNING);
 
-		if (!kthread_should_stop())
-			udp_client();
+		if (!kthread_should_stop()) {
+			trace_printk("Task %p\n", data);
+			tcp_client();
+		}
 	}
 	return 0;
 }
@@ -209,6 +212,7 @@ static __init int client_init(void)
 	if (!proc_create_data("tcp_"procname, 0666, proc_dir, &client_fops, tcp_client_task))
 		goto err;
 
+	trace_printk("TCP: %p\nUDP: %p\n", udp_client_task, tcp_client_task);
 	return 0;
 err:
 	return -1;
