@@ -81,7 +81,8 @@ static int noop_open(struct inode *inode, struct file *file)
 static inline void tcp_client(void)
 {
 #define PORT	8080
-#define SERVER_ADDR (10<<24|1<<16|4<<8|38) /*10.1.4.38*/
+//#define SERVER_ADDR (10<<24|1<<16|4<<8|38) /*10.1.4.38*/
+#define SERVER_ADDR (10<<24|154<<16|0<<8|21) /*10.154.0.21*/
 	int rc, i = 0;
 	struct socket *tx = NULL;
 	struct sockaddr_in srv_addr = {0};
