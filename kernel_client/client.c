@@ -11,6 +11,7 @@
 #include <linux/cpumask.h>
 
 #include <net/net_namespace.h> //init_net
+#include <net/sock.h> //ZCOPY
 #include <uapi/linux/in.h> //sockaddr_in
 
 #include <linux/uaccess.h>
@@ -83,7 +84,7 @@ static inline void tcp_client(void)
 #define PORT	8080
 //#define SERVER_ADDR (10<<24|1<<16|4<<8|38) /*10.1.4.38*/
 #define SERVER_ADDR (10<<24|154<<16|0<<8|21) /*10.154.0.21*/
-	int rc, i = 0;
+	int rc, i = 0, j;
 	struct socket *tx = NULL;
 	struct sockaddr_in srv_addr = {0};
 	struct msghdr msg = { 0 };
@@ -94,8 +95,9 @@ static inline void tcp_client(void)
         srv_addr.sin_addr.s_addr        = htonl(SERVER_ADDR);
         srv_addr.sin_port               = htons(PORT);
 
-	msg.msg_name = &srv_addr;
+	msg.msg_name 	= &srv_addr;
 	msg.msg_namelen = sizeof(struct sockaddr);
+	msg.msg_flags 	|= MSG_ZEROCOPY;
 
 	if (! (base  = page_address(alloc_pages(GFP_KERNEL, 4)))) {
 		rc = -ENOMEM;
@@ -108,8 +110,11 @@ static inline void tcp_client(void)
 	}
 
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
+                trace_printk("RC = %d (%d)", rc, __LINE__);
 		goto err;
         }
+
+	sock_set_flag(tx->sk, SOCK_KERN_ZEROCOPY);
 
         if ((rc = kernel_connect(tx, (struct sockaddr *)&srv_addr, sizeof(struct sockaddr), 0))) {
                 trace_printk("RC = %d (%d)", rc, __LINE__);
@@ -118,7 +123,11 @@ static inline void tcp_client(void)
 	trace_printk("Connected, sending...\n");
 
 	for (i = 0; i < (1<<19); i++) {
-	      kernel_sendmsg(tx, &msg, kvec, 16, (16 << PAGE_SHIFT));
+		for (j = 0; j < 16; j++) {
+			get_page(virt_to_page(base + (i * PAGE_SIZE)));
+		}
+
+		kernel_sendmsg(tx, &msg, kvec, 16, (16 << PAGE_SHIFT));
 	}
 	trace_printk("Hello messages sent.(%d)\n", i);
 	goto ok;
@@ -196,8 +205,8 @@ static __init int client_init(void)
 	proc_dir = proc_mkdir_mode(POLLER_DIR_NAME, 00555, NULL);
 	pkthread_bind_mask = (void *)kallsyms_lookup_name("kthread_bind_mask");
 
-	udp_client_task  = kthread_create(poll_thread, 0, "udp_client_thread");
-	tcp_client_task  = kthread_create(poll_thread, 1, "tcp_client_thread");
+	udp_client_task  = kthread_create(poll_thread, ((void *)0), "udp_client_thread");
+	tcp_client_task  = kthread_create(poll_thread, ((void *)1), "tcp_client_thread");
 
 	//pkthread_bind_mask(client_task, cpumask_of(0));
 
