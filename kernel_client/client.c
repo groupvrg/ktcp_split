@@ -17,6 +17,9 @@
 #include <linux/uaccess.h>
 #include <linux/cpumask.h>
 
+//Thread pool API
+#include "../tcpsplit/thread_pool.h"
+
 MODULE_AUTHOR("Markuze Alex markuze@cs.technion.ac.il");
 MODULE_DESCRIPTION("Deferred I/O client");
 MODULE_LICENSE("GPL");
@@ -78,6 +81,55 @@ static int noop_open(struct inode *inode, struct file *file)
 	file->private_data = PDE_DATA(inode);
 	trace_printk("%s\n", __FUNCTION__);
 	return 0;
+}
+
+//TODO: Consider a recvmsg server on a different port
+//TODO: same for sender, just dont set the ZEROCOPY Flag
+static int start_new_connection(void *)
+	//page * array
+	while (!kthread_should_stop()) {
+		//receive: report every sec: time_after, HZ
+	}
+}
+
+#define PORT	8080
+static int split_server(void *unused)
+{
+	int rc = 0;
+	struct socket *sock = NULL;
+	struct sockaddr_in srv_addr;
+
+	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
+		goto error;
+
+	srv_addr.sin_family 		= AF_INET;
+	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
+	srv_addr.sin_port 		= htons(PORT);
+
+	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
+		goto error;
+
+	if ((rc = kernel_listen(sock, 32)))
+		goto error;
+
+	trace_printk("accepting on port %d\n", PORT);
+	do {
+		struct socket *nsock;
+
+		rc = kernel_accept(sock, &nsock, 0);
+		if (unlikely(rc))
+			goto out;
+
+		kthread_pool_run(&cbn_pool, start_new_connection, nsock);
+
+	} while (!kthread_should_stop());
+
+error:
+	trace_printk("Exiting %d <%d>\n", rc, (server) ? server->status : -1);
+out:
+	if (sock)
+		sock_release(sock);
+	return rc;
 }
 
 /*
@@ -329,7 +381,7 @@ static __init int client_init(void)
 	wake_up_process(udp_client_task);
 	wake_up_process(tcp_client_task);
 
-	kthread_pool_run(&thread_pool, split_server, uint2void(tid, port));
+	kthread_pool_run(&thread_pool, split_server, NULL);
 
 	if (!proc_create_data("udp_"procname, 0666, proc_dir, &client_fops, udp_client_task))
 		goto err;
