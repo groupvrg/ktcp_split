@@ -9,6 +9,7 @@
 #include <linux/net.h>
 #include <linux/kallsyms.h>
 #include <linux/cpumask.h>
+#include <linux/tcp.h>
 
 #include <net/net_namespace.h> //init_net
 #include <net/sock.h> //ZCOPY
@@ -18,7 +19,7 @@
 #include <linux/cpumask.h>
 
 //Thread pool API
-#include "../tcpsplit/thread_pool.h"
+//#include "../tcpsplit/thread_pool.h"
 
 MODULE_AUTHOR("Markuze Alex markuze@cs.technion.ac.il");
 MODULE_DESCRIPTION("Deferred I/O client");
@@ -31,10 +32,11 @@ MODULE_VERSION("0.1");
 typedef void (*bind_mask_func)(struct task_struct *, const struct cpumask *);
 bind_mask_func pkthread_bind_mask;
 
+//static struct kthread_pool thread_pool = {.pool_size = 128 };
 static struct proc_dir_entry *proc_dir;
-static struct kthread_pool thread_pool = {.pool_size = 128 };
 static struct task_struct *udp_client_task;
 static struct task_struct *tcp_client_task;
+static struct task_struct *tcp_server;
 
 static ssize_t client_write(struct file *file, const char __user *buf,
                               size_t len, loff_t *ppos)
@@ -85,11 +87,43 @@ static int noop_open(struct inode *inode, struct file *file)
 
 //TODO: Consider a recvmsg server on a different port
 //TODO: same for sender, just dont set the ZEROCOPY Flag
-static int start_new_connection(void *)
-	//page * array
-	while (!kthread_should_stop()) {
-		//receive: report every sec: time_after, HZ
+#define VEC_SZ 16
+static int start_new_connection(void *nsock)
+{
+	struct socket *sock = nsock;
+	struct kvec kvec[VEC_SZ];
+	unsigned long bytes = 0 ;
+	ktime_t start = ktime_get();
+	//ktime_t initial_start = start;
+	int i, rc = 0;
+
+	for (i = 0; i < VEC_SZ; i++) {
+		kvec[i].iov_len = PAGE_SIZE;
+		if (! (kvec[i].iov_base = page_address(alloc_page(GFP_KERNEL))))
+			goto out;
 	}
+
+
+	while (!kthread_should_stop()) {
+		struct msghdr msg = { 0 };
+		ktime_t now = ktime_get();
+		//ktime_get_seconds
+		if (unlikely(ktime_after(now, ktime_add(start, NSEC_PER_SEC)))) {
+			trace_printk("%llu) %lu\n", ktime_sub(now, start), bytes);
+			start = now;
+			bytes = 0;
+		}
+		if ((rc = kernel_recvmsg(sock, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
+			goto out;
+		}
+		bytes += rc;
+
+	}
+out:
+	for (i = 0; i < VEC_SZ; i++)
+		free_page((unsigned long)(kvec[i].iov_base));
+	trace_printk("C ya, cowboy...\n");
+	return rc;
 }
 
 #define PORT	8080
@@ -120,12 +154,12 @@ static int split_server(void *unused)
 		if (unlikely(rc))
 			goto out;
 
-		kthread_pool_run(&cbn_pool, start_new_connection, nsock);
+		kthread_run(start_new_connection, nsock, "server_%p", nsock);
 
 	} while (!kthread_should_stop());
 
 error:
-	trace_printk("Exiting %d <%d>\n", rc, (server) ? server->status : -1);
+	trace_printk("Exiting %d\n", rc);
 out:
 	if (sock)
 		sock_release(sock);
@@ -134,102 +168,8 @@ out:
 
 /*
 	TODO: Need a thread to do accept (look at ktcp)
-	TODO: Create a thread pool user...
 	TODO: integrate DAMN, KTCP magazines
 */
-static void tcp_zcopy_rx(struct socket *sock, struct page **pages_array, unsigned int nr_pages)
-{
-	struct sock *sk = sock->sk;
-	const skb_frag_t *frags;
-	u32 seq, len, offset, nr = 0;
-	struct tcp_sock *tp;
-	struct sk_buff *skb;
-	int rc = -ENOTCONN;
-
-	lock_sock(sk);
-
-	if (sk->sk_state == TCP_LISTEN)
-		goto out;
-
-	sock_rps_record_flow(sk);
-
-	tp = tcp_sk(sk);
-	seq = tp->copied_seq;
-#if 0
-	unsigned long size = nr_pages << PAGE_SHIFT;
-
-	/* We dont actually care, accept everything...*/
-	if (tcp_inq(sk) < size) {
-		ret = sock_flag(sk, SOCK_DONE) ? -EIO : -EAGAIN;
-		goto out;
-	}
-	/* Abort if urgent data is in the area  --- Hmm.....*/
-	if (unlikely(tp->urg_data)) {
-		u32 urg_offset = tp->urg_seq - seq;
-
-		ret = -EINVAL;
-		if (urg_offset < size)
-			goto out;
-	}
-#endif
-	skb = tcp_recv_skb(sk, seq, &offset);
-	ret = -EINVAL;
-skb_start:
-	offset -= skb_headlen(skb);
-	/* Linear data present... - Handle it or Fix virtio */
-	if ((int)offset < 0)
-		goto out;
-	/* frag list present ? eehnmmm... gro wtf?*/
-	if (skb_has_frag_list(skb))
-		goto out;
-	len = skb->data_len - offset;
-	frags = skb_shinfo(skb)->frags;
-	while (offset) {
-		if (frags->size > offset)
-			goto out;
-		offset -= frags->size;
-		frags++;
-	}
-	while (nr < nr_pages) {
-		if (len) {
-			if (len < PAGE_SIZE)
-				goto out;
-			if (frags->size != PAGE_SIZE || frags->page_offset)
-				goto out;
-			pages_array[nr++] = skb_frag_page(frags);
-			frags++;
-			len -= PAGE_SIZE;
-			seq += PAGE_SIZE;
-			continue;
-		}
-		skb = skb->next;
-		offset = seq - TCP_SKB_CB(skb)->seq;
-		goto skb_start;
-	}
-#if 0
-	/* Ok now we need to get these pages...*/
-	for (nr = 0; nr < nr_pages; nr++) {
-		ret = vm_insert_page(vma, vma->vm_start + (nr << PAGE_SHIFT),
-				     pages_array[nr]);
-		if (ret)
-			goto out;
-	}
-#endif
-	/* operation is complete, we can 'consume' all skbs */
-	tp->copied_seq = seq;
-	tcp_rcv_space_adjust(sk);
-
-	/* Clean up data we have read: This will do ACK frames. */
-	tcp_recv_skb(sk, seq, &offset);
-	tcp_cleanup_rbuf(sk, size);
-
-	ret = 0;
-out:
-	release_sock(sk);
-
-	return ret;
-}
-
 static inline void tcp_client(void)
 {
 #define PORT	8080
@@ -366,7 +306,7 @@ static const struct file_operations client_fops = {
 
 static __init int client_init(void)
 {
-	cbn_kthread_pool_init(&thread_pool);
+	//cbn_kthread_pool_init(&thread_pool);
 	proc_dir = proc_mkdir_mode(POLLER_DIR_NAME, 00555, NULL);
 	pkthread_bind_mask = (void *)kallsyms_lookup_name("kthread_bind_mask");
 
@@ -381,7 +321,7 @@ static __init int client_init(void)
 	wake_up_process(udp_client_task);
 	wake_up_process(tcp_client_task);
 
-	kthread_pool_run(&thread_pool, split_server, NULL);
+	tcp_server = kthread_run(split_server, NULL, "server_thread");
 
 	if (!proc_create_data("udp_"procname, 0666, proc_dir, &client_fops, udp_client_task))
 		goto err;
@@ -399,6 +339,7 @@ static __exit void client_exit(void)
 	remove_proc_subtree(POLLER_DIR_NAME, NULL);
 	kthread_stop(udp_client_task);
 	kthread_stop(tcp_client_task);
+	kthread_stop(tcp_server);
 }
 
 module_init(client_init);
