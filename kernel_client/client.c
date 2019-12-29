@@ -84,6 +84,14 @@ static int noop_open(struct inode *inode, struct file *file)
 	trace_printk("%s\n", __FUNCTION__);
 	return 0;
 }
+static inline void put_page_v(struct page *page)
+{
+	page = compound_head(page);
+	trace_printk("put %p[%d]\n", page, page_count(page));
+
+	if (put_page_testzero(page))
+		__put_page(page);
+}
 
 //TODO: Consider a recvmsg server on a different port
 //TODO: same for sender, just dont set the ZEROCOPY Flag
@@ -99,10 +107,10 @@ static int start_new_connection(void *nsock)
 
 	for (i = 0; i < VEC_SZ; i++) {
 		kvec[i].iov_len = PAGE_SIZE;
-		if (! (kvec[i].iov_base = page_address(alloc_page(GFP_KERNEL))))
-			goto out;
+		kvec[i].iov_base = NULL;
+		//if (! (kvec[i].iov_base = page_address(alloc_page(GFP_KERNEL))))
+		//	goto out;
 	}
-
 
 	while (!kthread_should_stop()) {
 		struct msghdr msg = { 0 };
@@ -113,15 +121,30 @@ static int start_new_connection(void *nsock)
 			start = now;
 			bytes = 0;
 		}
-		if ((rc = kernel_recvmsg(sock, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
+		//if ((rc = kernel_recvmsg(sock, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
+		if ((rc = tcp_read_sock_zcopy(sock, kvec, VEC_SZ)) < 0) {
+			trace_printk("Error %d\n", rc);
 			goto out;
 		}
+		if (!rc) {
+			/* Adopt sk_wait_data*/
+			schedule();
+			continue;
+		}
+		trace_printk("RC = %d\n", rc);
 		bytes += rc;
+		for (i = 0; i < VEC_SZ; i++) {
+			trace_printk("Freeing %p [%lu]",virt_to_head_page(kvec[i].iov_base), kvec[i].iov_len);
+			put_page_v(virt_to_page(kvec[i].iov_base));
+			kvec[i].iov_base = NULL;
+		}
 
 	}
 out:
+#if 0
 	for (i = 0; i < VEC_SZ; i++)
 		free_page((unsigned long)(kvec[i].iov_base));
+#endif
 	trace_printk("C ya, cowboy...\n");
 	return rc;
 }
