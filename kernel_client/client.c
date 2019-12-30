@@ -84,6 +84,7 @@ static int noop_open(struct inode *inode, struct file *file)
 	trace_printk("%s\n", __FUNCTION__);
 	return 0;
 }
+#if 0
 static inline void put_page_v(struct page *page)
 {
 	page = compound_head(page);
@@ -92,10 +93,39 @@ static inline void put_page_v(struct page *page)
 	if (put_page_testzero(page))
 		__put_page(page);
 }
-
+#endif
 //TODO: Consider a recvmsg server on a different port
 //TODO: same for sender, just dont set the ZEROCOPY Flag
 #define VEC_SZ 16
+
+static int tcp_read_sock_zcopy_blocking(struct socket *sock, struct kvec *pages_array, unsigned int nr_pages)
+{
+	struct sock *sk = sock->sk;
+	struct sk_buff *last = NULL;
+	long timeo = 1 * HZ;//MAX_SCHEDULE_TIMEOUT;
+	int rc;
+
+retry:
+	last = skb_peek_tail(&sk->sk_receive_queue);
+	if (!last)
+		goto wait;
+
+	if ((rc = tcp_read_sock_zcopy(sock, pages_array, nr_pages)) < 0) {
+		//trace_printk("Error %d\n", rc);
+		goto out;
+	}
+	if (!rc) {
+wait:
+		lock_sock(sk);
+		rc = sk_wait_data(sock->sk, &timeo, NULL);
+		last = skb_peek_tail(&sk->sk_receive_queue);
+		release_sock(sk);
+		goto retry;
+	}
+out:
+	return rc;
+}
+
 static int start_new_connection(void *nsock)
 {
 	struct socket *sock = nsock;
@@ -122,7 +152,7 @@ static int start_new_connection(void *nsock)
 			bytes = 0;
 		}
 		//if ((rc = kernel_recvmsg(sock, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
-		if ((rc = tcp_read_sock_zcopy(sock, kvec, VEC_SZ)) < 0) {
+		if ((rc = tcp_read_sock_zcopy_blocking(sock, kvec, VEC_SZ)) < 0) {
 			trace_printk("Error %d\n", rc);
 			goto out;
 		}
@@ -131,11 +161,13 @@ static int start_new_connection(void *nsock)
 			schedule();
 			continue;
 		}
-		trace_printk("RC = %d\n", rc);
+		//trace_printk("RC = %d\n", rc);
 		bytes += rc;
 		for (i = 0; i < VEC_SZ; i++) {
-			trace_printk("Freeing %p [%lu]",virt_to_head_page(kvec[i].iov_base), kvec[i].iov_len);
-			put_page_v(virt_to_page(kvec[i].iov_base));
+			if (!kvec[i].iov_base)
+				break;
+			//trace_printk("Freeing %p [%lu]",virt_to_head_page(kvec[i].iov_base), kvec[i].iov_len);
+			put_page(virt_to_page(kvec[i].iov_base));
 			kvec[i].iov_base = NULL;
 		}
 
