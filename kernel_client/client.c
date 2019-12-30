@@ -36,7 +36,7 @@ bind_mask_func pkthread_bind_mask;
 static struct proc_dir_entry *proc_dir;
 static struct task_struct *udp_client_task;
 static struct task_struct *tcp_client_task;
-static struct task_struct *tcp_server;
+static struct task_struct *tcp_server[2];
 
 static ssize_t client_write(struct file *file, const char __user *buf,
                               size_t len, loff_t *ppos)
@@ -126,7 +126,47 @@ out:
 	return rc;
 }
 
+#define RX_ORDER	2
 static int start_new_connection(void *nsock)
+{
+	struct socket *sock = nsock;
+	struct kvec kvec[VEC_SZ];
+	unsigned long bytes = 0 ;
+	ktime_t start = ktime_get();
+	//ktime_t initial_start = start;
+	int i, rc = 0;
+
+	for (i = 0; i < VEC_SZ; i++) {
+		kvec[i].iov_len = PAGE_SIZE << RX_ORDER;
+		if (! (kvec[i].iov_base = page_address(alloc_pages(GFP_KERNEL, RX_ORDER))))
+			goto out;
+	}
+
+	while (!kthread_should_stop()) {
+		struct msghdr msg = { 0 };
+		ktime_t now = ktime_get();
+		//ktime_get_seconds
+		if (unlikely(ktime_after(now, ktime_add(start, NSEC_PER_SEC)))) {
+			trace_printk("%llu) %lu\n", ktime_sub(now, start), bytes);
+			start = now;
+			bytes = 0;
+		}
+		if ((rc = kernel_recvmsg(sock, &msg, kvec, VEC_SZ, ((PAGE_SIZE << RX_ORDER) * VEC_SZ), 0)) <= 0) {
+			trace_printk("Error %d\n", rc);
+			goto out;
+		}
+		//trace_printk("RC = %d\n", rc);
+		bytes += rc;
+	}
+out:
+	for (i = 0; i < VEC_SZ; i++)
+		free_pages((unsigned long)(kvec[i].iov_base), RX_ORDER);
+
+	trace_printk("C ya, cowboy...\n");
+	return rc;
+}
+
+static int start_new_connection_z(void *nsock)
 {
 	struct socket *sock = nsock;
 	struct kvec kvec[VEC_SZ];
@@ -158,7 +198,7 @@ static int start_new_connection(void *nsock)
 		}
 		if (!rc) {
 			/* Adopt sk_wait_data*/
-			schedule();
+			//schedule();
 			continue;
 		}
 		//trace_printk("RC = %d\n", rc);
@@ -178,6 +218,46 @@ out:
 		free_page((unsigned long)(kvec[i].iov_base));
 #endif
 	trace_printk("C ya, cowboy...\n");
+	return rc;
+}
+
+#define PORT_Z 9090
+static int split_server_z(void *unused)
+{
+	int rc = 0;
+	struct socket *sock = NULL;
+	struct sockaddr_in srv_addr;
+
+	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
+		goto error;
+
+	srv_addr.sin_family 		= AF_INET;
+	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
+	srv_addr.sin_port 		= htons(PORT_Z);
+
+	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
+		goto error;
+
+	if ((rc = kernel_listen(sock, 32)))
+		goto error;
+
+	trace_printk("accepting on port %d\n", PORT_Z);
+	do {
+		struct socket *nsock;
+
+		rc = kernel_accept(sock, &nsock, 0);
+		if (unlikely(rc))
+			goto out;
+
+		kthread_run(start_new_connection_z, nsock, "server_z_%lx", (unsigned long)nsock);
+
+	} while (!kthread_should_stop());
+
+error:
+	trace_printk("Exiting %d\n", rc);
+out:
+	if (sock)
+		sock_release(sock);
 	return rc;
 }
 
@@ -209,7 +289,7 @@ static int split_server(void *unused)
 		if (unlikely(rc))
 			goto out;
 
-		kthread_run(start_new_connection, nsock, "server_%p", nsock);
+		kthread_run(start_new_connection, nsock, "server_%lx", (unsigned long)nsock);
 
 	} while (!kthread_should_stop());
 
@@ -376,7 +456,8 @@ static __init int client_init(void)
 	wake_up_process(udp_client_task);
 	wake_up_process(tcp_client_task);
 
-	tcp_server = kthread_run(split_server, NULL, "server_thread");
+	tcp_server[0] = kthread_run(split_server, NULL, "server_thread");
+	tcp_server[1] = kthread_run(split_server_z, NULL, "server_thread_z");
 
 	if (!proc_create_data("udp_"procname, 0666, proc_dir, &client_fops, udp_client_task))
 		goto err;
@@ -394,7 +475,8 @@ static __exit void client_exit(void)
 	remove_proc_subtree(POLLER_DIR_NAME, NULL);
 	kthread_stop(udp_client_task);
 	kthread_stop(tcp_client_task);
-	kthread_stop(tcp_server);
+	kthread_stop(tcp_server[0]);
+	kthread_stop(tcp_server[1]);
 }
 
 module_init(client_init);
