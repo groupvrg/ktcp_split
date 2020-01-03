@@ -13,6 +13,7 @@
 
 #include <net/net_namespace.h> //init_net
 #include <net/sock.h> //ZCOPY
+#include <net/tcp.h> //mss
 #include <uapi/linux/in.h> //sockaddr_in
 
 #include <linux/uaccess.h>
@@ -38,9 +39,23 @@ static struct task_struct *udp_client_task;
 static struct task_struct *tcp_client_task;
 static struct task_struct *tcp_server[2];
 
+static int is_zcopy;
+
 static ssize_t client_write(struct file *file, const char __user *buf,
                               size_t len, loff_t *ppos)
 {
+	char *kbuf = memdup_user_nul(buf, len);
+	if (IS_ERR_OR_NULL(kbuf))
+		return PTR_ERR(kbuf);
+
+	is_zcopy = 0;
+	if (kbuf[0] == '0') {
+		is_zcopy = 1;
+		trace_printk("zero copy set...\n");
+	} else
+		trace_printk("Input... %c\n", kbuf[0]);
+	kfree(kbuf);
+
 	trace_printk("%s\n", __FUNCTION__);
 	wake_up_process(file->private_data);
 	return len;
@@ -183,7 +198,6 @@ static int start_new_connection_z(void *nsock)
 	}
 
 	while (!kthread_should_stop()) {
-		struct msghdr msg = { 0 };
 		ktime_t now = ktime_get();
 		//ktime_get_seconds
 		if (unlikely(ktime_after(now, ktime_add(start, NSEC_PER_SEC)))) {
@@ -221,7 +235,7 @@ out:
 	return rc;
 }
 
-#define PORT_Z 9090
+#define PORT_Z 8081
 static int split_server_z(void *unused)
 {
 	int rc = 0;
@@ -301,16 +315,29 @@ out:
 	return rc;
 }
 
-/*
-	TODO: Need a thread to do accept (look at ktcp)
-	TODO: integrate DAMN, KTCP magazines
-*/
+
+static inline void send_loop(struct socket *tx, struct msghdr *msg, struct kvec *vec)
+{
+	int rc, i = 0;
+
+	for (i = 0; i < (1<<19); i++) {
+		struct kvec kvec[16];
+
+		memcpy(kvec, vec, sizeof(struct kvec) << 4);
+
+		while ((rc = trace_sendmsg(tx, msg, kvec, 16, (PAGE_SIZE << 6))) <= 0) {
+			trace_printk("Received an Err %d\n", rc);
+			schedule();
+		}
+	}
+}
+
 static inline void tcp_client(void)
 {
 #define PORT	8080
 //#define SERVER_ADDR (10<<24|1<<16|4<<8|38) /*10.1.4.38*/
 #define SERVER_ADDR (10<<24|154<<16|0<<8|21) /*10.154.0.21*/
-	int rc, i = 0, j;
+	int rc, i = 0;
 	unsigned long cnt, max;
 	struct socket *tx = NULL;
 	struct sockaddr_in srv_addr = {0};
@@ -325,17 +352,16 @@ static inline void tcp_client(void)
 
 	msg.msg_name 	= &srv_addr;
 	msg.msg_namelen = sizeof(struct sockaddr);
-	msg.msg_flags 	|= MSG_ZEROCOPY;
 
-	if (! (base  = page_address(alloc_pages(GFP_KERNEL, 4)))) {
+	if (! (base  = page_address(alloc_pages(GFP_KERNEL|__GFP_COMP, 6)))) {
 		rc = -ENOMEM;
 		goto err;
 	}
  #define virt_to_pfn(kaddr) (__pa(kaddr) >> PAGE_SHIFT)
 	for (i = 0; i < 16; i++) {
-		kvec[i].iov_len = PAGE_SIZE;
-		kvec[i].iov_base = base + (i * PAGE_SIZE);
-		trace_printk("Page %d) 0x%lx (%lu)\n",i, (unsigned long)(kvec[i].iov_base), virt_to_pfn(kvec[i].iov_base));
+		kvec[i].iov_len = PAGE_SIZE << 2;
+		kvec[i].iov_base = base + (i * (PAGE_SIZE << 2));
+		trace_printk("Page %d) 0x%lx (0x%lx)\n",i, (unsigned long)(kvec[i].iov_base), (unsigned long)virt_to_page(kvec[i].iov_base));
 	}
 
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
@@ -343,38 +369,24 @@ static inline void tcp_client(void)
 		goto err;
         }
 
-	sock_set_flag(tx->sk, SOCK_KERN_ZEROCOPY);
+	if (is_zcopy) {
+		sock_set_flag(tx->sk, SOCK_KERN_ZEROCOPY);
+		msg.msg_flags 	|= MSG_ZEROCOPY;
+	}
 
         if ((rc = kernel_connect(tx, (struct sockaddr *)&srv_addr, sizeof(struct sockaddr), 0))) {
                 trace_printk("RC = %d (%d)\n", rc, __LINE__);
 		goto err;
         }
 	trace_printk("Connected, sending...\n");
-
-	for (i = 0; i < (1<<19); i++) {
-	//	for (j = 0; j < 16; j++) {
-	//		get_page(virt_to_page(base + (i * PAGE_SIZE)));
-	//	}
-
-
-		while ((rc = kernel_sendmsg(tx, &msg, kvec, 16, (16 << PAGE_SHIFT))) <= 0) {
-			//trace_printk("Received an Err %d\n", rc);
-			rc = 0;
-			cnt++;
-		}
-		if (unlikely(cnt > max)) {
-			trace_printk("Polling for %lu [%lu]\n", cnt, max);
-			max = cnt;
-		}
-		cnt = 0;
-	}
-	trace_printk("Hello messages sent.(%d)\n", i);
+	send_loop(tx, &msg, kvec);
+	trace_printk("Hello messages sent.(%d) mss %u\n", i, tcp_current_mss(tx->sk));
 	goto ok;
 err:
 	trace_printk("ERROR %d\n", rc);
 ok:
 	sock_release(tx);
-	free_pages((unsigned long)base, 4);
+	free_pages((unsigned long)base, 6);
 	return;
 }
 
