@@ -1,0 +1,208 @@
+From 14b94ca32a3c5039c8689a543905ed81cb53e367 Mon Sep 17 00:00:00 2001
+From: Build VM <build@example.com>
+Date: Sat, 28 Dec 2019 16:41:15 +0000
+Subject: [PATCH 12/24] tcp_read_sock_zcopy
+
+---
+ drivers/net/virtio_net.c |  12 +++-
+ include/linux/tcp.h      |   2 +
+ net/ipv4/tcp.c           | 120 +++++++++++++++------------------------
+ 3 files changed, 58 insertions(+), 76 deletions(-)
+
+diff --git a/drivers/net/virtio_net.c b/drivers/net/virtio_net.c
+index 6a900504d..46133fe5b 100644
+--- a/drivers/net/virtio_net.c
++++ b/drivers/net/virtio_net.c
+@@ -2684,7 +2684,8 @@ static int virtnet_probe(struct virtio_device *vdev)
+ 	struct net_device *dev;
+ 	struct virtnet_info *vi;
+ 	u16 max_queue_pairs;
+-	int mtu;
++	int mtu, cnt = 0;
++	char feat[256] = {0};
+ 
+ 	/* Find if host supports multiqueue virtio_net device */
+ 	err = virtio_cread_feature(vdev, VIRTIO_NET_F_MQ,
+@@ -2775,11 +2776,16 @@ static int virtnet_probe(struct virtio_device *vdev)
+ 	if (virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_TSO4) ||
+ 	    virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_TSO6) ||
+ 	    virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_ECN) ||
+-	    virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_UFO))
++	    virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_UFO)) {
+ 		vi->big_packets = true;
++		cnt += snprintf(feat[cnt], 32 , "BIG Packets ");
++	}
+ 
+-	if (virtio_has_feature(vdev, VIRTIO_NET_F_MRG_RXBUF))
++	if (virtio_has_feature(vdev, VIRTIO_NET_F_MRG_RXBUF)) {
+ 		vi->mergeable_rx_bufs = true;
++		cnt += snprintf(feat[cnt], 32 , "VIRTIO_NET_F_MRG_RXBUF");
++	}
++	trace_printk("%s: %s\n", __FILE__, feat);
+ 
+ 	if (virtio_has_feature(vdev, VIRTIO_NET_F_MRG_RXBUF) ||
+ 	    virtio_has_feature(vdev, VIRTIO_F_VERSION_1))
+diff --git a/include/linux/tcp.h b/include/linux/tcp.h
+index f92e921f3..6d516fb53 100644
+--- a/include/linux/tcp.h
++++ b/include/linux/tcp.h
+@@ -450,6 +450,8 @@ static inline void tcp_saved_syn_free(struct tcp_sock *tp)
+ }
+ 
+ struct sk_buff *tcp_get_timestamping_opt_stats(const struct sock *sk);
++int tcp_zcopy_rx(struct socket *sock, struct page **pages_array, unsigned int nr_pages);
++
+ 
+ static inline u16 tcp_mss_clamp(const struct tcp_sock *tp, u16 mss)
+ {
+diff --git a/net/ipv4/tcp.c b/net/ipv4/tcp.c
+index e1369c304..d44f1475c 100644
+--- a/net/ipv4/tcp.c
++++ b/net/ipv4/tcp.c
+@@ -3679,96 +3679,70 @@ void __init tcp_init(void)
+ 	tcp_tasklet_init();
+ }
+ 
+-void tcp_zcopy_rx(struct socket *sock, struct page **pages_array, unsigned int nr_pages)
++struct kvec_desc {
++	struct kvec *pages_array;
++	unsigned int nr_pages;
++	read_descriptor_t desc_t;
++};
++
++int skb_zerocopy_rx(read_descriptor_t *desc_t, struct sk_buff *skb, u32 offset, size_t len)
+ {
+-	struct sock *sk = sock->sk;
++	int copied = 0;
+ 	const skb_frag_t *frags;
+-	u32 seq, len, offset, nr = 0;
+-	struct tcp_sock *tp;
+-	struct sk_buff *skb;
+-	int rc = -ENOTCONN;
++	struct kvec_desc *desc = container_of(desc_t, struct kvec_desc, desc_t);
+ 
+-	lock_sock(sk);
++	/*TODO: move to using read_descriptor_t, this w/a is gratuitous*/
++	desc_t->count = 1;
+ 
+-	if (sk->sk_state == TCP_LISTEN)
+-		goto out;
++	if (unlikely(!desc->nr_pages))
++		return -ENOMEM;
+ 
+-	sock_rps_record_flow(sk);
++	if (skb_headlen(skb) > offset) {
++		if (!(skb->head_frag))
++			return -EINVAL;
+ 
+-	tp = tcp_sk(sk);
+-	seq = tp->copied_seq;
+-#if 0
+-	unsigned long size = nr_pages << PAGE_SHIFT;
++		desc->pages_array->iov_base = skb->data + offset;
++		desc->pages_array->iov_len = skb_headlen(skb) - offset;
++		copied = desc->pages_array->iov_len;
++		len -= copied;
++		offset = 0;
+ 
+-	/* We dont actually care, accept everything...*/
+-	if (tcp_inq(sk) < size) {
+-		ret = sock_flag(sk, SOCK_DONE) ? -EIO : -EAGAIN;
+-		goto out;
++		get_page(virt_to_head_page(skb->head));
++		desc->pages_array++;
++		desc->nr_pages--;
+ 	}
+-	/* Abort if urgent data is in the area  --- Hmm.....*/
+-	if (unlikely(tp->urg_data)) {
+-		u32 urg_offset = tp->urg_seq - seq;
+ 
+-		ret = -EINVAL;
+-		if (urg_offset < size)
+-			goto out;
+-	}
+-#endif
+-	skb = tcp_recv_skb(sk, seq, &offset);
+-	rc = -EINVAL;
+-skb_start:
+-	offset -= skb_headlen(skb);
+-	/* Linear data present... - Handle it or Fix virtio */
+-	if ((int)offset < 0)
+-		goto out;
+-	/* frag list present ? eehnmmm... gro wtf?*/
+-	if (skb_has_frag_list(skb))
+-		goto out;
+ 	len = skb->data_len - offset;
+ 	frags = skb_shinfo(skb)->frags;
+ 	while (offset) {
+ 		if (frags->size > offset)
+-			goto out;
++			break;
+ 		offset -= frags->size;
+ 		frags++;
+ 	}
+-	while (nr < nr_pages) {
+-		if (len) {
+-			if (len < PAGE_SIZE)
+-				goto out;
+-			if (frags->size != PAGE_SIZE || frags->page_offset)
+-				goto out;
+-			pages_array[nr++] = skb_frag_page(frags);
+-			frags++;
+-			len -= PAGE_SIZE;
+-			seq += PAGE_SIZE;
+-			continue;
+-		}
+-		skb = skb->next;
+-		offset = seq - TCP_SKB_CB(skb)->seq;
+-		goto skb_start;
+-	}
+-#if 0
+-       /* Ok now we need to get these pages...*/
+-       for (nr = 0; nr < nr_pages; nr++) {
+-               ret = vm_insert_page(vma, vma->vm_start + (nr << PAGE_SHIFT),
+-                                    pages_array[nr]);
+-               if (ret)
+-                       goto out;
+-       }
+-#endif
+-	/* operation is complete, we can 'consume' all skbs */
+-	tp->copied_seq = seq;
+-	tcp_rcv_space_adjust(sk);
+ 
+-	/* Clean up data we have read: This will do ACK frames. */
+-	tcp_recv_skb(sk, seq, &offset);
+-	//TODO: need to account for all received bytes...
+-	//tcp_cleanup_rbuf(sk, size);
++	while (desc->nr_pages) {
++		__skb_frag_ref(frags);
++		desc->pages_array->iov_base = skb_frag_address(frags) + offset;
++		desc->pages_array->iov_len = skb_frag_size(frags) - offset;
+ 
+-	rc = 0;
+-out:
+-	release_sock(sk);
++		offset = 0;
++		desc->pages_array++;
++		desc->nr_pages--;
++
++		len -= skb_frag_size(frags);
++		copied += skb_frag_size(frags);
++
++		if (len <= 0)
++			break;
++	}
++	return copied;
++}
++
++static int tcp_read_sock_zcopy(struct socket *sock, struct kvec *pages_array, unsigned int nr_pages)
++{
++	struct kvec_desc desc = {.pages_array = pages_array, .nr_pages = nr_pages};
+ 
+-	return rc;
++	return tcp_read_sock(sock->sk, &desc.desc_t , skb_zerocopy_rx);
+ }
++EXPORT_SYMBOL(tcp_read_sock_zcopy);
+-- 
+2.17.1
+

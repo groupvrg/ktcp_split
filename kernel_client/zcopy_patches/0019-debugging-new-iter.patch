@@ -1,0 +1,86 @@
+From 39ce06a158266e84a9b1185639feb2a10cd2bed7 Mon Sep 17 00:00:00 2001
+From: Build VM <build@example.com>
+Date: Thu, 2 Jan 2020 10:43:31 +0000
+Subject: [PATCH 19/24] debugging new iter
+
+---
+ net/core/datagram.c | 7 ++++++-
+ net/core/skbuff.c   | 4 ++--
+ net/ipv4/tcp.c      | 3 ++-
+ 3 files changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/net/core/datagram.c b/net/core/datagram.c
+index 4b0790719..b4abdf63c 100644
+--- a/net/core/datagram.c
++++ b/net/core/datagram.c
+@@ -587,10 +587,14 @@ static inline ssize_t kvec_get_frag_advance(struct iov_iter *from,
+ 	ssize_t copied = 0;
+ 	struct kvec *kvec = &from->kvec[from->iov_offset];
+ 
++	trace_printk("kvec %lx [%d]\n", kvec, from->iov_offset);
++
++	trace_printk("iter 0x%lx len %lu : base %p iov len %d off %lx\n", (unsigned long)from, len, virt_to_page(kvec->iov_base), kvec->iov_len, (unsigned long)kvec->iov_base & (~PAGE_MASK));
+ 	*page = virt_to_page(kvec->iov_base);
+ 	*off = (unsigned long)kvec->iov_base & (~PAGE_MASK);
+ 	get_page(*page);
+ 
++	trace_printk("...\n");
+ 	if (len >= kvec->iov_len) {
+ 		copied = kvec->iov_len;
+ 		kvec->iov_len = 0;
+@@ -610,7 +614,7 @@ int skb_zerocopy_sg_from_iter(struct sock *sk, struct sk_buff *skb,
+ 			    struct iov_iter *from, size_t len)
+ {
+ 	int frag = skb_shinfo(skb)->nr_frags;
+-
++	trace_printk("collecting Frags %p [%p -> %lu]\n", skb, from, len);
+ 	while (len && iov_iter_count(from)) {
+ 		struct page *page = NULL;
+ 		unsigned long truesize;
+@@ -621,6 +625,7 @@ int skb_zerocopy_sg_from_iter(struct sock *sk, struct sk_buff *skb,
+ 			return -EMSGSIZE;
+ 
+ 		copied = kvec_get_frag_advance(from, &page, &offset, len);
++		trace_printk("collected %lu [%p + %lu]\n", copied, page, offset);
+ 		len -= copied;
+ 
+ 		truesize = copied;
+diff --git a/net/core/skbuff.c b/net/core/skbuff.c
+index 930c93089..e73f89440 100644
+--- a/net/core/skbuff.c
++++ b/net/core/skbuff.c
+@@ -1146,7 +1146,7 @@ int skb_zerocopy_iter_stream(struct sock *sk, struct sk_buff *skb,
+ 	err = skb_zerocopy_sg_from_iter(sk, skb, &msg->msg_iter, len);
+ 	if (err == -EMSGSIZE && skb->len == orig_len) {
+ 		struct sock *save_sk = skb->sk;
+-
++		trace_printk("Failed to collet data...[%p]n", skb);
+ 		/* Streams do not free skb on error. Reset to prev state. */
+ 		msg->msg_iter = orig_iter;
+ 		skb->sk = sk;
+@@ -1154,7 +1154,7 @@ int skb_zerocopy_iter_stream(struct sock *sk, struct sk_buff *skb,
+ 		skb->sk = save_sk;
+ 		return err;
+ 	}
+-
++	trace_printk("Collected data, setting zcopy [%p]\n", skb);
+ 	skb_zcopy_set(skb, uarg);
+ 	return skb->len - orig_len;
+ }
+diff --git a/net/ipv4/tcp.c b/net/ipv4/tcp.c
+index fbf7da289..db3fa8977 100644
+--- a/net/ipv4/tcp.c
++++ b/net/ipv4/tcp.c
+@@ -1355,7 +1355,8 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
+ 			copy = msg_data_left(msg);
+ 
+ 		/* Where to copy to? */
+-		if (skb_availroom(skb) > 0) {
++		if (skb_availroom(skb) > 0 && !uarg->zerocopy ) {
++			/*TODO: WHy defuck? ... ignore this, maybve copy 64B - Next next...*/
+ 			/* We have some space in skb head. Superb! */
+ 			copy = min_t(int, copy, skb_availroom(skb));
+ 			err = skb_add_data_nocache(sk, skb, &msg->msg_iter, copy);
+-- 
+2.17.1
+

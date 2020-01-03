@@ -1,0 +1,212 @@
+From 2e480e5b8af75ff0e4a528fe948cfb35e620e1cd Mon Sep 17 00:00:00 2001
+From: Build VM <build@example.com>
+Date: Mon, 23 Dec 2019 17:34:00 +0000
+Subject: [PATCH 08/24] Kernel zero copy
+
+---
+ include/linux/mm.h     |  2 +-
+ include/linux/skbuff.h |  1 +
+ include/net/sock.h     |  1 +
+ net/core/skbuff.c      | 25 ++++++++++++++++++++++---
+ net/core/sock.c        |  6 +++---
+ net/ipv4/tcp.c         | 22 +++++++++++++++++-----
+ 6 files changed, 45 insertions(+), 12 deletions(-)
+
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index 4b59e40dc..e14bad183 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -374,7 +374,7 @@ enum page_entry_size {
+ /*
+  * These are the virtual MM functions - opening of an area, closing and
+  * unmapping it (needed to keep files on disk up-to-date etc), pointer
+- * to the functions called when a no-page or a wp-page exception occurs. 
++ * to the functions called when a no-page or a wp-page exception occurs.
+  */
+ struct vm_operations_struct {
+ 	void (*open)(struct vm_area_struct * area);
+diff --git a/include/linux/skbuff.h b/include/linux/skbuff.h
+index 1c4ac5323..53e2802e6 100644
+--- a/include/linux/skbuff.h
++++ b/include/linux/skbuff.h
+@@ -479,6 +479,7 @@ void sock_zerocopy_put(struct ubuf_info *uarg);
+ void sock_zerocopy_put_abort(struct ubuf_info *uarg);
+ 
+ void sock_zerocopy_callback(struct ubuf_info *uarg, bool success);
++void sock_kern_zerocopy_cb(struct ubuf_info *uarg, bool success);
+ 
+ int skb_zerocopy_iter_stream(struct sock *sk, struct sk_buff *skb,
+ 			     struct msghdr *msg, int len,
+diff --git a/include/net/sock.h b/include/net/sock.h
+index 30d3c6798..a60acc080 100644
+--- a/include/net/sock.h
++++ b/include/net/sock.h
+@@ -778,6 +778,7 @@ enum sock_flags {
+ 	SOCK_FASYNC, /* fasync() active */
+ 	SOCK_RXQ_OVFL,
+ 	SOCK_ZEROCOPY, /* buffers from userspace */
++	SOCK_KERN_ZEROCOPY, /* zero-copy kernel buffers */
+ 	SOCK_WIFI_STATUS, /* push wifi status to userspace */
+ 	SOCK_NOFCS, /* Tell NIC not to do the Ethernet FCS.
+ 		     * Will use last 4 bytes of packet sent from
+diff --git a/net/core/skbuff.c b/net/core/skbuff.c
+index d3128e9a3..e8ce51109 100644
+--- a/net/core/skbuff.c
++++ b/net/core/skbuff.c
+@@ -901,10 +901,14 @@ static int mm_account_pinned_pages(struct mmpin *mmp, size_t size)
+ 	unsigned long max_pg, num_pg, new_pg, old_pg;
+ 	struct user_struct *user;
+ 
++	if (IS_ERR(mmp->user))
++		return 0;
++
+ 	if (capable(CAP_IPC_LOCK) || !size)
+ 		return 0;
+ 
+ 	num_pg = (size >> PAGE_SHIFT) + 2;	/* worst case */
++
+ 	max_pg = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
+ 	user = mmp->user ? : current_user();
+ 
+@@ -928,7 +932,7 @@ static int mm_account_pinned_pages(struct mmpin *mmp, size_t size)
+ 
+ static void mm_unaccount_pinned_pages(struct mmpin *mmp)
+ {
+-	if (mmp->user) {
++	if (!IS_ERR_OR_NULL(mmp->user)) {
+ 		atomic_long_sub(mmp->num_pg, &mmp->user->locked_vm);
+ 		free_uid(mmp->user);
+ 	}
+@@ -947,14 +951,16 @@ struct ubuf_info *sock_zerocopy_alloc(struct sock *sk, size_t size)
+ 
+ 	BUILD_BUG_ON(sizeof(*uarg) > sizeof(skb->cb));
+ 	uarg = (void *)skb->cb;
+-	uarg->mmp.user = NULL;
++	uarg->mmp.user = sock_flag(sk, SOCK_KERN_ZEROCOPY) ? ERR_PTR(-ESRCH) : NULL;
++	trace_printk("zcopy user %lu\n", (unsigned long)uarg->mmp.user);
+ 
+ 	if (mm_account_pinned_pages(&uarg->mmp, size)) {
++		trace_printk("Hemmm... WTF?!\n");
+ 		kfree_skb(skb);
+ 		return NULL;
+ 	}
+ 
+-	uarg->callback = sock_zerocopy_callback;
++	uarg->callback = sock_flag(sk, SOCK_KERN_ZEROCOPY) ? sock_kern_zerocopy_cb : sock_zerocopy_callback;
+ 	uarg->id = ((u32)atomic_inc_return(&sk->sk_zckey)) - 1;
+ 	uarg->len = 1;
+ 	uarg->bytelen = size;
+@@ -1031,6 +1037,19 @@ static bool skb_zerocopy_notify_extend(struct sk_buff *skb, u32 lo, u16 len)
+ 	return true;
+ }
+ 
++void sock_kern_zerocopy_cb(struct ubuf_info *uarg, bool success)
++{
++	struct sk_buff *tail, *skb = skb_from_uarg(uarg);
++	int i, num_frags = skb_shinfo(skb)->nr_frags;
++
++	trace_printk("%s freeing pages...\n", __FUNCTION__);
++	for (i = 0; i < num_frags; i++) {
++		skb_frag_t *f = &skb_shinfo(skb)->frags[i];
++		put_page(f->page.p); // ? put_page?
++	}
++}
++EXPORT_SYMBOL(sock_kern_zerocopy_cb);
++
+ void sock_zerocopy_callback(struct ubuf_info *uarg, bool success)
+ {
+ 	struct sk_buff *tail, *skb = skb_from_uarg(uarg);
+diff --git a/net/core/sock.c b/net/core/sock.c
+index eb2428e88..7fbda6322 100644
+--- a/net/core/sock.c
++++ b/net/core/sock.c
+@@ -1945,9 +1945,9 @@ struct sk_buff *sock_omalloc(struct sock *sk, unsigned long size,
+ 	struct sk_buff *skb;
+ 
+ 	/* small safe race: SKB_TRUESIZE may differ from final skb->truesize */
+-	if (atomic_read(&sk->sk_omem_alloc) + SKB_TRUESIZE(size) >
+-	    sysctl_optmem_max)
+-		return NULL;
++	//if (atomic_read(&sk->sk_omem_alloc) + SKB_TRUESIZE(size) >
++	//    sysctl_optmem_max)
++	//	return NULL;
+ 
+ 	skb = alloc_skb(size, priority);
+ 	if (!skb)
+diff --git a/net/ipv4/tcp.c b/net/ipv4/tcp.c
+index 35aafe374..96801c578 100644
+--- a/net/ipv4/tcp.c
++++ b/net/ipv4/tcp.c
+@@ -1202,15 +1202,19 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
+ 	struct ubuf_info *uarg = NULL;
+ 	struct sk_buff *skb;
+ 	struct sockcm_cookie sockc;
+-	int flags, err, copied = 0;
++	int flags, err, copied = 0, line;
+ 	int mss_now = 0, size_goal, copied_syn = 0;
+ 	bool process_backlog = false;
+ 	bool sg;
+ 	long timeo;
+ 
+ 	flags = msg->msg_flags;
++	line = __LINE__;
++	if (flags & MSG_ZEROCOPY && size
++		&& (sock_flag(sk, SOCK_ZEROCOPY)
++			|| sock_flag(sk, SOCK_KERN_ZEROCOPY) )) {
+ 
+-	if (flags & MSG_ZEROCOPY && size && sock_flag(sk, SOCK_ZEROCOPY)) {
++		trace_printk("ZCOPY\n");
+ 		if ((1 << sk->sk_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
+ 			err = -EINVAL;
+ 			goto out_err;
+@@ -1220,11 +1224,14 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
+ 		uarg = sock_zerocopy_realloc(sk, size, skb_zcopy(skb));
+ 		if (!uarg) {
+ 			err = -ENOBUFS;
++			line = __LINE__;
+ 			goto out_err;
+ 		}
+ 
+-		if (!(sk_check_csum_caps(sk) && sk->sk_route_caps & NETIF_F_SG))
++		if (!(sk_check_csum_caps(sk) && sk->sk_route_caps & NETIF_F_SG)) {
++			trace_printk("WTF?...\n");
+ 			uarg->zerocopy = 0;
++		}
+ 	}
+ 
+ 	if (unlikely(flags & MSG_FASTOPEN || inet_sk(sk)->defer_connect) &&
+@@ -1232,8 +1239,10 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
+ 		err = tcp_sendmsg_fastopen(sk, msg, &copied_syn, size);
+ 		if (err == -EINPROGRESS && copied_syn > 0)
+ 			goto out;
+-		else if (err)
++		else if (err) {
++			line = __LINE__;
+ 			goto out_err;
++		}
+ 	}
+ 
+ 	timeo = sock_sndtimeo(sk, flags & MSG_DONTWAIT);
+@@ -1258,8 +1267,10 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
+ 		}
+ 
+ 		err = -EINVAL;
+-		if (tp->repair_queue == TCP_NO_QUEUE)
++		if (tp->repair_queue == TCP_NO_QUEUE) {
++			line = __LINE__;
+ 			goto out_err;
++		}
+ 
+ 		/* 'common' sending to sendq */
+ 	}
+@@ -1453,6 +1464,7 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
+ 	if (copied + copied_syn)
+ 		goto out;
+ out_err:
++	trace_printk("Error %d\n", line);
+ 	sock_zerocopy_put_abort(uarg);
+ 	err = sk_stream_error(sk, flags, err);
+ 	/* make sure we wake any epoll edge trigger waiter */
+-- 
+2.17.1
+

@@ -1,0 +1,44 @@
+From 7cf37e48d117a29a9cc55025b7552b9fd5152cbd Mon Sep 17 00:00:00 2001
+From: Build VM <build@example.com>
+Date: Mon, 16 Dec 2019 10:51:28 +0000
+Subject: [PATCH 05/24] virtio changes
+
+---
+ drivers/net/virtio_net.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/net/virtio_net.c b/drivers/net/virtio_net.c
+index edfa09087..6a900504d 100644
+--- a/drivers/net/virtio_net.c
++++ b/drivers/net/virtio_net.c
+@@ -2643,13 +2643,13 @@ static int virtio_net_show(struct seq_file *m, void *v)
+ 		rx_napi			+= stats->rx_napi;
+ 		rx_napi_complete	+= stats->rx_napi_complete;
+ 		rx_packets		+= stats->rx_packets;
+-		seq_printf(m, "%d: RX:\n\t%020lld\n\t%020lld\n\t%020lld\n", cpu,
++		seq_printf(m, "%d: RX:\n\t%20lld\n\t%20lld\n\t%20lld\n", cpu,
+ 				stats->rx_packets, stats->rx_napi, stats->rx_napi_complete);
+-		seq_printf(m, "%d: TX:\n\t%020lld\n\t%020lld\nQ: %s\n", cpu, stats->tx_packets, stats->tx_kick,
+-				netif_xmit_stopped(txq) ? "STOPPED!":"OK");
++		seq_printf(m, "%d: TX(%s):\n\t%20lld\n\t%20lld\n", cpu, netif_xmit_stopped(txq) ? "STOPPED!":"OK",
++				stats->tx_packets, stats->tx_kick);
+ 	}
+-	seq_printf(m, "\nTotal RX:\n\t%-20lld\n\t%-20lld\n\t%-20lld\n", rx_packets, rx_napi, rx_napi_complete);
+-	seq_printf(m, "Total TX:\n\t%-20lld\n\t%-20lld\n", tx_packets, tx_kick);
++	seq_printf(m, "\nTotal RX:\n\t%20lld\n\t%20lld\n\t%20lld\n", rx_packets, rx_napi, rx_napi_complete);
++	seq_printf(m, "Total TX:\n\t%20lld\n\t%20lld\n", tx_packets, tx_kick);
+         return 0;
+ }
+ 
+@@ -3016,7 +3016,7 @@ static __init int virtio_net_driver_init(void)
+ 	if (ret)
+ 		goto err_virtio;
+ 
+-	virtio_net_proc_init();
++	//virtio_net_proc_init();
+ 	return 0;
+ err_virtio:
+ 	cpuhp_remove_multi_state(CPUHP_VIRT_NET_DEAD);
+-- 
+2.17.1
+

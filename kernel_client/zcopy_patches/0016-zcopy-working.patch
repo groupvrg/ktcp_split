@@ -1,0 +1,56 @@
+From 2407bb8eabb22b316f0c8f40a6189fe095c43ab6 Mon Sep 17 00:00:00 2001
+From: Build VM <build@example.com>
+Date: Sun, 29 Dec 2019 17:47:38 +0000
+Subject: [PATCH 16/24] zcopy working
+
+---
+ net/ipv4/tcp.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/net/ipv4/tcp.c b/net/ipv4/tcp.c
+index 7db39bf83..54ad5b041 100644
+--- a/net/ipv4/tcp.c
++++ b/net/ipv4/tcp.c
+@@ -3696,8 +3696,6 @@ int skb_zerocopy_rx(read_descriptor_t *desc_t, struct sk_buff *skb, u32 offset,
+ 	const skb_frag_t *frags;
+ 	struct kvec_desc *desc = container_of(desc_t, struct kvec_desc, desc_t);
+ 
+-	/*TODO: move to using read_descriptor_t, this w/a is gratuitous*/
+-
+ 	if (unlikely(!desc->nr_pages)) {
+ 		trace_printk("nr_pages = 0\n");
+ 		return -ENOMEM;
+@@ -3744,8 +3742,9 @@ int skb_zerocopy_rx(read_descriptor_t *desc_t, struct sk_buff *skb, u32 offset,
+ 	trace_printk("Collecting frags: %d [%d] of %u len %lu\n", skb_shinfo(skb)->nr_frags, skipped, offset, len);
+ 
+ 	while (desc->nr_pages) {
+-		if (unlikely(!(skb_shinfo(skb)->nr_frags -skipped)))
++		if (unlikely(!(skb_shinfo(skb)->nr_frags -skipped))) {
+ 			break;
++		}
+ 		desc->pages_array->iov_base = skb_frag_address(frags) + offset;
+ 		desc->pages_array->iov_len = skb_frag_size(frags) - offset;
+ 
+@@ -3753,16 +3752,16 @@ int skb_zerocopy_rx(read_descriptor_t *desc_t, struct sk_buff *skb, u32 offset,
+ 		len -= skb_frag_size(frags);
+ 		copied += skb_frag_size(frags);
+ 
+-		trace_printk("Frag: %p = %p [%d]<%d> [%lu/%lu] [%d,%d]\n",
+-				skb_frag_page(frags),
++		trace_printk("Frag: %p [%d]<%d> [%lu=%u/%lu] [%d,%d]\n",
+ 				virt_to_head_page(desc->pages_array->iov_base), frags->page_offset + offset,
+ 				page_count(virt_to_head_page(desc->pages_array->iov_base)),
+-				desc->pages_array->iov_len, len, copied, desc->nr_pages);
++				desc->pages_array->iov_len, skb_frag_size(frags), len, copied, desc->nr_pages);
+ 
+ 		skb_frag_get(frags);//TODO: BUG - Doesnt use compound head!!! - GRO use case breaks
+ 		offset = 0;
+ 		desc->pages_array++;
+ 		desc->nr_pages--;
++		skipped++;
+ 		frags++;
+ 
+ 		if (len <= 0)
+-- 
+2.17.1
+
