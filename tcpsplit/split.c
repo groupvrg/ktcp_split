@@ -23,7 +23,7 @@
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Markuze Alex");
-MODULE_DESCRIPTION("CBN TCP Split Module");
+MODULE_DESCRIPTION("CBN zcopy TCP Split Module");
 MODULE_VERSION(KTCP_VERSION);
 
 #define BACKLOG     	128
@@ -406,24 +406,19 @@ static inline void stop_sockets(void)
 #define VEC_SZ 16
 int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 {
-	struct kvec kvec[VEC_SZ];
-	int id = 0, i ,dir = sock->dir;
+	struct kvec kvec[MAX_SKB_FRAGS];
+	int id = 0, dir = sock->dir;
 	int rc;
 	uint64_t bytes = 0;
 
 	/*Allow to run on any core...*/
-	if ((rc = sched_setaffinity(0, cpu_possible_mask)))
+	if ((rc = sched_setaffinity( 0, cpu_possible_mask)))
 		TRACE_ERROR("Failed to sched_setaffinity! [%d]", rc);
-	rc = -ENOMEM;
-	for (i = 0; i < VEC_SZ; i++) {
-		kvec[i].iov_len = PAGE_SIZE;
-		/*TODO: In case of alloc failure put_qp is needed */
-		if (! (kvec[i].iov_base = page_address(alloc_page(GFP_KERNEL))))
-			goto err;
-	}
+
+	sock_set_flag(sock->tx->sk, SOCK_KERN_ZEROCOPY);
 	do {
 		struct msghdr msg = { 0 };
-		if ((rc = kernel_recvmsg(sock->rx, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
+		if ((rc = tcp_read_sock_zcopy_blocking(sock->rx, kvec, MAX_SKB_FRAGS)) <= 0) {
 			TRACE_DEBUG("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
 					dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 			put_qp(qp);
@@ -441,11 +436,10 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 		}
 		bytes += rc;
 		id ^= 1;
-		if (msg.msg_flags)
-			TRACE_PRINT("[%s] GOT A FUCKING FLAG %d", id ? "Send" : "Rcv", msg.msg_flags);
+		msg.msg_flags   |= MSG_ZEROCOPY;
 
-		//use kern_sendpage if flags needed.
-		if ((rc = kernel_sendmsg(sock->tx, &msg, kvec, VEC_SZ, rc)) <= 0) {
+		//FIXME: Need to make sure we know num of frags
+		if ((rc = kernel_sendmsg(sock->tx, &msg, kvec, MAX_SKB_FRAGS, rc)) <= 0) {
 			TRACE_PRINT("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
 					dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 			put_qp(qp);
@@ -459,8 +453,6 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 			goto err;
 		}
 		id ^= 1;
-		if (msg.msg_flags)
-			TRACE_PRINT("[%s] GOT A FUCKING FLAG %d", id ? "Send" : "Rcv", msg.msg_flags);
 
 	} while (!kthread_should_stop());
 
@@ -472,8 +464,6 @@ err:
 		TRACE_DEBUG("%s [%s] stopping (%d) at %s with %lld bytes", __FUNCTION__,
 				dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 	}
-	for (i = 0; i < VEC_SZ; i++)
-		free_page((unsigned long)(kvec[i].iov_base));
 
 	return rc;
 }
