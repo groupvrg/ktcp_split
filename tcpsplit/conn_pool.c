@@ -243,7 +243,7 @@ static int prealloc_connection(void *arg)
 
 connect_fail:
 	if (rc) {
-		PRECONN_PRINT("pre-connection out %s <%d @ %d>", __FUNCTION__, rc, line);
+		//PRECONN_PRINT("pre-connection out %s <%d @ %d>", __FUNCTION__, rc, line);
 		if (tx) {
 			sock_release(tx);
 		}

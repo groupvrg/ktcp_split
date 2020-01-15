@@ -403,6 +403,32 @@ static inline void stop_sockets(void)
 	}
 }
 
+//implementing binary search
+static inline int get_kvec_len(struct kvec *kvec, unsigned long len)
+{
+	struct kvec *start = kvec;
+	char buffer[256] = {0};
+	char *ptr = buffer;
+	int i, n = 0;
+
+	for (i = 0; i < len; i++) {
+		n += snprintf(&ptr[n], 16, " %lu", kvec[i].iov_len);
+		if (i && !(i & 7))
+			n += snprintf(&ptr[n], 16, "\n");
+	}
+
+	while (len) {
+		len = (len >> 1);
+		if (kvec[len].iov_len)
+			kvec = &kvec[len];
+	}
+	if (kvec[len].iov_len)
+		kvec = &kvec[len + 1];
+	len = (kvec - start) + !!kvec[0].iov_len;
+	trace_printk("%ld) now %lu prev %lu\n\%s\n", len, kvec[0].iov_len, kvec[-1].iov_len, buffer);
+	return len;
+}
+
 #define VEC_SZ 16
 int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 {
@@ -418,8 +444,11 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 	sock_set_flag(sock->tx->sk, SOCK_KERN_ZEROCOPY);
 	do {
 		struct msghdr msg = { 0 };
+
+		memset(kvec, 0, sizeof(kvec));
+
 		if ((rc = tcp_read_sock_zcopy_blocking(sock->rx, kvec, MAX_SKB_FRAGS)) <= 0) {
-			TRACE_DEBUG("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
+			TRACE_DEBUG("ERROR: %s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
 					dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 			put_qp(qp);
 			/*
@@ -434,13 +463,18 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 			*/
 			goto err;
 		}
+		TRACE_PRINT("%s [%s] %s :  %d", __FUNCTION__,
+				dir  ? "TX" : "RX", id ? "Send" : "Rcv", rc);
+
+
 		bytes += rc;
 		id ^= 1;
-		msg.msg_flags   |= MSG_ZEROCOPY;
+		//msg.msg_flags   |= MSG_ZEROCOPY;
 
 		//FIXME: Need to make sure we know num of frags
-		if ((rc = kernel_sendmsg(sock->tx, &msg, kvec, MAX_SKB_FRAGS, rc)) <= 0) {
-			TRACE_PRINT("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
+		if ((rc = kernel_sendmsg(sock->tx, &msg, kvec,
+					get_kvec_len(kvec, MAX_SKB_FRAGS), rc)) <= 0) {
+			TRACE_PRINT("ERROR: %s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
 					dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 			put_qp(qp);
 			/*
@@ -452,6 +486,8 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 			*/
 			goto err;
 		}
+		TRACE_PRINT("%s [%s] %s :  %d", __FUNCTION__,
+				dir  ? "TX" : "RX", id ? "Send" : "Rcv", rc);
 		id ^= 1;
 
 	} while (!kthread_should_stop());
