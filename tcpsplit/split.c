@@ -429,7 +429,7 @@ static inline int get_kvec_len(struct kvec *kvec, unsigned long len)
 	return len;
 }
 
-#define VEC_SZ 64
+#define VEC_SZ 32
 int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 {
 	struct kvec kvec[VEC_SZ];
@@ -441,7 +441,7 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 	if ((rc = sched_setaffinity( 0, cpu_possible_mask)))
 		TRACE_ERROR("Failed to sched_setaffinity! [%d]", rc);
 
-	sock_set_flag(sock->tx->sk, SOCK_KERN_ZEROCOPY);
+	//sock_set_flag(sock->tx->sk, SOCK_KERN_ZEROCOPY);
 	do {
 		struct msghdr msg = { 0 };
 
@@ -486,8 +486,8 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 			*/
 			goto err;
 		}
-		TRACE_PRINT("%s [%s] %s :  %d", __FUNCTION__,
-				dir  ? "TX" : "RX", id ? "Send" : "Rcv", rc);
+		//TRACE_PRINT("%s [%s] %s :  %d", __FUNCTION__,
+		//		dir  ? "TX" : "RX", id ? "Send" : "Rcv", rc);
 		id ^= 1;
 
 	} while (!kthread_should_stop());
