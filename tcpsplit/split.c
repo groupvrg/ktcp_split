@@ -429,10 +429,10 @@ static inline int get_kvec_len(struct kvec *kvec, unsigned long len)
 	return len;
 }
 
-#define VEC_SZ 16
+#define VEC_SZ 64
 int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 {
-	struct kvec kvec[MAX_SKB_FRAGS];
+	struct kvec kvec[VEC_SZ];
 	int id = 0, dir = sock->dir;
 	int rc;
 	uint64_t bytes = 0;
@@ -447,7 +447,7 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 
 		memset(kvec, 0, sizeof(kvec));
 
-		if ((rc = tcp_read_sock_zcopy_blocking(sock->rx, kvec, MAX_SKB_FRAGS)) <= 0) {
+		if ((rc = tcp_read_sock_zcopy_blocking(sock->rx, kvec, VEC_SZ)) <= 0) {
 			TRACE_DEBUG("ERROR: %s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
 					dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 			put_qp(qp);
@@ -473,7 +473,7 @@ int half_duplex(struct sockets *sock, struct cbn_qp *qp)
 
 		//FIXME: Need to make sure we know num of frags
 		if ((rc = kernel_sendmsg(sock->tx, &msg, kvec,
-					get_kvec_len(kvec, MAX_SKB_FRAGS), rc)) <= 0) {
+					get_kvec_len(kvec, VEC_SZ), rc)) <= 0) {
 			TRACE_PRINT("ERROR: %s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
 					dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
 			put_qp(qp);
