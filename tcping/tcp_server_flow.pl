@@ -16,6 +16,8 @@ sub get_params {
 }
 
 my $serverport = 8080;
+
+
 #my $serverport = 9216;
 my $size = (64 * 1024) - 28;
 get_params();
@@ -47,7 +49,7 @@ while (1) {
 		my $addr = $client->recv($data, $size);
 		die "bye..." unless defined ($addr);
 		my $time = Time::HiRes::gettimeofday() ;
-		$count += $size;
+		$count += length($data);
 		if (($time - $start_time)> 1 ) {
 			$start_time = $time;
 			printf "Received (%.2f): %.2fGb/s %d\n", ($time - $start), $count/(1024*1024*128), length($data);

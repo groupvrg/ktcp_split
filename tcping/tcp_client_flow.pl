@@ -8,9 +8,14 @@ use Regexp::Common qw/ net number /;
 $| = 1; #?
 
 #my $serverip = '127.0.0.1';
-my $serverip = '10.154.0.21';
+my $serverip = '10.154.0.18';
 my $serverport = 8080;
 my $size = 65536 ;
+
+
+$serverport = $ARGV[0] if defined $ARGV[0];
+
+printf " stream to $serverport\n";
 
 sub parse_size {
 	my $base = shift;
@@ -64,12 +69,20 @@ my $message = IO::Socket::INET->new(Proto=>"tcp", PeerPort=>$serverport,
 				     PeerAddr=>$serverip);
 my $time = Time::HiRes::gettimeofday();
 printf "connected...%f\n", $time - $start_time;
+my $bytes = 0;
+my $last_time = $start_time;
 
-while (($time - $start_time) < 10) {
+while (($time - $start_time) < 160) {
 
-	$time = Time::HiRes::gettimeofday();
+	if (($time - $last_time) > 1) {
+		$last_time = $time;
+		printf "%f) %.2f\n", $last_time - $start_time, $bytes/(128 * 1024);
+		$bytes = 0;
+	}
 	$message->send("x"x$size);
+	$bytes += $size;
+	$time = Time::HiRes::gettimeofday();
 }
 
-printf "Sent, closing...\n";
+printf "Sent [%.2fGB], closing...\n", $bytes/(1024*1024);
 $message->close();
