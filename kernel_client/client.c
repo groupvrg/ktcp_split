@@ -37,9 +37,15 @@ bind_mask_func pkthread_bind_mask;
 static struct proc_dir_entry *proc_dir;
 static struct task_struct *udp_client_task;
 static struct task_struct *tcp_client_task;
-static struct task_struct *tcp_server[2];
-
+static struct task_struct *tcp_server[4];
+struct kmem_cache *pairs;
 static int is_zcopy;
+
+struct sock_pair {
+	struct socket *in;
+	struct socket *out;
+	struct wait_queue_head wait;
+};
 
 static ssize_t client_write(struct file *file, const char __user *buf,
                               size_t len, loff_t *ppos)
@@ -109,6 +115,51 @@ static inline void put_page_v(struct page *page)
 		__put_page(page);
 }
 #endif
+
+int half_duplex_zero(struct socket *in, struct socket *out)
+{
+	struct kvec kvec[VEC_SZ];
+	int rc;
+	uint64_t bytes = 0;
+
+
+	sock_set_flag(sock->tx->sk, SOCK_KERN_ZEROCOPY);
+	do {
+		struct msghdr msg = { 0 };
+
+		memset(kvec, 0, sizeof(kvec));
+
+		if ((rc = tcp_read_sock_zcopy_blocking(in, kvec, VEC_SZ)) <= 0) {
+			TRACE_DEBUG("ERROR: %s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
+					rc, id ? "Send" : "Rcv", bytes);
+			sock_shutdown(out);
+			goto err;
+		}
+		TRACE_PRINT("%s [%s] %s :  %d", __FUNCTION__,
+				dir  ? "TX" : "RX", id ? "Send" : "Rcv", rc);
+
+
+		bytes += rc;
+		id ^= 1;
+		msg.msg_flags   |= MSG_ZEROCOPY;
+
+		//FIXME: Need to make sure we know num of frags
+		if ((rc = kernel_sendmsg(sock->tx, &msg, kvec,
+					get_kvec_len(kvec, VEC_SZ), rc)) <= 0) {
+			TRACE_PRINT("ERROR: %s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
+					rc, id ? "Send" : "Rcv", bytes);
+			sock_shutdown("");
+			goto err;
+		}
+		id ^= 1;
+
+	} while (!kthread_should_stop());
+
+err:
+	trace_printk("%s [%s] stopping on error (%d) at %s with %lld bytes\n", __FUNCTION__,
+			rc, id ? "Send" : "Rcv", bytes);
+	return rc;
+}
 //TODO: Consider a recvmsg server on a different port
 //TODO: same for sender, just dont set the ZEROCOPY Flag
 #define VEC_SZ 16
@@ -235,7 +286,68 @@ out:
 	return rc;
 }
 
-#define PORT_Z 8081
+static int proxy_in(void *arg)
+{
+	struct sock_pair *pair = arg;
+	int error = wait_event_interruptible_timeout(pair->wait,
+							pair->out, HZ);
+	if (error)
+		goto err;
+	//kernel_sock_shutdown(net->socket, SHUT_RDWR);
+	//sock_release(net->socket);
+	half_duplex(pair);
+	return 0;
+err:
+	trace_printk("Waiting timed out (%d)\n", error);
+	return -1
+}
+
+#define K_PROXY 8083
+static int proxy_server(void *unused)
+{
+	int rc = 0;
+	struct socket *sock = NULL;
+	struct sockaddr_in srv_addr;
+
+	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
+		goto error;
+
+	srv_addr.sin_family 		= AF_INET;
+	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
+	srv_addr.sin_port 		= htons(K_PROXY);
+
+	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
+		goto error;
+
+	if ((rc = kernel_listen(sock, 32)))
+		goto error;
+
+	trace_printk("accepting on port %d\n", PORT_Z);
+	do {
+		struct sock_pair *pair = kmem_cache_alloc(pairs, GFP_KERNEL);;
+		struct socket *nsock;
+
+		rc = kernel_accept(sock, &nsock, 0);
+		if (unlikely(rc))
+			goto out;
+
+		pair->in = nsock;
+		init_waitqueue_head(&pair->wait);
+
+		kthread_run(proxy_in, pair, "proxy_in_%lx", (unsigned long)nsock);
+		kthread_run(proxy_out, pair, "proxy_out_%lx", (unsigned long)nsock);
+
+	} while (!kthread_should_stop());
+
+error:
+	trace_printk("Exiting %d\n", rc);
+out:
+	if (sock)
+		sock_release(sock);
+	return rc;
+}
+
+#define PORT_Z 8082
 static int split_server_z(void *unused)
 {
 	int rc = 0;
@@ -275,7 +387,7 @@ out:
 	return rc;
 }
 
-#define PORT	8080
+#define PORT	8081
 static int split_server(void *unused)
 {
 	int rc = 0;
@@ -457,6 +569,9 @@ static __init int client_init(void)
 	proc_dir = proc_mkdir_mode(POLLER_DIR_NAME, 00555, NULL);
 	pkthread_bind_mask = (void *)kallsyms_lookup_name("kthread_bind_mask");
 
+	qp_slab = kmem_cache_create("cbn_qp_mdata",
+					sizeof(struct sock_pair), 0, 0, NULL);
+
 	udp_client_task  = kthread_create(poll_thread, ((void *)0), "udp_client_thread");
 	tcp_client_task  = kthread_create(poll_thread, ((void *)1), "tcp_client_thread");
 
@@ -470,6 +585,8 @@ static __init int client_init(void)
 
 	tcp_server[0] = kthread_run(split_server, NULL, "server_thread");
 	tcp_server[1] = kthread_run(split_server_z, NULL, "server_thread_z");
+	tcp_server[3] = kthread_run(split_server_z, NULL, "proxy_thread");
+	tcp_server[4] = kthread_run(split_server_z, NULL, "proxy_thread_z");
 
 	if (!proc_create_data("udp_"procname, 0666, proc_dir, &client_fops, udp_client_task))
 		goto err;
@@ -489,6 +606,8 @@ static __exit void client_exit(void)
 	kthread_stop(tcp_client_task);
 	kthread_stop(tcp_server[0]);
 	kthread_stop(tcp_server[1]);
+	kthread_stop(tcp_server[2]);
+	kthread_stop(tcp_server[3]);
 }
 
 module_init(client_init);
