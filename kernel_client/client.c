@@ -116,6 +116,56 @@ static inline void put_page_v(struct page *page)
 }
 #endif
 
+int half_duplex(struct socket *in, struct socket *out)
+{
+        struct kvec kvec[VEC_SZ];
+        int id = 0, i;
+        int rc;
+        uint64_t bytes = 0;
+
+        rc = -ENOMEM;
+        for (i = 0; i < VEC_SZ; i++) {
+                kvec[i].iov_len = PAGE_SIZE;
+                /*TODO: In case of alloc failure put_qp is needed */
+                if (! (kvec[i].iov_base = page_address(alloc_page(GFP_KERNEL))))
+                        goto err;
+        }
+        do {
+                struct msghdr msg = { 0 };
+                if ((rc = kernel_recvmsg(in, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
+                        TRACE_DEBUG("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
+                                        dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
+			sock_shutdown(out);
+			goto err;
+		}
+		TRACE_PRINT("%s [%s] %s :  %d", __FUNCTION__,
+				dir  ? "TX" : "RX", id ? "Send" : "Rcv", rc);
+
+
+		bytes += rc;
+		id ^= 1;
+		msg.msg_flags   |= MSG_ZEROCOPY;
+
+		//FIXME: Need to make sure we know num of frags
+		if ((rc = kernel_sendmsg(out, &msg, kvec,
+					get_kvec_len(kvec, VEC_SZ), rc)) <= 0) {
+			TRACE_PRINT("ERROR: %s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
+					rc, id ? "Send" : "Rcv", bytes);
+			sock_shutdown(in);
+			goto err;
+		}
+		id ^= 1;
+
+	} while (!kthread_should_stop());
+
+err:
+	for (i = 0; i < VEC_SZ; i++)
+                free_page((unsigned long)(kvec[i].iov_base));
+	trace_printk("%s [%s] stopping on error (%d) at %s with %lld bytes\n", __FUNCTION__,
+			rc, id ? "Send" : "Rcv", bytes);
+	return rc;
+}
+
 int half_duplex_zero(struct socket *in, struct socket *out)
 {
 	struct kvec kvec[VEC_SZ];
@@ -284,6 +334,37 @@ out:
 #endif
 	trace_printk("C ya, cowboy...\n");
 	return rc;
+}
+
+static int proxy_out(void *arg)
+{
+#define PORT	8080
+//#define SERVER_ADDR (10<<24|1<<16|4<<8|38) /*10.1.4.38*/
+#define SERVER_ADDR (10<<24|154<<16|0<<8|21) /*10.154.0.21*/
+	struct sock_pair *pair = arg;
+	int rc, i = 0;
+	unsigned long cnt, max;
+	struct socket *tx = NULL;
+	struct sockaddr_in srv_addr = {0};
+
+        srv_addr.sin_family             = AF_INET;
+        srv_addr.sin_addr.s_addr        = htonl(SERVER_ADDR);
+        srv_addr.sin_port               = htons(PORT);
+
+	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
+                trace_printk("RC = %d (%d)\n", rc, __LINE__);
+		goto err;
+        }
+
+        if ((rc = kernel_connect(tx, (struct sockaddr *)&srv_addr, sizeof(struct sockaddr), 0))) {
+                trace_printk("RC = %d (%d)\n", rc, __LINE__);
+		goto err;
+        }
+	wake_up(&pair->wait);
+	return 0;
+err:
+	trace_printk("Failed to connect (%d)\n", rc);
+	return -1
 }
 
 static int proxy_in(void *arg)
