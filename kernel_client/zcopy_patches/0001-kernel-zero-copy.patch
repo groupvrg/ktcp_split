@@ -1,10 +1,9 @@
-From 69cbc40b0f2e574da52d70971b4c789c47133f72 Mon Sep 17 00:00:00 2001
+From 411126761afb1cd1811712ceb854a7e791458a51 Mon Sep 17 00:00:00 2001
 From: Build VM <build@example.com>
-Date: Tue, 21 Jan 2020 17:04:04 +0000
-Subject: [PATCH] :zero copy kernel
+Date: Tue, 21 Jan 2020 20:49:52 +0000
+Subject: [PATCH] kernel zero copy
 
 ---
- Makefile               |   2 +-
  include/linux/mm.h     |   2 +-
  include/linux/net.h    |   2 +
  include/linux/skbuff.h |  24 ++++-
@@ -17,21 +16,8 @@ Subject: [PATCH] :zero copy kernel
  net/ipv4/tcp.c         | 201 ++++++++++++++++++++++++++++++++++++++---
  net/ipv4/tcp_output.c  |   2 +-
  net/socket.c           |   8 ++
- 13 files changed, 355 insertions(+), 41 deletions(-)
+ 12 files changed, 354 insertions(+), 40 deletions(-)
 
-diff --git a/Makefile b/Makefile
-index 1fe5d2a2c..d69a321d0 100644
---- a/Makefile
-+++ b/Makefile
-@@ -2,7 +2,7 @@
- VERSION = 4
- PATCHLEVEL = 15
- SUBLEVEL = 18
--EXTRAVERSION =
-+EXTRAVERSION = '-cbn'
- NAME = Fearless Coyote
- 
- # *DOCUMENTATION*
 diff --git a/include/linux/mm.h b/include/linux/mm.h
 index 4b59e40dc..e14bad183 100644
 --- a/include/linux/mm.h
@@ -335,7 +321,7 @@ index 1c33dfab0..c95cba047 100644
  			    struct iov_iter *from, size_t length)
  {
 diff --git a/net/core/skbuff.c b/net/core/skbuff.c
-index d3128e9a3..8ef3444f5 100644
+index d3128e9a3..931533ecd 100644
 --- a/net/core/skbuff.c
 +++ b/net/core/skbuff.c
 @@ -901,10 +901,14 @@ static int mm_account_pinned_pages(struct mmpin *mmp, size_t size)
@@ -391,7 +377,7 @@ index d3128e9a3..8ef3444f5 100644
 +	struct sock *sk = skb->sk;
 +	int i, num_frags = skb_shinfo(skb)->nr_frags;
 +
-+	trace_printk("%s skb: %p freeing pages[%d]...\n", __FUNCTION__, skb, num_frags);
++	//trace_printk("%s skb: %p freeing pages[%d]...\n", __FUNCTION__, skb, num_frags);
 +	if (!uarg->len /*|| sock_flag(sk, SOCK_DEAD)*/) {
 +		consume_skb(skb);
 +		sock_put(sk);
