@@ -127,6 +127,7 @@ static inline void put_page_v(struct page *page)
 }
 #endif
 
+#define ALLOC_ORDER 4
 int half_duplex(struct socket *in, struct socket *out)
 {
         struct kvec kvec[VEC_SZ];
@@ -136,21 +137,22 @@ int half_duplex(struct socket *in, struct socket *out)
 
         rc = -ENOMEM;
         for (i = 0; i < VEC_SZ; i++) {
-                kvec[i].iov_len = PAGE_SIZE;
+                kvec[i].iov_len = (PAGE_SIZE << ALLOC_ORDER);
                 /*TODO: In case of alloc failure put_qp is needed */
-                if (! (kvec[i].iov_base = page_address(alloc_page(GFP_KERNEL))))
+                if (! (kvec[i].iov_base = page_address(alloc_pages(GFP_KERNEL, ALLOC_ORDER))))
                         goto err;
         }
         do {
                 struct msghdr msg = { 0 };
-                if ((rc = kernel_recvmsg(in, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
+                if ((rc = kernel_recvmsg(in, &msg, kvec, VEC_SZ,
+					(PAGE_SIZE * VEC_SZ)<<ALLOC_ORDER, 0)) <= 0) {
                         trace_printk("ERROR: %s (%d) at %s with %lld bytes\n", __FUNCTION__,
                                         rc, id ? "Send" : "Rcv", bytes);
 			kernel_sock_shutdown(out, SHUT_RDWR);
 			goto err;
 		}
-		trace_printk("%s %s :  %d\n", __FUNCTION__,
-				id ? "Send" : "Rcv", rc);
+	//	trace_printk("%s %s :  %d\n", __FUNCTION__,
+	//			id ? "Send" : "Rcv", rc);
 
 
 		bytes += rc;
@@ -169,7 +171,7 @@ int half_duplex(struct socket *in, struct socket *out)
 
 err:
 	for (i = 0; i < VEC_SZ; i++)
-                free_page((unsigned long)(kvec[i].iov_base));
+                free_pages((unsigned long)(kvec[i].iov_base), ALLOC_ORDER);
 	trace_printk("%s stopping on error (%d) at %s with %lld bytes\n", __FUNCTION__,
 			rc, id ? "Send" : "Rcv", bytes);
 	return rc;
@@ -258,7 +260,7 @@ int half_duplex_zero(struct socket *in, struct socket *out)
 		id ^= 1;
 		msg.msg_flags   |= MSG_ZEROCOPY;
 
-		//FIXME: Need to make sure we know num of frags
+		//Need an additional put on the pages?
 		if ((rc = kernel_sendmsg(out, &msg, kvec,
 					get_kvec_len(kvec, VEC_SZ), rc)) <= 0) {
 			trace_printk("ERROR: %s (%d) at %s with %lld bytes\n", __FUNCTION__,
@@ -392,6 +394,7 @@ static int proxy_out_zero(void *arg)
         }
 	pair->out = tx;
 	wake_up(&pair->wait);
+	trace_printk("starting  %p -> %p\n", pair->out, pair->in);
 	half_duplex_zero(tx, pair->in);
 	return 0;
 err:
@@ -421,6 +424,7 @@ static int proxy_out(void *arg)
         }
 	pair->out = tx;
 	wake_up(&pair->wait);
+	trace_printk("starting  %p -> %p\n", pair->out, pair->in);
 	half_duplex(tx, pair->in);
 	return 0;
 err:
@@ -433,7 +437,7 @@ static int proxy_in_zero(void *arg)
 	struct sock_pair *pair = arg;
 	int error = wait_event_interruptible_timeout(pair->wait,
 							pair->out, HZ);
-	if (error)
+	if (!error || IS_ERR_OR_NULL(pair->out))
 		goto err;
 	//kernel_sock_shutdown(net->socket, SHUT_RDWR);
 	//sock_release(net->socket);
@@ -451,6 +455,7 @@ static int proxy_in(void *arg)
 							pair->out, HZ);
 	if (!error || IS_ERR_OR_NULL(pair->out))
 		goto err;
+	trace_printk("starting  %p -> %p\n", pair->in, pair->out);
 	//kernel_sock_shutdown(net->socket, SHUT_RDWR);
 	//sock_release(net->socket);
 	half_duplex(pair->in, pair->out);
@@ -535,8 +540,8 @@ static int proxy_server_z(void *unused)
 		pair->in = nsock;
 		init_waitqueue_head(&pair->wait);
 
-		kthread_run(proxy_in, pair, "proxy_in_%lx", (unsigned long)nsock);
-		kthread_run(proxy_out, pair, "proxy_out_%lx", (unsigned long)nsock);
+		kthread_run(proxy_in_zero, pair, "proxy_in_%lx", (unsigned long)nsock);
+		kthread_run(proxy_out_zero, pair, "proxy_out_%lx", (unsigned long)nsock);
 
 	} while (!kthread_should_stop());
 
