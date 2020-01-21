@@ -180,15 +180,15 @@ err:
 static inline int get_kvec_len(struct kvec *kvec, unsigned long len)
 {
 	struct kvec *start = kvec;
-	char buffer[256] = {0};
-	char *ptr = buffer;
-	int i, n = 0;
-
-	for (i = 0; i < len; i++) {
-		n += snprintf(&ptr[n], 16, " %lu", kvec[i].iov_len);
-		if (i && !(i & 7))
-			n += snprintf(&ptr[n], 16, "\n");
-	}
+	//char buffer[256] = {0};
+	//char *ptr = buffer;
+	//int i, n = 0;
+//
+//for (i = 0; i < len; i++) {
+//	n += snprintf(&ptr[n], 16, " %lu", kvec[i].iov_len);
+//	if (i && !(i & 7))
+//		n += snprintf(&ptr[n], 16, "\n");
+//}
 
 	while (len) {
 		len = (len >> 1);
@@ -198,7 +198,7 @@ static inline int get_kvec_len(struct kvec *kvec, unsigned long len)
 	if (kvec[len].iov_len)
 		kvec = &kvec[len + 1];
 	len = (kvec - start) + !!kvec[0].iov_len;
-	trace_printk("%ld) now %lu prev %lu\n\%s\n", len, kvec[0].iov_len, kvec[-1].iov_len, buffer);
+	//trace_printk("%ld) now %lu prev %lu\n\%s\n", len, kvec[0].iov_len, kvec[-1].iov_len, buffer);
 	return len;
 }
 #if 0
@@ -243,6 +243,7 @@ int half_duplex_zero(struct socket *in, struct socket *out)
 	sock_set_flag(out->sk, SOCK_KERN_ZEROCOPY);
 	do {
 		struct msghdr msg = { 0 };
+		int vec_len;
 
 		memset(kvec, 0, sizeof(kvec));
 
@@ -252,17 +253,17 @@ int half_duplex_zero(struct socket *in, struct socket *out)
 			kernel_sock_shutdown(out, SHUT_RDWR);
 			goto err;
 		}
-		trace_printk("%s %s :  %d", __FUNCTION__,
-				id ? "Send" : "Rcv", rc);
+		//trace_printk("%s %s :  %d", __FUNCTION__,
+		//		id ? "Send" : "Rcv", rc);
 
 
 		bytes += rc;
 		id ^= 1;
 		msg.msg_flags   |= MSG_ZEROCOPY;
-
+		vec_len = get_kvec_len(kvec, VEC_SZ);
 		//Need an additional put on the pages?
 		if ((rc = kernel_sendmsg(out, &msg, kvec,
-					get_kvec_len(kvec, VEC_SZ), rc)) <= 0) {
+					vec_len, rc)) <= 0) {
 			trace_printk("ERROR: %s (%d) at %s with %lld bytes\n", __FUNCTION__,
 					rc, id ? "Send" : "Rcv", bytes);
 			kernel_sock_shutdown(in, SHUT_RDWR);
