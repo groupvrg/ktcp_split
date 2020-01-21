@@ -1,23 +1,37 @@
-From 5058f4929cde01b15931d30e69d1f3855798e8d3 Mon Sep 17 00:00:00 2001
+From 69cbc40b0f2e574da52d70971b4c789c47133f72 Mon Sep 17 00:00:00 2001
 From: Build VM <build@example.com>
 Date: Tue, 21 Jan 2020 17:04:04 +0000
-Subject: [PATCH 3/3] zero copy kernel
+Subject: [PATCH] :zero copy kernel
 
 ---
+ Makefile               |   2 +-
  include/linux/mm.h     |   2 +-
  include/linux/net.h    |   2 +
  include/linux/skbuff.h |  24 ++++-
  include/linux/tcp.h    |   7 ++
  include/net/sock.h     |   1 +
  kernel/softirq.c       |  21 ++++-
- net/core/datagram.c    |  71 +++++++++++++++
- net/core/skbuff.c      |  49 +++++++---
+ net/core/datagram.c    |  73 +++++++++++++++
+ net/core/skbuff.c      |  47 ++++++++--
  net/core/sock.c        |   6 +-
  net/ipv4/tcp.c         | 201 ++++++++++++++++++++++++++++++++++++++---
  net/ipv4/tcp_output.c  |   2 +-
  net/socket.c           |   8 ++
- 12 files changed, 353 insertions(+), 41 deletions(-)
+ 13 files changed, 355 insertions(+), 41 deletions(-)
 
+diff --git a/Makefile b/Makefile
+index 1fe5d2a2c..d69a321d0 100644
+--- a/Makefile
++++ b/Makefile
+@@ -2,7 +2,7 @@
+ VERSION = 4
+ PATCHLEVEL = 15
+ SUBLEVEL = 18
+-EXTRAVERSION =
++EXTRAVERSION = '-cbn'
+ NAME = Fearless Coyote
+ 
+ # *DOCUMENTATION*
 diff --git a/include/linux/mm.h b/include/linux/mm.h
 index 4b59e40dc..e14bad183 100644
 --- a/include/linux/mm.h
@@ -237,10 +251,10 @@ index f61113f6b..c949680ac 100644
  		cond_resched_rcu_qs();
  		return;
 diff --git a/net/core/datagram.c b/net/core/datagram.c
-index 1c33dfab0..5bbc33e45 100644
+index 1c33dfab0..c95cba047 100644
 --- a/net/core/datagram.c
 +++ b/net/core/datagram.c
-@@ -580,6 +580,77 @@ int skb_copy_datagram_from_iter(struct sk_buff *skb, int offset,
+@@ -580,6 +580,79 @@ int skb_copy_datagram_from_iter(struct sk_buff *skb, int offset,
  }
  EXPORT_SYMBOL(skb_copy_datagram_from_iter);
  
@@ -251,13 +265,13 @@ index 1c33dfab0..5bbc33e45 100644
 +	ssize_t copied = 0;
 +	struct kvec *kvec = &from->kvec[from->iov_offset];
 +
-+	//trace_printk("%d: kvec %lx [%lu]\n", from->type, (unsigned long)kvec, from->iov_offset);
-+
-+	//trace_printk("iter 0x%lx len %lu : base %lx [%lx] iov len %lu off %lx\n", (unsigned long)from, len,
-+		//(unsigned long)virt_to_page(kvec->iov_base),
-+		//(unsigned long)virt_to_head_page(kvec->iov_base),
-+		//kvec->iov_len,
-+		//(unsigned long)kvec->iov_base & (~PAGE_MASK));
++//trace_printk("%d: kvec %lx [%lu]\n", from->type, (unsigned long)kvec, from->iov_offset);
++//
++//trace_printk("iter 0x%lx len %lu : base %lx [%lx] iov len %lu off %lx\n", (unsigned long)from, len,
++//	(unsigned long)virt_to_page(kvec->iov_base),
++//	(unsigned long)virt_to_head_page(kvec->iov_base),
++//	kvec->iov_len,
++//	(unsigned long)kvec->iov_base & (~PAGE_MASK));
 +	*page = virt_to_page(kvec->iov_base);
 +	*off = (unsigned long)kvec->iov_base & (~PAGE_MASK);
 +	get_page(*page);
@@ -290,9 +304,10 @@ index 1c33dfab0..5bbc33e45 100644
 +		ssize_t copied;
 +		ssize_t offset;
 +
-+		if (frag == MAX_SKB_FRAGS || from->count)
++		if (frag == MAX_SKB_FRAGS || !from->count) {
++			//trace_printk("WTF?!?\n");
 +			return -EMSGSIZE;
-+
++		}
 +		copied = kvec_get_frag_advance(from, &page, &offset, len);
 +		//trace_printk("collected %lu [%p + %lu]\n", copied, page, offset);
 +		len -= copied;
@@ -311,6 +326,7 @@ index 1c33dfab0..5bbc33e45 100644
 +		skb_fill_page_desc(skb, frag++, page, offset, copied);
 +		//trace_printk("skb %p nr frags %d\n", skb, frag);
 +	}
++
 +	return 0;
 +}
 +EXPORT_SYMBOL(skb_zerocopy_sg_from_iter);
@@ -319,7 +335,7 @@ index 1c33dfab0..5bbc33e45 100644
  			    struct iov_iter *from, size_t length)
  {
 diff --git a/net/core/skbuff.c b/net/core/skbuff.c
-index d3128e9a3..ce9f2ec73 100644
+index d3128e9a3..8ef3444f5 100644
 --- a/net/core/skbuff.c
 +++ b/net/core/skbuff.c
 @@ -901,10 +901,14 @@ static int mm_account_pinned_pages(struct mmpin *mmp, size_t size)
@@ -404,7 +420,7 @@ index d3128e9a3..ce9f2ec73 100644
  
  int skb_zerocopy_iter_stream(struct sock *sk, struct sk_buff *skb,
  			     struct msghdr *msg, int len,
-@@ -1121,18 +1148,18 @@ int skb_zerocopy_iter_stream(struct sock *sk, struct sk_buff *skb,
+@@ -1121,10 +1148,10 @@ int skb_zerocopy_iter_stream(struct sock *sk, struct sk_buff *skb,
  	if (orig_uarg && uarg != orig_uarg)
  		return -EEXIST;
  
@@ -418,8 +434,7 @@ index d3128e9a3..ce9f2ec73 100644
  		/* Streams do not free skb on error. Reset to prev state. */
  		msg->msg_iter = orig_iter;
  		skb->sk = sk;
--		___pskb_trim(skb, orig_len);
-+		//___pskb_trim(skb, orig_len);
+@@ -1132,7 +1159,7 @@ int skb_zerocopy_iter_stream(struct sock *sk, struct sk_buff *skb,
  		skb->sk = save_sk;
  		return err;
  	}
@@ -455,7 +470,7 @@ index eb2428e88..7fbda6322 100644
  	skb = alloc_skb(size, priority);
  	if (!skb)
 diff --git a/net/ipv4/tcp.c b/net/ipv4/tcp.c
-index 35aafe374..5712cebdb 100644
+index 35aafe374..87a9b2a21 100644
 --- a/net/ipv4/tcp.c
 +++ b/net/ipv4/tcp.c
 @@ -1202,15 +1202,18 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
@@ -604,10 +619,10 @@ index 35aafe374..5712cebdb 100644
 +	struct kvec_desc *desc = container_of(desc_t, struct kvec_desc, desc_t);
 +
 +	desc_t->count = desc->nr_pages;
-+	trace_printk("Collecting : %d  off %u len %lu\n", desc->nr_pages, offset, len);
++//	trace_printk("Collecting : %d  off %u len %lu\n", desc->nr_pages, offset, len);
 +
 +	if (unlikely(!desc->nr_pages)) {
-+		trace_printk("nr_pages = 0\n");
++//		trace_printk("nr_pages = 0\n");
 +		return -ENOMEM;
 +	}
 +
@@ -644,7 +659,7 @@ index 35aafe374..5712cebdb 100644
 +
 +	len = skb->data_len - offset;
 +	if (unlikely(!len)) {
-+		trace_printk("%p len %d data len %d of %d copied %d\n", skb, skb->len, skb->data_len, offset, copied);
++//		trace_printk("%p len %d data len %d of %d copied %d\n", skb, skb->len, skb->data_len, offset, copied);
 +		return copied;
 +	}
 +
@@ -657,7 +672,7 @@ index 35aafe374..5712cebdb 100644
 +		frags++;
 +	}
 +
-+	trace_printk("Collecting frags: %d [%d] of %u len %lu\n", skb_shinfo(skb)->nr_frags, skipped, offset, len);
++//	trace_printk("Collecting frags: %d [%d] of %u len %lu\n", skb_shinfo(skb)->nr_frags, skipped, offset, len);
 +
 +	while (desc->nr_pages) {
 +		//if (unlikely(!(skb_shinfo(skb)->nr_frags -skipped))) {
