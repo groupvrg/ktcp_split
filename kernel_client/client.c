@@ -20,7 +20,18 @@
 #include <linux/cpumask.h>
 
 //Thread pool API
-//#include "../tcpsplit/thread_pool.h"
+#define PROXY_PORT	8081
+#define PROXY_Z_PORT 	8082
+#define PORT_MAIO 	8083
+#define PORT_SERVER	8084
+#define PORT_Z_SERVER	8085
+#define PORT_NEXT_HOP	8086
+
+#define IP_HEX(a,b,c,d) ((a)<<24|(b)<<16|(c)<<8|(d))
+#define SERVER_ADDR	IP_HEX(10,154,0,21)
+//#define SERVER_ADDR (10<<24|154<<16|0<<8|21) /*10.154.0.21*/
+
+#define VEC_SZ 32
 
 MODULE_AUTHOR("Markuze Alex markuze@cs.technion.ac.il");
 MODULE_DESCRIPTION("Deferred I/O client");
@@ -133,25 +144,23 @@ int half_duplex(struct socket *in, struct socket *out)
         do {
                 struct msghdr msg = { 0 };
                 if ((rc = kernel_recvmsg(in, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
-                        TRACE_DEBUG("%s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
-                                        dir  ? "TX" : "RX", rc, id ? "Send" : "Rcv", bytes);
-			sock_shutdown(out);
+                        trace_printk("ERROR: %s (%d) at %s with %lld bytes\n", __FUNCTION__,
+                                        rc, id ? "Send" : "Rcv", bytes);
+			kernel_sock_shutdown(out, SHUT_RDWR);
 			goto err;
 		}
-		TRACE_PRINT("%s [%s] %s :  %d", __FUNCTION__,
-				dir  ? "TX" : "RX", id ? "Send" : "Rcv", rc);
+		trace_printk("%s %s :  %d\n", __FUNCTION__,
+				id ? "Send" : "Rcv", rc);
 
 
 		bytes += rc;
 		id ^= 1;
-		msg.msg_flags   |= MSG_ZEROCOPY;
 
 		//FIXME: Need to make sure we know num of frags
-		if ((rc = kernel_sendmsg(out, &msg, kvec,
-					get_kvec_len(kvec, VEC_SZ), rc)) <= 0) {
-			TRACE_PRINT("ERROR: %s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
+		if ((rc = kernel_sendmsg(out, &msg, kvec, VEC_SZ, rc)) <= 0) {
+			trace_printk("ERROR: %s (%d) at %s with %lld bytes\n", __FUNCTION__,
 					rc, id ? "Send" : "Rcv", bytes);
-			sock_shutdown(in);
+			kernel_sock_shutdown(in, SHUT_RDWR);
 			goto err;
 		}
 		id ^= 1;
@@ -161,60 +170,38 @@ int half_duplex(struct socket *in, struct socket *out)
 err:
 	for (i = 0; i < VEC_SZ; i++)
                 free_page((unsigned long)(kvec[i].iov_base));
-	trace_printk("%s [%s] stopping on error (%d) at %s with %lld bytes\n", __FUNCTION__,
+	trace_printk("%s stopping on error (%d) at %s with %lld bytes\n", __FUNCTION__,
 			rc, id ? "Send" : "Rcv", bytes);
 	return rc;
 }
 
-int half_duplex_zero(struct socket *in, struct socket *out)
+static inline int get_kvec_len(struct kvec *kvec, unsigned long len)
 {
-	struct kvec kvec[VEC_SZ];
-	int rc;
-	uint64_t bytes = 0;
+	struct kvec *start = kvec;
+	char buffer[256] = {0};
+	char *ptr = buffer;
+	int i, n = 0;
 
+	for (i = 0; i < len; i++) {
+		n += snprintf(&ptr[n], 16, " %lu", kvec[i].iov_len);
+		if (i && !(i & 7))
+			n += snprintf(&ptr[n], 16, "\n");
+	}
 
-	sock_set_flag(sock->tx->sk, SOCK_KERN_ZEROCOPY);
-	do {
-		struct msghdr msg = { 0 };
-
-		memset(kvec, 0, sizeof(kvec));
-
-		if ((rc = tcp_read_sock_zcopy_blocking(in, kvec, VEC_SZ)) <= 0) {
-			TRACE_DEBUG("ERROR: %s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
-					rc, id ? "Send" : "Rcv", bytes);
-			sock_shutdown(out);
-			goto err;
-		}
-		TRACE_PRINT("%s [%s] %s :  %d", __FUNCTION__,
-				dir  ? "TX" : "RX", id ? "Send" : "Rcv", rc);
-
-
-		bytes += rc;
-		id ^= 1;
-		msg.msg_flags   |= MSG_ZEROCOPY;
-
-		//FIXME: Need to make sure we know num of frags
-		if ((rc = kernel_sendmsg(sock->tx, &msg, kvec,
-					get_kvec_len(kvec, VEC_SZ), rc)) <= 0) {
-			TRACE_PRINT("ERROR: %s [%s] (%d) at %s with %lld bytes", __FUNCTION__,
-					rc, id ? "Send" : "Rcv", bytes);
-			sock_shutdown("");
-			goto err;
-		}
-		id ^= 1;
-
-	} while (!kthread_should_stop());
-
-err:
-	trace_printk("%s [%s] stopping on error (%d) at %s with %lld bytes\n", __FUNCTION__,
-			rc, id ? "Send" : "Rcv", bytes);
-	return rc;
+	while (len) {
+		len = (len >> 1);
+		if (kvec[len].iov_len)
+			kvec = &kvec[len];
+	}
+	if (kvec[len].iov_len)
+		kvec = &kvec[len + 1];
+	len = (kvec - start) + !!kvec[0].iov_len;
+	trace_printk("%ld) now %lu prev %lu\n\%s\n", len, kvec[0].iov_len, kvec[-1].iov_len, buffer);
+	return len;
 }
-//TODO: Consider a recvmsg server on a different port
-//TODO: same for sender, just dont set the ZEROCOPY Flag
-#define VEC_SZ 16
-
-static int tcp_read_sock_zcopy_blocking(struct socket *sock, struct kvec *pages_array, unsigned int nr_pages)
+#if 0
+static int tcp_read_sock_zcopy_blocking(struct socket *sock, struct kvec *pages_array,
+					unsigned int nr_pages)
 {
 	struct sock *sk = sock->sk;
 	struct sk_buff *last = NULL;
@@ -239,6 +226,53 @@ wait:
 		goto retry;
 	}
 out:
+	return rc;
+}
+#endif
+
+int half_duplex_zero(struct socket *in, struct socket *out)
+{
+	struct kvec kvec[VEC_SZ];
+        int id = 0;
+	int rc;
+	uint64_t bytes = 0;
+
+
+	sock_set_flag(out->sk, SOCK_KERN_ZEROCOPY);
+	do {
+		struct msghdr msg = { 0 };
+
+		memset(kvec, 0, sizeof(kvec));
+
+		if ((rc = tcp_read_sock_zcopy_blocking(in, kvec, VEC_SZ)) <= 0) {
+			trace_printk("ERROR: %s (%d) at %s with %lld bytes\n", __FUNCTION__,
+					rc, id ? "Send" : "Rcv", bytes);
+			kernel_sock_shutdown(out, SHUT_RDWR);
+			goto err;
+		}
+		trace_printk("%s %s :  %d", __FUNCTION__,
+				id ? "Send" : "Rcv", rc);
+
+
+		bytes += rc;
+		id ^= 1;
+		msg.msg_flags   |= MSG_ZEROCOPY;
+
+		//FIXME: Need to make sure we know num of frags
+		if ((rc = kernel_sendmsg(out, &msg, kvec,
+					get_kvec_len(kvec, VEC_SZ), rc)) <= 0) {
+			trace_printk("ERROR: %s (%d) at %s with %lld bytes\n", __FUNCTION__,
+					rc, id ? "Send" : "Rcv", bytes);
+			kernel_sock_shutdown(in, SHUT_RDWR);
+			goto err;
+		}
+		id ^= 1;
+
+	} while (!kthread_should_stop());
+
+err:
+	trace_printk("%s stopping on error (%d) at %s with %lld bytes\n", __FUNCTION__,
+			rc, id ? "Send" : "Rcv", bytes);
 	return rc;
 }
 
@@ -338,18 +372,14 @@ out:
 
 static int proxy_out(void *arg)
 {
-#define PORT	8080
-//#define SERVER_ADDR (10<<24|1<<16|4<<8|38) /*10.1.4.38*/
-#define SERVER_ADDR (10<<24|154<<16|0<<8|21) /*10.154.0.21*/
 	struct sock_pair *pair = arg;
-	int rc, i = 0;
-	unsigned long cnt, max;
+	int rc;
 	struct socket *tx = NULL;
 	struct sockaddr_in srv_addr = {0};
 
         srv_addr.sin_family             = AF_INET;
         srv_addr.sin_addr.s_addr        = htonl(SERVER_ADDR);
-        srv_addr.sin_port               = htons(PORT);
+        srv_addr.sin_port               = htons(PORT_NEXT_HOP);
 
 	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
                 trace_printk("RC = %d (%d)\n", rc, __LINE__);
@@ -364,7 +394,7 @@ static int proxy_out(void *arg)
 	return 0;
 err:
 	trace_printk("Failed to connect (%d)\n", rc);
-	return -1
+	return -1;
 }
 
 static int proxy_in(void *arg)
@@ -376,14 +406,13 @@ static int proxy_in(void *arg)
 		goto err;
 	//kernel_sock_shutdown(net->socket, SHUT_RDWR);
 	//sock_release(net->socket);
-	half_duplex(pair);
+	half_duplex(pair->in, pair->out);
 	return 0;
 err:
 	trace_printk("Waiting timed out (%d)\n", error);
-	return -1
+	return -1;
 }
 
-#define K_PROXY 8083
 static int proxy_server(void *unused)
 {
 	int rc = 0;
@@ -395,7 +424,7 @@ static int proxy_server(void *unused)
 
 	srv_addr.sin_family 		= AF_INET;
 	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
-	srv_addr.sin_port 		= htons(K_PROXY);
+	srv_addr.sin_port 		= htons(PROXY_PORT);
 
 	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
 		goto error;
@@ -403,10 +432,10 @@ static int proxy_server(void *unused)
 	if ((rc = kernel_listen(sock, 32)))
 		goto error;
 
-	trace_printk("accepting on port %d\n", PORT_Z);
+	trace_printk("accepting on port %d\n", PROXY_PORT);
 	do {
-		struct sock_pair *pair = kmem_cache_alloc(pairs, GFP_KERNEL);;
 		struct socket *nsock;
+		struct sock_pair *pair = kmem_cache_alloc(pairs, GFP_KERNEL);;
 
 		rc = kernel_accept(sock, &nsock, 0);
 		if (unlikely(rc))
@@ -428,8 +457,7 @@ out:
 	return rc;
 }
 
-#define PORT_Z 8082
-static int split_server_z(void *unused)
+static int proxy_server_z(void *unused)
 {
 	int rc = 0;
 	struct socket *sock = NULL;
@@ -440,7 +468,7 @@ static int split_server_z(void *unused)
 
 	srv_addr.sin_family 		= AF_INET;
 	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
-	srv_addr.sin_port 		= htons(PORT_Z);
+	srv_addr.sin_port 		= htons(PROXY_Z_PORT);
 
 	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
 		goto error;
@@ -448,15 +476,17 @@ static int split_server_z(void *unused)
 	if ((rc = kernel_listen(sock, 32)))
 		goto error;
 
-	trace_printk("accepting on port %d\n", PORT_Z);
+	trace_printk("accepting on port %d\n", PROXY_Z_PORT);
 	do {
 		struct socket *nsock;
+		struct sock_pair *pair = kmem_cache_alloc(pairs, GFP_KERNEL);;
 
 		rc = kernel_accept(sock, &nsock, 0);
 		if (unlikely(rc))
 			goto out;
 
-		kthread_run(start_new_connection_z, nsock, "server_z_%lx", (unsigned long)nsock);
+		kthread_run(proxy_in, pair, "proxy_in_%lx", (unsigned long)nsock);
+		kthread_run(proxy_out, pair, "proxy_out_%lx", (unsigned long)nsock);
 
 	} while (!kthread_should_stop());
 
@@ -468,7 +498,6 @@ out:
 	return rc;
 }
 
-#define PORT	8081
 static int split_server(void *unused)
 {
 	int rc = 0;
@@ -480,7 +509,7 @@ static int split_server(void *unused)
 
 	srv_addr.sin_family 		= AF_INET;
 	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
-	srv_addr.sin_port 		= htons(PORT);
+	srv_addr.sin_port 		= htons(PORT_SERVER);
 
 	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
 		goto error;
@@ -488,7 +517,7 @@ static int split_server(void *unused)
 	if ((rc = kernel_listen(sock, 32)))
 		goto error;
 
-	trace_printk("accepting on port %d\n", PORT);
+	trace_printk("accepting on port %d\n", PORT_SERVER);
 	do {
 		struct socket *nsock;
 
@@ -508,6 +537,44 @@ out:
 	return rc;
 }
 
+static int split_server_z(void *unused)
+{
+	int rc = 0;
+	struct socket *sock = NULL;
+	struct sockaddr_in srv_addr;
+
+	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock)))
+		goto error;
+
+	srv_addr.sin_family 		= AF_INET;
+	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
+	srv_addr.sin_port 		= htons(PORT_Z_SERVER);
+
+	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
+		goto error;
+
+	if ((rc = kernel_listen(sock, 32)))
+		goto error;
+
+	trace_printk("accepting on port %d\n", PORT_SERVER);
+	do {
+		struct socket *nsock;
+
+		rc = kernel_accept(sock, &nsock, 0);
+		if (unlikely(rc))
+			goto out;
+
+		kthread_run(start_new_connection_z, nsock, "server_%lx", (unsigned long)nsock);
+
+	} while (!kthread_should_stop());
+
+error:
+	trace_printk("Exiting %d\n", rc);
+out:
+	if (sock)
+		sock_release(sock);
+	return rc;
+}
 
 static inline void send_loop(struct socket *tx, struct msghdr *msg, struct kvec *vec)
 {
@@ -525,11 +592,9 @@ static inline void send_loop(struct socket *tx, struct msghdr *msg, struct kvec 
 	}
 }
 
+#define virt_to_pfn(kaddr) (__pa(kaddr) >> PAGE_SHIFT)
 static inline void tcp_client(void)
 {
-#define PORT	8080
-//#define SERVER_ADDR (10<<24|1<<16|4<<8|38) /*10.1.4.38*/
-#define SERVER_ADDR (10<<24|154<<16|0<<8|21) /*10.154.0.21*/
 	int rc, i = 0;
 	unsigned long cnt, max;
 	struct socket *tx = NULL;
@@ -541,7 +606,7 @@ static inline void tcp_client(void)
 	cnt = max = 0;
         srv_addr.sin_family             = AF_INET;
         srv_addr.sin_addr.s_addr        = htonl(SERVER_ADDR);
-        srv_addr.sin_port               = htons(PORT);
+        srv_addr.sin_port               = htons(PORT_NEXT_HOP);
 
 	msg.msg_name 	= &srv_addr;
 	msg.msg_namelen = sizeof(struct sockaddr);
@@ -550,7 +615,6 @@ static inline void tcp_client(void)
 		rc = -ENOMEM;
 		goto err;
 	}
- #define virt_to_pfn(kaddr) (__pa(kaddr) >> PAGE_SHIFT)
 	for (i = 0; i < 16; i++) {
 		kvec[i].iov_len = PAGE_SIZE << 2;
 		kvec[i].iov_base = base + (i * (PAGE_SIZE << 2));
@@ -593,7 +657,7 @@ static inline void udp_client(void)
 
         srv_addr.sin_family             = AF_INET;
         srv_addr.sin_addr.s_addr        = htonl(SERVER_ADDR);
-        srv_addr.sin_port               = htons(PORT);
+        srv_addr.sin_port               = htons(PORT_NEXT_HOP);
 
 	msg.msg_name = &srv_addr;
 	msg.msg_namelen = sizeof(struct sockaddr);
@@ -650,7 +714,7 @@ static __init int client_init(void)
 	proc_dir = proc_mkdir_mode(POLLER_DIR_NAME, 00555, NULL);
 	pkthread_bind_mask = (void *)kallsyms_lookup_name("kthread_bind_mask");
 
-	qp_slab = kmem_cache_create("cbn_qp_mdata",
+	pairs = kmem_cache_create("cbn_qp_mdata",
 					sizeof(struct sock_pair), 0, 0, NULL);
 
 	udp_client_task  = kthread_create(poll_thread, ((void *)0), "udp_client_thread");
@@ -666,8 +730,8 @@ static __init int client_init(void)
 
 	tcp_server[0] = kthread_run(split_server, NULL, "server_thread");
 	tcp_server[1] = kthread_run(split_server_z, NULL, "server_thread_z");
-	tcp_server[3] = kthread_run(split_server_z, NULL, "proxy_thread");
-	tcp_server[4] = kthread_run(split_server_z, NULL, "proxy_thread_z");
+	tcp_server[2] = kthread_run(proxy_server, NULL, "proxy_thread");
+	tcp_server[3] = kthread_run(proxy_server_z, NULL, "proxy_thread_z");
 
 	if (!proc_create_data("udp_"procname, 0666, proc_dir, &client_fops, udp_client_task))
 		goto err;
