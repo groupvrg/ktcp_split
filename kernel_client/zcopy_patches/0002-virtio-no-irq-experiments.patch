@@ -1,0 +1,368 @@
+From 0baecd017473d223786cb5ed9a1bae64bf5aee31 Mon Sep 17 00:00:00 2001
+From: Build VM <build@example.com>
+Date: Tue, 21 Jan 2020 17:01:46 +0000
+Subject: [PATCH 2/3] virtio-no-irq experiments
+
+---
+ drivers/net/virtio_net.c | 167 +++++++++++++++++++++++++++++++++------
+ 1 file changed, 141 insertions(+), 26 deletions(-)
+
+diff --git a/drivers/net/virtio_net.c b/drivers/net/virtio_net.c
+index 2b6916c01..93f1064ab 100644
+--- a/drivers/net/virtio_net.c
++++ b/drivers/net/virtio_net.c
+@@ -32,7 +32,13 @@
+ #include <linux/filter.h>
+ #include <net/route.h>
+ 
+-static int napi_weight = NAPI_POLL_WEIGHT;
++
++#include <linux/proc_fs.h>
++#include <linux/seq_file.h>
++#include <linux/string.h>
++
++#define VIRTIO_RX_POLL_MAX	64
++static int napi_weight = 4; //NAPI_POLL_WEIGHT;
+ module_param(napi_weight, int, 0444);
+ 
+ static bool csum = true, gso = true, napi_tx;
+@@ -71,9 +77,12 @@ struct virtnet_stats {
+ 	struct u64_stats_sync rx_syncp;
+ 	u64 tx_bytes;
+ 	u64 tx_packets;
++	u64 tx_kick;
+ 
+ 	u64 rx_bytes;
+ 	u64 rx_packets;
++	u64 rx_napi;
++	u64 rx_napi_complete;
+ };
+ 
+ /* Internal representation of a send virtqueue */
+@@ -260,6 +269,16 @@ static void virtqueue_napi_schedule(struct napi_struct *napi,
+ 	}
+ }
+ 
++static void virtqueue_irq_reanble(struct napi_struct *napi, struct virtqueue *vq)
++{
++	int opaque;
++
++	opaque = virtqueue_enable_cb_prepare(vq);
++	if (unlikely(virtqueue_poll(vq, opaque))) {
++		virtqueue_napi_schedule(napi, vq);
++	}
++}
++
+ static void virtqueue_napi_complete(struct napi_struct *napi,
+ 				    struct virtqueue *vq, int processed)
+ {
+@@ -274,6 +293,7 @@ static void virtqueue_napi_complete(struct napi_struct *napi,
+ 	}
+ }
+ 
++/* TX IRQ CB*/
+ static void skb_xmit_done(struct virtqueue *vq)
+ {
+ 	struct virtnet_info *vi = vq->vdev->priv;
+@@ -1064,6 +1084,7 @@ static bool try_fill_recv(struct virtnet_info *vi, struct receive_queue *rq,
+ 	return !oom;
+ }
+ 
++/* RX IRQ */
+ static void skb_recv_done(struct virtqueue *rvq)
+ {
+ 	struct virtnet_info *vi = rvq->vdev->priv;
+@@ -1207,7 +1228,7 @@ static bool is_xdp_raw_buffer_queue(struct virtnet_info *vi, int q)
+ 		return false;
+ }
+ 
+-static void virtnet_poll_cleantx(struct receive_queue *rq)
++static inline void virtnet_poll_cleantx(struct receive_queue *rq)
+ {
+ 	struct virtnet_info *vi = rq->vq->vdev->priv;
+ 	unsigned int index = vq2rxq(rq->vq);
+@@ -1226,22 +1247,42 @@ static void virtnet_poll_cleantx(struct receive_queue *rq)
+ 		netif_tx_wake_queue(txq);
+ }
+ 
++static int max = 4;
++/*MA: RX NAPI CB */
+ static int virtnet_poll(struct napi_struct *napi, int budget)
+ {
+ 	struct receive_queue *rq =
+ 		container_of(napi, struct receive_queue, napi);
+ 	struct virtnet_info *vi = rq->vq->vdev->priv;
++	struct virtnet_stats *stats = this_cpu_ptr(vi->stats);
+ 	struct send_queue *sq;
+ 	unsigned int received, qp;
+ 	bool xdp_xmit = false;
+ 
+-	virtnet_poll_cleantx(rq);
++	//virtnet_poll_cleantx(rq);
+ 
+-	received = virtnet_receive(rq, budget, &xdp_xmit);
++	stats->rx_napi++;
++	received = virtnet_receive(rq, budget + 4, &xdp_xmit);
+ 
+ 	/* Out of packets? */
+-	if (received < budget)
++	if (received < budget) {
+ 		virtqueue_napi_complete(napi, rq->vq, received);
++		stats->rx_napi_complete++;
++		napi->weight = (received < 4) ? 4 : received;
++	} else {
++		/* Received will not exceed budget...*/
++		napi->weight = (received > VIRTIO_RX_POLL_MAX) ? VIRTIO_RX_POLL_MAX : received;
++	}
++
++#if 0
++	if (napi->weight != weight) {
++		//trace_printk("Budget %d received %d (%d) in %s\n", budget, received, weight, in_serving_softirq() ? "SOFTIRQ": "WTF?");
++		napi->weight = weight;
++	}
++#endif
++	if (unlikely(napi->weight > max)) {
++		max = napi->weight;
++	}
+ 
+ 	if (xdp_xmit) {
+ 		qp = vi->curr_queue_pairs - vi->xdp_queue_pairs +
+@@ -1251,7 +1292,7 @@ static int virtnet_poll(struct napi_struct *napi, int budget)
+ 		xdp_do_flush_map();
+ 	}
+ 
+-	return received;
++	return (budget < received) ? budget : received;
+ }
+ 
+ static int virtnet_open(struct net_device *dev)
+@@ -1271,6 +1312,7 @@ static int virtnet_open(struct net_device *dev)
+ 	return 0;
+ }
+ 
++/*MA: TX NAPI CB */
+ static int virtnet_poll_tx(struct napi_struct *napi, int budget)
+ {
+ 	struct send_queue *sq = container_of(napi, struct send_queue, napi);
+@@ -1288,26 +1330,33 @@ static int virtnet_poll_tx(struct napi_struct *napi, int budget)
+ 	__netif_tx_lock(txq, raw_smp_processor_id());
+ 	free_old_xmit_skbs(sq);
+ 	__netif_tx_unlock(txq);
++	trace_printk("%d) TX IRQ[%p] napi poll\n", smp_processor_id(), txq);
+ 
+-	virtqueue_napi_complete(napi, sq->vq, 0);
++	/*MA: re-enables IRQs,
++		Why is it using 0?  */
++	//virtqueue_napi_complete(napi, sq->vq, 0);
++	napi_complete_done(napi, 0);
+ 
+ 	if (sq->vq->num_free >= 2 + MAX_SKB_FRAGS)
+ 		netif_tx_wake_queue(txq);
+ 
++	if (netif_xmit_stopped(txq)) {
++		virtqueue_irq_reanble(napi, sq->vq);
++		trace_printk("<%d>: Q[%p] IRQ Reanbaled\n", smp_processor_id(), txq);
++	}
++
+ 	return 0;
+ }
+ 
+ static int xmit_skb(struct send_queue *sq, struct sk_buff *skb)
+ {
+ 	struct virtio_net_hdr_mrg_rxbuf *hdr;
+-	const unsigned char *dest = ((struct ethhdr *)skb->data)->h_dest;
++	//const unsigned char *dest = ((struct ethhdr *)skb->data)->h_dest;
+ 	struct virtnet_info *vi = sq->vq->vdev->priv;
+ 	int num_sg;
+ 	unsigned hdr_len = vi->hdr_len;
+ 	bool can_push;
+ 
+-	pr_debug("%s: xmit %p %pM\n", vi->dev->name, skb, dest);
+-
+ 	can_push = vi->any_header_sg &&
+ 		!((unsigned long)skb->data & (__alignof__(*hdr) - 1)) &&
+ 		!skb_header_cloned(skb) && skb_headroom(skb) >= hdr_len;
+@@ -1352,14 +1401,11 @@ static netdev_tx_t start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 	int err;
+ 	struct netdev_queue *txq = netdev_get_tx_queue(dev, qnum);
+ 	bool kick = !skb->xmit_more;
+-	bool use_napi = sq->napi.weight;
+ 
+ 	/* Free up any pending old buffers before queueing new ones. */
++	/* MA: Only do this is Q is long and, avoid trushing... */
+ 	free_old_xmit_skbs(sq);
+ 
+-	if (use_napi && kick)
+-		virtqueue_enable_cb_delayed(sq->vq);
+-
+ 	/* timestamp packet in software */
+ 	skb_tx_timestamp(skb);
+ 
+@@ -1378,10 +1424,8 @@ static netdev_tx_t start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 	}
+ 
+ 	/* Don't wait up for transmitted skbs to be freed. */
+-	if (!use_napi) {
+-		skb_orphan(skb);
+-		nf_reset(skb);
+-	}
++	skb_orphan(skb);
++	nf_reset(skb);
+ 
+ 	/* If running out of space, stop queue to avoid getting packets that we
+ 	 * are then unable to transmit.
+@@ -1395,8 +1439,8 @@ static netdev_tx_t start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 	 */
+ 	if (sq->vq->num_free < 2+MAX_SKB_FRAGS) {
+ 		netif_stop_subqueue(dev, qnum);
+-		if (!use_napi &&
+-		    unlikely(!virtqueue_enable_cb_delayed(sq->vq))) {
++		trace_printk("%d: Q[%p] stopped (%s)\n", smp_processor_id(), txq, in_task() ? "IN TASK":"IN_SW_IRQ");
++		if (unlikely(!virtqueue_enable_cb_delayed(sq->vq))) {
+ 			/* More just got used, free them then recheck. */
+ 			free_old_xmit_skbs(sq);
+ 			if (sq->vq->num_free >= 2+MAX_SKB_FRAGS) {
+@@ -1406,8 +1450,11 @@ static netdev_tx_t start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 		}
+ 	}
+ 
+-	if (kick || netif_xmit_stopped(txq))
++	if (kick || netif_xmit_stopped(txq)) {
++		struct virtnet_stats *stats = this_cpu_ptr(vi->stats);
++		stats->tx_kick++;
+ 		virtqueue_kick(sq->vq);
++	}
+ 
+ 	return NETDEV_TX_OK;
+ }
+@@ -2579,14 +2626,68 @@ static int virtnet_validate(struct virtio_device *vdev)
+ 	return 0;
+ }
+ 
++static int virtio_net_show(struct seq_file *m, void *v)
++{
++	struct virtnet_info *vi;
++	int cpu;
++	u64 tx_kick  = 0 , rx_napi  = 0 , rx_napi_complete  = 0 , tx_packets = 0 , rx_packets = 0;
++	vi = m->private;
++
++        seq_printf(m, "Poll Max: %d\n", max);
++
++	for_each_possible_cpu(cpu) {
++		struct virtnet_stats *stats = per_cpu_ptr(vi->stats, cpu);
++		struct netdev_queue *txq = netdev_get_tx_queue(vi->dev, cpu);
++		tx_kick			+= stats->tx_kick;
++		tx_packets		+= stats->tx_packets;
++		rx_napi			+= stats->rx_napi;
++		rx_napi_complete	+= stats->rx_napi_complete;
++		rx_packets		+= stats->rx_packets;
++		seq_printf(m, "%d: RX:\n\t%20lld\n\t%20lld\n\t%20lld\n", cpu,
++				stats->rx_packets, stats->rx_napi, stats->rx_napi_complete);
++		seq_printf(m, "%d: TX(%s):\n\t%20lld\n\t%20lld\n", cpu, netif_xmit_stopped(txq) ? "STOPPED!":"OK",
++				stats->tx_packets, stats->tx_kick);
++	}
++	seq_printf(m, "\nTotal RX:\n\t%20lld\n\t%20lld\n\t%20lld\n", rx_packets, rx_napi, rx_napi_complete);
++	seq_printf(m, "Total TX:\n\t%20lld\n\t%20lld\n", tx_packets, tx_kick);
++        return 0;
++}
++
++static int virtio_net_open(struct inode *inode, struct  file *file)
++{
++        return single_open(file, virtio_net_show, PDE_DATA(inode));
++}
++
++static const struct file_operations stats_fops = {
++        .owner          = THIS_MODULE,
++        .open           = virtio_net_open,
++	.llseek         = seq_lseek,
++        .read           = seq_read,
++        .release        = single_release,
++};
++
++static struct proc_dir_entry *virtio_net_dir;
++
++static int virtio_net_proc_init(void)
++{
++	virtio_net_dir = proc_mkdir_mode("virtio_net", 00555, NULL);
++	if (!virtio_net_dir) {
++		pr_err("couldnt create virtio_net_dir\n");
++		return -1;
++	}
++	return 0;
++}
++
+ static int virtnet_probe(struct virtio_device *vdev)
+ {
+ 	int i, err;
+ 	struct net_device *dev;
+ 	struct virtnet_info *vi;
+ 	u16 max_queue_pairs;
+-	int mtu;
++	int mtu, cnt = 0;
++	char feat[256] = {0};
+ 
++	trace_printk("Hello...\n");
+ 	/* Find if host supports multiqueue virtio_net device */
+ 	err = virtio_cread_feature(vdev, VIRTIO_NET_F_MQ,
+ 				   struct virtio_net_config,
+@@ -2676,11 +2777,16 @@ static int virtnet_probe(struct virtio_device *vdev)
+ 	if (virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_TSO4) ||
+ 	    virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_TSO6) ||
+ 	    virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_ECN) ||
+-	    virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_UFO))
++	    virtio_has_feature(vdev, VIRTIO_NET_F_GUEST_UFO)) {
+ 		vi->big_packets = true;
++		cnt += snprintf(&feat[cnt], 32 , "BIG Packets ");
++	}
+ 
+-	if (virtio_has_feature(vdev, VIRTIO_NET_F_MRG_RXBUF))
++	if (virtio_has_feature(vdev, VIRTIO_NET_F_MRG_RXBUF)) {
+ 		vi->mergeable_rx_bufs = true;
++		cnt += snprintf(&feat[cnt], 32 , "VIRTIO_NET_F_MRG_RXBUF");
++	}
++	trace_printk("%s: %s\n", __FILE__, feat);
+ 
+ 	if (virtio_has_feature(vdev, VIRTIO_NET_F_MRG_RXBUF) ||
+ 	    virtio_has_feature(vdev, VIRTIO_F_VERSION_1))
+@@ -2770,7 +2876,11 @@ static int virtnet_probe(struct virtio_device *vdev)
+ 		if (virtio_has_feature(vi->vdev, guest_offloads[i]))
+ 			set_bit(guest_offloads[i], &vi->guest_offloads);
+ 
+-	pr_debug("virtnet: registered device %s with %d RX and TX vq's\n",
++	if (virtio_net_dir)
++		virtio_net_proc_init();
++	if (!proc_create_data(dev->name, 00444, virtio_net_dir, &stats_fops, vi))
++		pr_err("Failed to create %s\n", dev->name);
++	pr_info("virtnet: registered device %s with %d RX and TX vq's\n",
+ 		 dev->name, max_queue_pairs);
+ 
+ 	return 0;
+@@ -2912,6 +3022,8 @@ static __init int virtio_net_driver_init(void)
+         ret = register_virtio_driver(&virtio_net_driver);
+ 	if (ret)
+ 		goto err_virtio;
++
++	//virtio_net_proc_init();
+ 	return 0;
+ err_virtio:
+ 	cpuhp_remove_multi_state(CPUHP_VIRT_NET_DEAD);
+@@ -2924,6 +3036,9 @@ module_init(virtio_net_driver_init);
+ 
+ static __exit void virtio_net_driver_exit(void)
+ {
++	if (virtio_net_dir)
++		remove_proc_subtree("virtio_net", NULL);
++
+ 	unregister_virtio_driver(&virtio_net_driver);
+ 	cpuhp_remove_multi_state(CPUHP_VIRT_NET_DEAD);
+ 	cpuhp_remove_multi_state(virtionet_online);
+@@ -2931,5 +3046,5 @@ static __exit void virtio_net_driver_exit(void)
+ module_exit(virtio_net_driver_exit);
+ 
+ MODULE_DEVICE_TABLE(virtio, id_table);
+-MODULE_DESCRIPTION("Virtio network driver");
++MODULE_DESCRIPTION("Virtio network driver no IRQ");
+ MODULE_LICENSE("GPL");
+-- 
+2.17.1
+

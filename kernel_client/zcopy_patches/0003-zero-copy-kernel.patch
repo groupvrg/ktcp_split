@@ -1,0 +1,773 @@
+From 5058f4929cde01b15931d30e69d1f3855798e8d3 Mon Sep 17 00:00:00 2001
+From: Build VM <build@example.com>
+Date: Tue, 21 Jan 2020 17:04:04 +0000
+Subject: [PATCH 3/3] zero copy kernel
+
+---
+ include/linux/mm.h     |   2 +-
+ include/linux/net.h    |   2 +
+ include/linux/skbuff.h |  24 ++++-
+ include/linux/tcp.h    |   7 ++
+ include/net/sock.h     |   1 +
+ kernel/softirq.c       |  21 ++++-
+ net/core/datagram.c    |  71 +++++++++++++++
+ net/core/skbuff.c      |  49 +++++++---
+ net/core/sock.c        |   6 +-
+ net/ipv4/tcp.c         | 201 ++++++++++++++++++++++++++++++++++++++---
+ net/ipv4/tcp_output.c  |   2 +-
+ net/socket.c           |   8 ++
+ 12 files changed, 353 insertions(+), 41 deletions(-)
+
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index 4b59e40dc..e14bad183 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -374,7 +374,7 @@ enum page_entry_size {
+ /*
+  * These are the virtual MM functions - opening of an area, closing and
+  * unmapping it (needed to keep files on disk up-to-date etc), pointer
+- * to the functions called when a no-page or a wp-page exception occurs. 
++ * to the functions called when a no-page or a wp-page exception occurs.
+  */
+ struct vm_operations_struct {
+ 	void (*open)(struct vm_area_struct * area);
+diff --git a/include/linux/net.h b/include/linux/net.h
+index caeb159ab..3848e8015 100644
+--- a/include/linux/net.h
++++ b/include/linux/net.h
+@@ -282,6 +282,8 @@ do {									\
+ #define net_get_random_once_wait(buf, nbytes)			\
+ 	get_random_once_wait((buf), (nbytes))
+ 
++int trace_sendmsg(struct socket *sock, struct msghdr *msg,
++		   struct kvec *vec, size_t num, size_t size);
+ int kernel_sendmsg(struct socket *sock, struct msghdr *msg, struct kvec *vec,
+ 		   size_t num, size_t len);
+ int kernel_sendmsg_locked(struct sock *sk, struct msghdr *msg,
+diff --git a/include/linux/skbuff.h b/include/linux/skbuff.h
+index 27425284e..03756c4c7 100644
+--- a/include/linux/skbuff.h
++++ b/include/linux/skbuff.h
+@@ -427,8 +427,12 @@ enum {
+ 
+ 	/* generate software time stamp when entering packet scheduling */
+ 	SKBTX_SCHED_TSTAMP = 1 << 6,
++
++	/* spliced fargs  */
++	SKBTX_KERN_ZEROCOPY = 1 << 3,
+ };
+ 
++#define SKBTX_KERN_ZEROCOPY_FRAG	(SKBTX_DEV_ZEROCOPY | SKBTX_KERN_ZEROCOPY)
+ #define SKBTX_ZEROCOPY_FRAG	(SKBTX_DEV_ZEROCOPY | SKBTX_SHARED_FRAG)
+ #define SKBTX_ANY_SW_TSTAMP	(SKBTX_SW_TSTAMP    | \
+ 				 SKBTX_SCHED_TSTAMP)
+@@ -479,6 +483,7 @@ void sock_zerocopy_put(struct ubuf_info *uarg);
+ void sock_zerocopy_put_abort(struct ubuf_info *uarg);
+ 
+ void sock_zerocopy_callback(struct ubuf_info *uarg, bool success);
++void sock_kern_zerocopy_cb(struct ubuf_info *uarg, bool success);
+ 
+ int skb_zerocopy_iter_stream(struct sock *sk, struct sk_buff *skb,
+ 			     struct msghdr *msg, int len,
+@@ -582,7 +587,7 @@ typedef unsigned int sk_buff_data_t;
+ typedef unsigned char *sk_buff_data_t;
+ #endif
+ 
+-/** 
++/**
+  *	struct sk_buff - socket buffer
+  *	@next: Next buffer in list
+  *	@prev: Previous buffer in list
+@@ -882,7 +887,7 @@ static inline bool skb_pfmemalloc(const struct sk_buff *skb)
+  */
+ static inline struct dst_entry *skb_dst(const struct sk_buff *skb)
+ {
+-	/* If refdst was not refcounted, check we still are in a 
++	/* If refdst was not refcounted, check we still are in a
+ 	 * rcu_read_lock section
+ 	 */
+ 	WARN_ON((skb->_skb_refdst & SKB_DST_NOREF) &&
+@@ -1280,6 +1285,14 @@ static inline struct skb_shared_hwtstamps *skb_hwtstamps(struct sk_buff *skb)
+ 	return &skb_shinfo(skb)->hwtstamps;
+ }
+ 
++static inline struct ubuf_info *skb_kern_zcopy(struct sk_buff *skb)
++{
++	bool is_zcopy = skb && skb_shinfo(skb)->tx_flags & SKBTX_KERN_ZEROCOPY;
++
++	return is_zcopy ? skb_uarg(skb) : NULL;
++}
++
++
+ static inline struct ubuf_info *skb_zcopy(struct sk_buff *skb)
+ {
+ 	bool is_zcopy = skb && skb_shinfo(skb)->tx_flags & SKBTX_DEV_ZEROCOPY;
+@@ -1292,7 +1305,7 @@ static inline void skb_zcopy_set(struct sk_buff *skb, struct ubuf_info *uarg)
+ 	if (skb && uarg && !skb_zcopy(skb)) {
+ 		sock_zerocopy_get(uarg);
+ 		skb_shinfo(skb)->destructor_arg = uarg;
+-		skb_shinfo(skb)->tx_flags |= SKBTX_ZEROCOPY_FRAG;
++		skb_shinfo(skb)->tx_flags |= SKBTX_KERN_ZEROCOPY_FRAG;
+ 	}
+ }
+ 
+@@ -1300,6 +1313,7 @@ static inline void skb_zcopy_set_nouarg(struct sk_buff *skb, void *val)
+ {
+ 	skb_shinfo(skb)->destructor_arg = (void *)((uintptr_t) val | 0x1UL);
+ 	skb_shinfo(skb)->tx_flags |= SKBTX_ZEROCOPY_FRAG;
++	trace_printk("!!!!FixMe...\n");
+ }
+ 
+ static inline bool skb_zcopy_is_nouarg(struct sk_buff *skb)
+@@ -2538,7 +2552,7 @@ static inline int __skb_grow(struct sk_buff *skb, unsigned int len)
+  *	destructor function and make the @skb unowned. The buffer continues
+  *	to exist but is no longer charged to its former owner.
+  */
+-static inline void skb_orphan(struct sk_buff *skb)
++static inline  void skb_orphan(struct sk_buff *skb)
+ {
+ 	if (skb->destructor) {
+ 		skb->destructor(skb);
+@@ -2560,7 +2574,7 @@ static inline void skb_orphan(struct sk_buff *skb)
+  */
+ static inline int skb_orphan_frags(struct sk_buff *skb, gfp_t gfp_mask)
+ {
+-	if (likely(!skb_zcopy(skb)))
++	if (likely(!skb_zcopy(skb) || skb_kern_zcopy(skb) ))
+ 		return 0;
+ 	if (!skb_zcopy_is_nouarg(skb) &&
+ 	    skb_uarg(skb)->callback == sock_zerocopy_callback)
+diff --git a/include/linux/tcp.h b/include/linux/tcp.h
+index f92e921f3..6375391c1 100644
+--- a/include/linux/tcp.h
++++ b/include/linux/tcp.h
+@@ -450,6 +450,13 @@ static inline void tcp_saved_syn_free(struct tcp_sock *tp)
+ }
+ 
+ struct sk_buff *tcp_get_timestamping_opt_stats(const struct sock *sk);
++int tcp_zcopy_rx(struct socket *sock, struct page **pages_array, unsigned int nr_pages);
++int tcp_read_sock_zcopy(struct socket *sock,
++			struct kvec *pages_array, unsigned int nr_pages);
++int tcp_read_sock_zcopy_blocking(struct socket *sock,
++					struct kvec *pages_array,
++					unsigned int nr_pages);
++
+ 
+ static inline u16 tcp_mss_clamp(const struct tcp_sock *tp, u16 mss)
+ {
+diff --git a/include/net/sock.h b/include/net/sock.h
+index 30d3c6798..a60acc080 100644
+--- a/include/net/sock.h
++++ b/include/net/sock.h
+@@ -778,6 +778,7 @@ enum sock_flags {
+ 	SOCK_FASYNC, /* fasync() active */
+ 	SOCK_RXQ_OVFL,
+ 	SOCK_ZEROCOPY, /* buffers from userspace */
++	SOCK_KERN_ZEROCOPY, /* zero-copy kernel buffers */
+ 	SOCK_WIFI_STATUS, /* push wifi status to userspace */
+ 	SOCK_NOFCS, /* Tell NIC not to do the Ethernet FCS.
+ 		     * Will use last 4 bytes of packet sent from
+diff --git a/kernel/softirq.c b/kernel/softirq.c
+index f61113f6b..c949680ac 100644
+--- a/kernel/softirq.c
++++ b/kernel/softirq.c
+@@ -56,6 +56,7 @@ EXPORT_SYMBOL(irq_stat);
+ static struct softirq_action softirq_vec[NR_SOFTIRQS] __cacheline_aligned_in_smp;
+ 
+ DEFINE_PER_CPU(struct task_struct *, ksoftirqd);
++DEFINE_PER_CPU(bool, ksoftirqd_scheduled);
+ 
+ const char * const softirq_to_name[NR_SOFTIRQS] = {
+ 	"HI", "TIMER", "NET_TX", "NET_RX", "BLOCK", "IRQ_POLL",
+@@ -73,8 +74,10 @@ static void wakeup_softirqd(void)
+ 	/* Interrupts are disabled: no need to stop preemption */
+ 	struct task_struct *tsk = __this_cpu_read(ksoftirqd);
+ 
+-	if (tsk && tsk->state != TASK_RUNNING)
++	if (tsk && tsk->state != TASK_RUNNING) {
++		__this_cpu_write(ksoftirqd_scheduled, true);
+ 		wake_up_process(tsk);
++	}
+ }
+ 
+ /*
+@@ -182,7 +185,9 @@ void __local_bh_enable_ip(unsigned long ip, unsigned int cnt)
+ 	 */
+ 	preempt_count_sub(cnt - 1);
+ 
+-	if (unlikely(!in_interrupt() && local_softirq_pending())) {
++	if (unlikely(!in_interrupt() &&
++			local_softirq_pending() &&
++			!__this_cpu_read(ksoftirqd_scheduled))) {
+ 		/*
+ 		 * Run softirq if any pending. And do it in its own stack
+ 		 * as we may be calling this deep in a task call stack already.
+@@ -307,9 +312,9 @@ asmlinkage __visible void __softirq_entry __do_softirq(void)
+ 
+ 	pending = local_softirq_pending();
+ 	if (pending) {
+-		if (time_before(jiffies, end) && !need_resched() &&
+-		    --max_restart)
+-			goto restart;
++	//	if (time_before(jiffies, end) && !need_resched() &&
++	//	    --max_restart)
++	//		goto restart;
+ 
+ 		wakeup_softirqd();
+ 	}
+@@ -363,7 +368,11 @@ static inline void invoke_softirq(void)
+ 	if (ksoftirqd_running(local_softirq_pending()))
+ 		return;
+ 
++	if (__this_cpu_read(ksoftirqd_scheduled))
++		return;
++
+ 	if (!force_irqthreads) {
++		WARN_ON_ONCE(1);
+ #ifdef CONFIG_HAVE_IRQ_EXIT_ON_IRQ_STACK
+ 		/*
+ 		 * We can safely execute softirq on the current stack if
+@@ -672,6 +681,8 @@ static void run_ksoftirqd(unsigned int cpu)
+ 		 * in the task stack here.
+ 		 */
+ 		__do_softirq();
++		if (!local_softirq_pending())
++			__this_cpu_write(ksoftirqd_scheduled, false);
+ 		local_irq_enable();
+ 		cond_resched_rcu_qs();
+ 		return;
+diff --git a/net/core/datagram.c b/net/core/datagram.c
+index 1c33dfab0..5bbc33e45 100644
+--- a/net/core/datagram.c
++++ b/net/core/datagram.c
+@@ -580,6 +580,77 @@ int skb_copy_datagram_from_iter(struct sk_buff *skb, int offset,
+ }
+ EXPORT_SYMBOL(skb_copy_datagram_from_iter);
+ 
++static inline ssize_t kvec_get_frag_advance(struct iov_iter *from,
++					struct page **page,
++					ssize_t *off, size_t len)
++{
++	ssize_t copied = 0;
++	struct kvec *kvec = &from->kvec[from->iov_offset];
++
++	//trace_printk("%d: kvec %lx [%lu]\n", from->type, (unsigned long)kvec, from->iov_offset);
++
++	//trace_printk("iter 0x%lx len %lu : base %lx [%lx] iov len %lu off %lx\n", (unsigned long)from, len,
++		//(unsigned long)virt_to_page(kvec->iov_base),
++		//(unsigned long)virt_to_head_page(kvec->iov_base),
++		//kvec->iov_len,
++		//(unsigned long)kvec->iov_base & (~PAGE_MASK));
++	*page = virt_to_page(kvec->iov_base);
++	*off = (unsigned long)kvec->iov_base & (~PAGE_MASK);
++	get_page(*page);
++
++	if (len >= kvec->iov_len) {
++		copied = kvec->iov_len;
++		kvec->iov_len = 0;
++		kvec->iov_base = 0;
++		from->iov_offset++;
++	} else {
++		copied = len;
++		kvec->iov_len -= copied;
++		kvec->iov_base += copied;
++	}
++	from->count -= copied;
++
++	return copied;
++}
++
++int skb_zerocopy_sg_from_iter(struct sock *sk, struct sk_buff *skb,
++			    struct iov_iter *from, size_t len)
++{
++	int frag = skb_shinfo(skb)->nr_frags;
++
++	//trace_printk("collecting Frags skb %p [%lu -> %lu], %d\n", skb, from->count, len, frag);
++
++	while (len && iov_iter_count(from)) {
++		struct page *page = NULL;
++		unsigned long truesize;
++		ssize_t copied;
++		ssize_t offset;
++
++		if (frag == MAX_SKB_FRAGS || from->count)
++			return -EMSGSIZE;
++
++		copied = kvec_get_frag_advance(from, &page, &offset, len);
++		//trace_printk("collected %lu [%p + %lu]\n", copied, page, offset);
++		len -= copied;
++
++		truesize = copied;
++		skb->data_len += copied;
++		skb->len += copied;
++		skb->truesize += copied;
++
++		if (sk && sk->sk_type == SOCK_STREAM) {
++			sk->sk_wmem_queued += truesize;
++			sk_mem_charge(sk, truesize);
++		} else {
++			refcount_add(truesize, &skb->sk->sk_wmem_alloc);
++		}
++		skb_fill_page_desc(skb, frag++, page, offset, copied);
++		//trace_printk("skb %p nr frags %d\n", skb, frag);
++	}
++	return 0;
++}
++EXPORT_SYMBOL(skb_zerocopy_sg_from_iter);
++
+ int __zerocopy_sg_from_iter(struct sock *sk, struct sk_buff *skb,
+ 			    struct iov_iter *from, size_t length)
+ {
+diff --git a/net/core/skbuff.c b/net/core/skbuff.c
+index d3128e9a3..ce9f2ec73 100644
+--- a/net/core/skbuff.c
++++ b/net/core/skbuff.c
+@@ -901,10 +901,14 @@ static int mm_account_pinned_pages(struct mmpin *mmp, size_t size)
+ 	unsigned long max_pg, num_pg, new_pg, old_pg;
+ 	struct user_struct *user;
+ 
++	if (IS_ERR(mmp->user))
++		return 0;
++
+ 	if (capable(CAP_IPC_LOCK) || !size)
+ 		return 0;
+ 
+ 	num_pg = (size >> PAGE_SHIFT) + 2;	/* worst case */
++
+ 	max_pg = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
+ 	user = mmp->user ? : current_user();
+ 
+@@ -928,7 +932,7 @@ static int mm_account_pinned_pages(struct mmpin *mmp, size_t size)
+ 
+ static void mm_unaccount_pinned_pages(struct mmpin *mmp)
+ {
+-	if (mmp->user) {
++	if (!IS_ERR_OR_NULL(mmp->user)) {
+ 		atomic_long_sub(mmp->num_pg, &mmp->user->locked_vm);
+ 		free_uid(mmp->user);
+ 	}
+@@ -947,14 +951,16 @@ struct ubuf_info *sock_zerocopy_alloc(struct sock *sk, size_t size)
+ 
+ 	BUILD_BUG_ON(sizeof(*uarg) > sizeof(skb->cb));
+ 	uarg = (void *)skb->cb;
+-	uarg->mmp.user = NULL;
++	uarg->mmp.user = sock_flag(sk, SOCK_KERN_ZEROCOPY) ? ERR_PTR(-ESRCH) : NULL;
++	//trace_printk("zcopy user %lu\n", (unsigned long)uarg->mmp.user);
+ 
+ 	if (mm_account_pinned_pages(&uarg->mmp, size)) {
++		trace_printk("Hemmm... WTF?!\n");
+ 		kfree_skb(skb);
+ 		return NULL;
+ 	}
+ 
+-	uarg->callback = sock_zerocopy_callback;
++	uarg->callback = sock_flag(sk, SOCK_KERN_ZEROCOPY) ? sock_kern_zerocopy_cb : sock_zerocopy_callback;
+ 	uarg->id = ((u32)atomic_inc_return(&sk->sk_zckey)) - 1;
+ 	uarg->len = 1;
+ 	uarg->bytelen = size;
+@@ -1031,6 +1037,27 @@ static bool skb_zerocopy_notify_extend(struct sk_buff *skb, u32 lo, u16 len)
+ 	return true;
+ }
+ 
++void sock_kern_zerocopy_cb(struct ubuf_info *uarg, bool success)
++{
++	struct sk_buff *skb = skb_from_uarg(uarg);
++	struct sock *sk = skb->sk;
++	int i, num_frags = skb_shinfo(skb)->nr_frags;
++
++	trace_printk("%s skb: %p freeing pages[%d]...\n", __FUNCTION__, skb, num_frags);
++	if (!uarg->len /*|| sock_flag(sk, SOCK_DEAD)*/) {
++		consume_skb(skb);
++		sock_put(sk);
++	}
++#if 0
++	for (i = 0; i < num_frags; i++) {
++		skb_frag_t *f = &skb_shinfo(skb)->frags[i];
++		trace_printk("put %lx head [%lx]\n", (unsigned long)f->page.p, (unsigned long)compound_head(f->page.p));
++		put_page(f->page.p); // ? put_page?
++	}
++#endif
++}
++EXPORT_SYMBOL(sock_kern_zerocopy_cb);
++
+ void sock_zerocopy_callback(struct ubuf_info *uarg, bool success)
+ {
+ 	struct sk_buff *tail, *skb = skb_from_uarg(uarg);
+@@ -1104,8 +1131,8 @@ void sock_zerocopy_put_abort(struct ubuf_info *uarg)
+ }
+ EXPORT_SYMBOL_GPL(sock_zerocopy_put_abort);
+ 
+-extern int __zerocopy_sg_from_iter(struct sock *sk, struct sk_buff *skb,
+-				   struct iov_iter *from, size_t length);
++extern int skb_zerocopy_sg_from_iter(struct sock *sk, struct sk_buff *skb,
++				    struct iov_iter *from, size_t length);
+ 
+ int skb_zerocopy_iter_stream(struct sock *sk, struct sk_buff *skb,
+ 			     struct msghdr *msg, int len,
+@@ -1121,18 +1148,18 @@ int skb_zerocopy_iter_stream(struct sock *sk, struct sk_buff *skb,
+ 	if (orig_uarg && uarg != orig_uarg)
+ 		return -EEXIST;
+ 
+-	err = __zerocopy_sg_from_iter(sk, skb, &msg->msg_iter, len);
+-	if (err == -EFAULT || (err == -EMSGSIZE && skb->len == orig_len)) {
++	err = skb_zerocopy_sg_from_iter(sk, skb, &msg->msg_iter, len);
++	if (err == -EMSGSIZE && skb->len == orig_len) {
+ 		struct sock *save_sk = skb->sk;
+-
++		//trace_printk("Failed to collet data...[%p]\n", skb);
+ 		/* Streams do not free skb on error. Reset to prev state. */
+ 		msg->msg_iter = orig_iter;
+ 		skb->sk = sk;
+-		___pskb_trim(skb, orig_len);
++		//___pskb_trim(skb, orig_len);
+ 		skb->sk = save_sk;
+ 		return err;
+ 	}
+-
++	//trace_printk("Collected data, setting zcopy [%p]\n", skb);
+ 	skb_zcopy_set(skb, uarg);
+ 	return skb->len - orig_len;
+ }
+@@ -1142,7 +1169,7 @@ static int skb_zerocopy_clone(struct sk_buff *nskb, struct sk_buff *orig,
+ 			      gfp_t gfp_mask)
+ {
+ 	if (skb_zcopy(orig)) {
+-		if (skb_zcopy(nskb)) {
++		if (skb_zcopy(nskb) && !skb_kern_zcopy(nskb)) {
+ 			/* !gfp_mask callers are verified to !skb_zcopy(nskb) */
+ 			if (!gfp_mask) {
+ 				WARN_ON_ONCE(1);
+diff --git a/net/core/sock.c b/net/core/sock.c
+index eb2428e88..7fbda6322 100644
+--- a/net/core/sock.c
++++ b/net/core/sock.c
+@@ -1945,9 +1945,9 @@ struct sk_buff *sock_omalloc(struct sock *sk, unsigned long size,
+ 	struct sk_buff *skb;
+ 
+ 	/* small safe race: SKB_TRUESIZE may differ from final skb->truesize */
+-	if (atomic_read(&sk->sk_omem_alloc) + SKB_TRUESIZE(size) >
+-	    sysctl_optmem_max)
+-		return NULL;
++	//if (atomic_read(&sk->sk_omem_alloc) + SKB_TRUESIZE(size) >
++	//    sysctl_optmem_max)
++	//	return NULL;
+ 
+ 	skb = alloc_skb(size, priority);
+ 	if (!skb)
+diff --git a/net/ipv4/tcp.c b/net/ipv4/tcp.c
+index 35aafe374..5712cebdb 100644
+--- a/net/ipv4/tcp.c
++++ b/net/ipv4/tcp.c
+@@ -1202,15 +1202,18 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
+ 	struct ubuf_info *uarg = NULL;
+ 	struct sk_buff *skb;
+ 	struct sockcm_cookie sockc;
+-	int flags, err, copied = 0;
++	int flags, err, copied = 0, line;
+ 	int mss_now = 0, size_goal, copied_syn = 0;
+ 	bool process_backlog = false;
+ 	bool sg;
+ 	long timeo;
+ 
+ 	flags = msg->msg_flags;
++	line = __LINE__;
++	if (flags & MSG_ZEROCOPY && size
++		&& (sock_flag(sk, SOCK_ZEROCOPY)
++			|| sock_flag(sk, SOCK_KERN_ZEROCOPY) )) {
+ 
+-	if (flags & MSG_ZEROCOPY && size && sock_flag(sk, SOCK_ZEROCOPY)) {
+ 		if ((1 << sk->sk_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
+ 			err = -EINVAL;
+ 			goto out_err;
+@@ -1220,11 +1223,14 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
+ 		uarg = sock_zerocopy_realloc(sk, size, skb_zcopy(skb));
+ 		if (!uarg) {
+ 			err = -ENOBUFS;
++			line = __LINE__;
+ 			goto out_err;
+ 		}
+ 
+-		if (!(sk_check_csum_caps(sk) && sk->sk_route_caps & NETIF_F_SG))
++		if (!(sk_check_csum_caps(sk) && sk->sk_route_caps & NETIF_F_SG)) {
++			trace_printk("WTF?...\n");
+ 			uarg->zerocopy = 0;
++		}
+ 	}
+ 
+ 	if (unlikely(flags & MSG_FASTOPEN || inet_sk(sk)->defer_connect) &&
+@@ -1232,8 +1238,10 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
+ 		err = tcp_sendmsg_fastopen(sk, msg, &copied_syn, size);
+ 		if (err == -EINPROGRESS && copied_syn > 0)
+ 			goto out;
+-		else if (err)
++		else if (err) {
++			line = __LINE__;
+ 			goto out_err;
++		}
+ 	}
+ 
+ 	timeo = sock_sndtimeo(sk, flags & MSG_DONTWAIT);
+@@ -1258,8 +1266,10 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
+ 		}
+ 
+ 		err = -EINVAL;
+-		if (tp->repair_queue == TCP_NO_QUEUE)
++		if (tp->repair_queue == TCP_NO_QUEUE) {
++			line = __LINE__;
+ 			goto out_err;
++		}
+ 
+ 		/* 'common' sending to sendq */
+ 	}
+@@ -1344,18 +1354,27 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
+ 		if (copy > msg_data_left(msg))
+ 			copy = msg_data_left(msg);
+ 
+-		/* Where to copy to? */
+-		if (skb_availroom(skb) > 0) {
+-			/* We have some space in skb head. Superb! */
+-			copy = min_t(int, copy, skb_availroom(skb));
+-			err = skb_add_data_nocache(sk, skb, &msg->msg_iter, copy);
+-			if (err)
+-				goto do_fault;
+-		} else if (!uarg || !uarg->zerocopy) {
++///* Where to copy to? */
++//if (skb_availroom(skb) > 0 && !uarg->zerocopy ) {
++//	/*TODO: WHy defuck? ... ignore this, maybve copy 64B - Next next...*/
++//	/* We have some space in skb head. Superb! */
++//	copy = min_t(int, copy, skb_availroom(skb));
++//	err = skb_add_data_nocache(sk, skb, &msg->msg_iter, copy);
++//	if (err)
++//		goto do_fault;
++//} else
++		if (!uarg || !uarg->zerocopy) {
+ 			bool merge = true;
+ 			int i = skb_shinfo(skb)->nr_frags;
+ 			struct page_frag *pfrag = sk_page_frag(sk);
+ 
++			if (skb_availroom(skb) > 0) {
++				copy = min_t(int, copy, skb_availroom(skb));
++				err = skb_add_data_nocache(sk, skb, &msg->msg_iter, copy);
++				if (err)
++					goto do_fault;
++				goto next;
++			}
+ 			if (!sk_page_frag_refill(sk, pfrag))
+ 				goto wait_for_memory;
+ 
+@@ -1386,7 +1405,7 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
+ 			} else {
+ 				skb_fill_page_desc(skb, i, pfrag->page,
+ 						   pfrag->offset, copy);
+-				page_ref_inc(pfrag->page);
++				get_page(pfrag->page);
+ 			}
+ 			pfrag->offset += copy;
+ 		} else {
+@@ -1397,7 +1416,7 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
+ 				goto do_error;
+ 			copy = err;
+ 		}
+-
++next:
+ 		if (!copied)
+ 			TCP_SKB_CB(skb)->tcp_flags &= ~TCPHDR_PSH;
+ 
+@@ -1670,6 +1689,7 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
+ 			/* Stop reading if we hit a patch of urgent data */
+ 			if (tp->urg_data) {
+ 				u32 urg_offset = tp->urg_seq - seq;
++				trace_printk("Shit wha?!\n");
+ 				if (urg_offset < len)
+ 					len = urg_offset;
+ 				if (!len)
+@@ -3668,3 +3688,154 @@ void __init tcp_init(void)
+ 	BUG_ON(tcp_register_congestion_control(&tcp_reno) != 0);
+ 	tcp_tasklet_init();
+ }
++
++struct kvec_desc {
++	struct kvec *pages_array;
++	unsigned int nr_pages;
++	read_descriptor_t desc_t;
++};
++
++static inline void skb_frag_get(const skb_frag_t *frag)
++{
++	get_page(compound_head(skb_frag_page(frag)));
++}
++
++int skb_zerocopy_rx(read_descriptor_t *desc_t, struct sk_buff *skb, u32 offset, size_t len)
++{
++	int copied = 0, skipped = 0;
++	const skb_frag_t *frags;
++	struct kvec_desc *desc = container_of(desc_t, struct kvec_desc, desc_t);
++
++	desc_t->count = desc->nr_pages;
++	trace_printk("Collecting : %d  off %u len %lu\n", desc->nr_pages, offset, len);
++
++	if (unlikely(!desc->nr_pages)) {
++		trace_printk("nr_pages = 0\n");
++		return -ENOMEM;
++	}
++
++	if (skb_headlen(skb) > offset) {
++		if (!(skb->head_frag)) {
++			trace_printk("head_frag error...\n");
++			return -EINVAL;
++		}
++
++		desc->pages_array->iov_base = skb->data + offset;
++		desc->pages_array->iov_len = skb_headlen(skb) - offset;
++		copied = desc->pages_array->iov_len;
++		len -= copied;
++
++		get_page(virt_to_head_page(skb->head));
++#if 0
++		trace_printk("Head: %p<%d> [%lu/%lu] [%d,%d] (?%d)\n",
++				virt_to_head_page(desc->pages_array->iov_base),
++				page_count(virt_to_head_page(desc->pages_array->iov_base)),
++				desc->pages_array->iov_len, len, copied, desc->nr_pages, offset);
++#endif
++		offset = 0;
++		desc->pages_array++;
++		desc->nr_pages--;
++		desc_t->count = desc->nr_pages;
++	} else {
++		offset -= skb_headlen(skb);
++	}
++
++	if (offset > skb->data_len) {
++		trace_printk("WEIRD?!: %p len %d data len %d of %d copied %d\n", skb, skb->len, skb->data_len, offset, copied);
++		return copied;
++	}
++
++	len = skb->data_len - offset;
++	if (unlikely(!len)) {
++		trace_printk("%p len %d data len %d of %d copied %d\n", skb, skb->len, skb->data_len, offset, copied);
++		return copied;
++	}
++
++	frags = skb_shinfo(skb)->frags;
++	while (offset) {
++		if (frags->size > offset)
++			break;
++		offset -= frags->size;
++		skipped++;
++		frags++;
++	}
++
++	trace_printk("Collecting frags: %d [%d] of %u len %lu\n", skb_shinfo(skb)->nr_frags, skipped, offset, len);
++
++	while (desc->nr_pages) {
++		//if (unlikely(!(skb_shinfo(skb)->nr_frags -skipped))) {
++		if (unlikely(skb_shinfo(skb)->nr_frags <= skipped)) {
++			break;
++		}
++		desc->pages_array->iov_base = skb_frag_address(frags) + offset;
++		desc->pages_array->iov_len = skb_frag_size(frags) - offset;
++
++
++		len -= skb_frag_size(frags);
++		copied += skb_frag_size(frags);
++#if 0
++		trace_printk("Frag: %p [%d]<%d> [%lu=%u/%lu] [%d,%d]\n",
++				virt_to_head_page(desc->pages_array->iov_base), frags->page_offset + offset,
++				page_count(virt_to_head_page(desc->pages_array->iov_base)),
++				desc->pages_array->iov_len, skb_frag_size(frags), len, copied, desc->nr_pages);
++#endif
++		skb_frag_get(frags);//TODO: BUG - Doesnt use compound head!!! - GRO use case breaks
++		offset = 0;
++		desc->pages_array++;
++		desc->nr_pages--;
++		skipped++;
++		frags++;
++
++		if (len <= 0)
++			break;
++	}
++
++	desc_t->count = desc->nr_pages;
++	BUG_ON(!copied);
++	return copied;
++}
++
++int tcp_read_sock_zcopy_blocking(struct socket *sock,
++					struct kvec *pages_array,
++					unsigned int nr_pages)
++{
++	struct sock *sk = sock->sk;
++	struct sk_buff *last = NULL;
++	long timeo = 1 * HZ;//MAX_SCHEDULE_TIMEOUT;
++	int rc;
++
++	if (skb_queue_empty(&sk->sk_receive_queue))
++		goto wait;
++
++retry:
++	if ((rc = tcp_read_sock_zcopy(sock, pages_array, nr_pages)) < 0) {
++		trace_printk("Error %d\n", rc);
++		goto out;
++	}
++	if (!rc) {
++wait:
++		//trace_printk("Waiting... \n");
++		lock_sock(sk);
++		timeo = 1/HZ;
++		rc = sk_wait_data(sock->sk, &timeo, NULL);
++		//last = skb_peek_tail(&sk->sk_receive_queue);
++		release_sock(sk);
++		goto retry;
++	}
++out:
++	return rc;
++}
++EXPORT_SYMBOL(tcp_read_sock_zcopy_blocking);
++
++int tcp_read_sock_zcopy(struct socket *sock, struct kvec *pages_array, unsigned int nr_pages)
++{
++	int rc = 0;
++	struct kvec_desc desc = {.pages_array = pages_array, .nr_pages = nr_pages};
++
++	lock_sock(sock->sk);
++	rc =  tcp_read_sock(sock->sk, &desc.desc_t , skb_zerocopy_rx);
++	release_sock(sock->sk);
++	return rc;
++
++}
++EXPORT_SYMBOL(tcp_read_sock_zcopy);
+diff --git a/net/ipv4/tcp_output.c b/net/ipv4/tcp_output.c
+index bdc47cf15..38de8b5e0 100644
+--- a/net/ipv4/tcp_output.c
++++ b/net/ipv4/tcp_output.c
+@@ -1635,7 +1635,7 @@ unsigned int tcp_current_mss(struct sock *sk)
+ 
+ 	return mss_now;
+ }
+-
++EXPORT_SYMBOL(tcp_current_mss);
+ /* RFC2861, slow part. Adjust cwnd, after it was not full during one rto.
+  * As additional protections, we do not touch cwnd in retransmission phases,
+  * and if application hit its sndbuf limit recently.
+diff --git a/net/socket.c b/net/socket.c
+index 34ee10c6d..343e63231 100644
+--- a/net/socket.c
++++ b/net/socket.c
+@@ -663,6 +663,14 @@ int sock_sendmsg(struct socket *sock, struct msghdr *msg)
+ }
+ EXPORT_SYMBOL(sock_sendmsg);
+ 
++int trace_sendmsg(struct socket *sock, struct msghdr *msg,
++		   struct kvec *vec, size_t num, size_t size)
++{
++	//trace_printk("Sending vec %lx\n", (unsigned long)vec);
++	return kernel_sendmsg(sock, msg, vec, num, size);
++}
++EXPORT_SYMBOL(trace_sendmsg);
++
+ int kernel_sendmsg(struct socket *sock, struct msghdr *msg,
+ 		   struct kvec *vec, size_t num, size_t size)
+ {
+-- 
+2.17.1
+
