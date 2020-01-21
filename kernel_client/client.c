@@ -370,6 +370,35 @@ out:
 	return rc;
 }
 
+static int proxy_out_zero(void *arg)
+{
+	struct sock_pair *pair = arg;
+	int rc;
+	struct socket *tx = NULL;
+	struct sockaddr_in srv_addr = {0};
+
+        srv_addr.sin_family             = AF_INET;
+        srv_addr.sin_addr.s_addr        = htonl(SERVER_ADDR);
+        srv_addr.sin_port               = htons(PORT_NEXT_HOP);
+
+	if ((rc = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &tx))) {
+                trace_printk("RC = %d (%d)\n", rc, __LINE__);
+		goto err;
+        }
+
+        if ((rc = kernel_connect(tx, (struct sockaddr *)&srv_addr, sizeof(struct sockaddr), 0))) {
+                trace_printk("RC = %d (%d)\n", rc, __LINE__);
+		goto err;
+        }
+	pair->out = tx;
+	wake_up(&pair->wait);
+	half_duplex_zero(tx, pair->in);
+	return 0;
+err:
+	trace_printk("Failed to connect (%d)\n", rc);
+	return -1;
+}
+
 static int proxy_out(void *arg)
 {
 	struct sock_pair *pair = arg;
@@ -390,10 +419,28 @@ static int proxy_out(void *arg)
                 trace_printk("RC = %d (%d)\n", rc, __LINE__);
 		goto err;
         }
+	pair->out = tx;
 	wake_up(&pair->wait);
+	half_duplex(tx, pair->in);
 	return 0;
 err:
 	trace_printk("Failed to connect (%d)\n", rc);
+	return -1;
+}
+
+static int proxy_in_zero(void *arg)
+{
+	struct sock_pair *pair = arg;
+	int error = wait_event_interruptible_timeout(pair->wait,
+							pair->out, HZ);
+	if (error)
+		goto err;
+	//kernel_sock_shutdown(net->socket, SHUT_RDWR);
+	//sock_release(net->socket);
+	half_duplex_zero(pair->in, pair->out);
+	return 0;
+err:
+	trace_printk("Waiting timed out (%d)\n", error);
 	return -1;
 }
 
@@ -402,7 +449,7 @@ static int proxy_in(void *arg)
 	struct sock_pair *pair = arg;
 	int error = wait_event_interruptible_timeout(pair->wait,
 							pair->out, HZ);
-	if (error)
+	if (!error || IS_ERR_OR_NULL(pair->out))
 		goto err;
 	//kernel_sock_shutdown(net->socket, SHUT_RDWR);
 	//sock_release(net->socket);
@@ -432,7 +479,7 @@ static int proxy_server(void *unused)
 	if ((rc = kernel_listen(sock, 32)))
 		goto error;
 
-	trace_printk("accepting on port %d\n", PROXY_PORT);
+	trace_printk("(KTCP) accepting on port %d\n", PROXY_PORT);
 	do {
 		struct socket *nsock;
 		struct sock_pair *pair = kmem_cache_alloc(pairs, GFP_KERNEL);;
@@ -476,7 +523,7 @@ static int proxy_server_z(void *unused)
 	if ((rc = kernel_listen(sock, 32)))
 		goto error;
 
-	trace_printk("accepting on port %d\n", PROXY_Z_PORT);
+	trace_printk("(KTCP ZERO)accepting on port %d\n", PROXY_Z_PORT);
 	do {
 		struct socket *nsock;
 		struct sock_pair *pair = kmem_cache_alloc(pairs, GFP_KERNEL);;
@@ -484,6 +531,9 @@ static int proxy_server_z(void *unused)
 		rc = kernel_accept(sock, &nsock, 0);
 		if (unlikely(rc))
 			goto out;
+
+		pair->in = nsock;
+		init_waitqueue_head(&pair->wait);
 
 		kthread_run(proxy_in, pair, "proxy_in_%lx", (unsigned long)nsock);
 		kthread_run(proxy_out, pair, "proxy_out_%lx", (unsigned long)nsock);
@@ -517,7 +567,7 @@ static int split_server(void *unused)
 	if ((rc = kernel_listen(sock, 32)))
 		goto error;
 
-	trace_printk("accepting on port %d\n", PORT_SERVER);
+	trace_printk("(recv msg) accepting on port %d\n", PORT_SERVER);
 	do {
 		struct socket *nsock;
 
@@ -556,7 +606,7 @@ static int split_server_z(void *unused)
 	if ((rc = kernel_listen(sock, 32)))
 		goto error;
 
-	trace_printk("accepting on port %d\n", PORT_SERVER);
+	trace_printk("(zero recv) accepting on port %d\n", PORT_Z_SERVER);
 	do {
 		struct socket *nsock;
 
@@ -738,7 +788,7 @@ static __init int client_init(void)
 	if (!proc_create_data("tcp_"procname, 0666, proc_dir, &client_fops, tcp_client_task))
 		goto err;
 
-	trace_printk("TCP: %p\nUDP: %p\n", udp_client_task, tcp_client_task);
+	//trace_printk("TCP: %p\nUDP: %p\n", udp_client_task, tcp_client_task);
 	return 0;
 err:
 	return -1;
