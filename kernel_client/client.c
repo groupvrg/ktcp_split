@@ -243,11 +243,12 @@ int half_duplex_zero(struct socket *in, struct socket *out)
 	sock_set_flag(out->sk, SOCK_KERN_ZEROCOPY);
 	do {
 		struct msghdr msg = { 0 };
+		struct kvec tkvec[VEC_SZ];
 		int vec_len;
 
 		memset(kvec, 0, sizeof(kvec));
 
-		if ((rc = tcp_read_sock_zcopy_blocking(in, kvec, VEC_SZ)) <= 0) {
+		if ((rc = tcp_read_sock_zcopy_blocking(in, kvec, VEC_SZ -1)) <= 0) {
 			trace_printk("ERROR: %s (%d) at %s with %lld bytes\n", __FUNCTION__,
 					rc, id ? "Send" : "Rcv", bytes);
 			kernel_sock_shutdown(out, SHUT_RDWR);
@@ -261,6 +262,8 @@ int half_duplex_zero(struct socket *in, struct socket *out)
 		id ^= 1;
 		msg.msg_flags   |= MSG_ZEROCOPY;
 		vec_len = get_kvec_len(kvec, VEC_SZ);
+		//trace_printk("memcpy %lu * %d\n", sizeof(struct kvec), vec_len);
+		memcpy(tkvec, kvec, sizeof(struct kvec) * vec_len);
 		//Need an additional put on the pages?
 		if ((rc = kernel_sendmsg(out, &msg, kvec,
 					vec_len, rc)) <= 0) {
@@ -269,6 +272,9 @@ int half_duplex_zero(struct socket *in, struct socket *out)
 			kernel_sock_shutdown(in, SHUT_RDWR);
 			goto err;
 		}
+		for (rc = 0; rc < vec_len; rc++)
+			//get_page(virt_to_head_page(skb->head));
+			put_page(virt_to_head_page(tkvec[rc].iov_base));
 		id ^= 1;
 
 	} while (!kthread_should_stop());
@@ -442,6 +448,7 @@ static int proxy_in_zero(void *arg)
 		goto err;
 	//kernel_sock_shutdown(net->socket, SHUT_RDWR);
 	//sock_release(net->socket);
+	trace_printk("starting  %p -> %p\n", pair->in, pair->out);
 	half_duplex_zero(pair->in, pair->out);
 	return 0;
 err:
