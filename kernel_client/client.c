@@ -23,9 +23,9 @@
 #define PROXY_PORT	8081
 #define PROXY_Z_PORT 	8082
 #define PORT_MAIO 	8083
-#define PORT_SERVER	8084
+#define ECHO_SERVER	8084
 #define PORT_Z_SERVER	8085
-#define PORT_NEXT_HOP	8086
+#define PORT_NEXT_HOP	PORT_Z_SERVER
 
 #define IP_HEX(a,b,c,d) ((a)<<24|(b)<<16|(c)<<8|(d))
 #define SERVER_ADDR	IP_HEX(10,154,0,21)
@@ -645,7 +645,7 @@ static int echo_server(void *unused)
 
 	srv_addr.sin_family 		= AF_INET;
 	srv_addr.sin_addr.s_addr 	= htonl(INADDR_ANY);
-	srv_addr.sin_port 		= htons(PORT_SERVER);
+	srv_addr.sin_port 		= htons(ECHO_SERVER);
 
 	if ((rc = kernel_bind(sock, (struct sockaddr *)&srv_addr, sizeof(srv_addr))))
 		goto error;
@@ -653,7 +653,7 @@ static int echo_server(void *unused)
 	if ((rc = kernel_listen(sock, 32)))
 		goto error;
 
-	trace_printk("(echo server) accepting on port %d\n", PORT_SERVER);
+	trace_printk("(echo server) accepting on port %d\n", ECHO_SERVER);
 	do {
 		struct socket *nsock;
 
