@@ -355,6 +355,8 @@ static int echo_z(void *nsock)
                 struct msghdr msg = { 0 };
 		int vec_len;
 
+		memset(kvec, 0, sizeof(kvec));
+
 		if ((rc = tcp_read_sock_zcopy_blocking(sock, kvec, VEC_SZ -1)) < 0) {
 			trace_printk("Error %d\n", rc);
 			goto out;
@@ -419,6 +421,7 @@ static int start_new_connection_z(void *nsock)
 			start = now;
 			bytes = 0;
 		}
+		memset(kvec, 0, sizeof(kvec));
 		//if ((rc = kernel_recvmsg(sock, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
 		if ((rc = tcp_read_sock_zcopy_blocking(sock, kvec, VEC_SZ -1)) < 0) {
 			//trace_printk("Error %d\n", rc);
