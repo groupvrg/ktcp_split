@@ -850,11 +850,11 @@ static __init int client_init(void)
 
 	//pkthread_bind_mask(client_task, cpumask_of(0));
 
-	udp_client_task->flags &= ~PF_NO_SETAFFINITY;
-	tcp_client_task->flags &= ~PF_NO_SETAFFINITY;
+	//udp_client_task->flags &= ~PF_NO_SETAFFINITY;
+	//tcp_client_task->flags &= ~PF_NO_SETAFFINITY;
 
-	wake_up_process(udp_client_task);
-	wake_up_process(tcp_client_task);
+	//wake_up_process(udp_client_task);
+	//wake_up_process(tcp_client_task);
 
 	tcp_server[0] = kthread_run(echo_server, NULL, "server_thread");
 	tcp_server[1] = kthread_run(split_server_z, NULL, "server_thread_z");
@@ -863,7 +863,7 @@ static __init int client_init(void)
 
 	//if (!proc_create_data("udp_"procname, 0666, proc_dir, &client_fops, udp_client_task))
 	//	goto err;
-	if (!proc_create_data("tcp_"procname, 0666, proc_dir, &client_fops, tcp_client_task))
+	if (!proc_create_data("tcp_"procname, 0666, proc_dir, &client_fops, NULL))
 		goto err;
 
 	//trace_printk("TCP: %p\nUDP: %p\n", udp_client_task, tcp_client_task);
@@ -875,8 +875,8 @@ err:
 static __exit void client_exit(void)
 {
 	remove_proc_subtree(POLLER_DIR_NAME, NULL);
-	kthread_stop(udp_client_task);
-	kthread_stop(tcp_client_task);
+	//kthread_stop(udp_client_task);
+	//kthread_stop(tcp_client_task);
 	kthread_stop(tcp_server[0]);
 	kthread_stop(tcp_server[1]);
 	kthread_stop(tcp_server[2]);
