@@ -9,7 +9,7 @@ $| = 1; #?
 
 #my $serverip = '127.0.0.1';
 my $serverip = '10.154.0.21';
-my $serverport = 8080;
+my $serverport = 8085;
 my $size = 65536 ;
 
 sub parse_size {

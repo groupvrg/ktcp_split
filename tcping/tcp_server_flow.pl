@@ -15,7 +15,7 @@ sub get_params {
 	}
 }
 
-my $serverport = 8080;
+my $serverport = 8085;
 #my $serverport = 9216;
 my $size = (64 * 1024) - 28;
 get_params();
@@ -43,7 +43,7 @@ while (1) {
 	my $count = 0 ;
 	my $start_time = Time::HiRes::gettimeofday();
 	my $start = $start_time;
-	do { 
+	do {
 		my $addr = $client->recv($data, $size);
 		die "bye..." unless defined ($addr);
 		my $time = Time::HiRes::gettimeofday() ;

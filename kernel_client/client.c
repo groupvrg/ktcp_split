@@ -355,7 +355,7 @@ static int echo_z(void *nsock)
                 struct msghdr msg = { 0 };
 		int vec_len;
 
-		if ((rc = tcp_read_sock_zcopy_blocking(sock, kvec, VEC_SZ)) < 0) {
+		if ((rc = tcp_read_sock_zcopy_blocking(sock, kvec, VEC_SZ -1)) < 0) {
 			trace_printk("Error %d\n", rc);
 			goto out;
 		}
@@ -420,8 +420,8 @@ static int start_new_connection_z(void *nsock)
 			bytes = 0;
 		}
 		//if ((rc = kernel_recvmsg(sock, &msg, kvec, VEC_SZ, (PAGE_SIZE * VEC_SZ), 0)) <= 0) {
-		if ((rc = tcp_read_sock_zcopy_blocking(sock, kvec, VEC_SZ)) < 0) {
-			trace_printk("Error %d\n", rc);
+		if ((rc = tcp_read_sock_zcopy_blocking(sock, kvec, VEC_SZ -1)) < 0) {
+			//trace_printk("Error %d\n", rc);
 			goto out;
 		}
 		if (!rc) {
@@ -718,7 +718,7 @@ static inline void send_loop(struct socket *tx, struct msghdr *msg, struct kvec 
 		struct kvec kvec[16];
 
 		memcpy(kvec, vec, sizeof(struct kvec) << 4);
-
+		trace_printk("Sending...\n");
 		if ((rc = trace_sendmsg(tx, msg, kvec, 16, (PAGE_SIZE << 6))) <= 0) {
 			trace_printk("Received an Err %d\n", rc);
 			goto out;
@@ -726,7 +726,7 @@ static inline void send_loop(struct socket *tx, struct msghdr *msg, struct kvec 
 		bytes += rc;
 	}
 out:
-	trace_printk("Out %lluMb [%d]\n", bytes >> 17, rc);
+	trace_printk("Out %luMb [%d]\n", bytes >> 17, rc);
 }
 
 #define virt_to_pfn(kaddr) (__pa(kaddr) >> PAGE_SHIFT)
