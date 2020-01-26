@@ -504,8 +504,8 @@ static int proxy_out(void *arg)
 		goto err;
         }
 	pair->out = tx;
-	wake_up(&pair->wait);
 	trace_printk("starting  %p -> %p\n", pair->out, pair->in);
+	wake_up(&pair->wait);
 	half_duplex(tx, pair->in);
 	return 0;
 err:
@@ -537,6 +537,7 @@ static int proxy_in(void *arg)
 							pair->out, HZ);
 	if (!error || IS_ERR_OR_NULL(pair->out))
 		goto err;
+
 	trace_printk("starting  %p -> %p\n", pair->in, pair->out);
 	//kernel_sock_shutdown(net->socket, SHUT_RDWR);
 	//sock_release(net->socket);
@@ -575,6 +576,7 @@ static int proxy_server(void *unused)
 		if (unlikely(rc))
 			goto out;
 
+		memset(pair, 0, sizeof(struct sock_pair));
 		pair->in = nsock;
 		init_waitqueue_head(&pair->wait);
 
@@ -621,6 +623,7 @@ static int proxy_server_z(void *unused)
 
 		pair->in = nsock;
 		init_waitqueue_head(&pair->wait);
+		memset(pair, 0, sizeof(struct sock_pair));
 
 		kthread_run(proxy_in_zero, pair, "proxy_in_%lx", (unsigned long)nsock);
 		kthread_run(proxy_out_zero, pair, "proxy_out_%lx", (unsigned long)nsock);
@@ -880,8 +883,7 @@ static __init int client_init(void)
 	if (!proc_create_data("tcp_"procname, 0666, proc_dir, &client_fops, NULL))
 		goto err;
 	trace_printk("Next Hop Port %d\n", PORT_NEXT_HOP);
-	trace_printk("TCP Client echo <port> > /proc/io_client/tcp_client\n");
-
+	trace_printk("TCP Client: echo <port> > /proc/io_client/tcp_client\n");
 	//trace_printk("TCP: %p\nUDP: %p\n", udp_client_task, tcp_client_task);
 	return 0;
 err:
