@@ -58,6 +58,7 @@ struct sock_pair {
 	struct wait_queue_head wait;
 };
 
+static int poll_thread(void *data);
 static ssize_t client_write(struct file *file, const char __user *buf,
                               size_t len, loff_t *ppos)
 {
@@ -74,7 +75,9 @@ static ssize_t client_write(struct file *file, const char __user *buf,
 	kfree(kbuf);
 
 	trace_printk("%s\n", __FUNCTION__);
-	wake_up_process(file->private_data);
+	kthread_run(poll_thread, ((void *)1), "tcp_client_thread");
+//	tcp_client_task  =
+//	wake_up_process(file->private_data);
 	return len;
 }
 
@@ -325,6 +328,68 @@ out:
 	return rc;
 }
 
+static int echo_z(void *nsock)
+{
+	struct socket *sock = nsock;
+	struct kvec kvec[VEC_SZ];
+	unsigned long bytes = 0 ;
+	//ktime_t start = ktime_get();
+	//ktime_t initial_start = start;
+	int i, rc = 0;
+
+	for (i = 0; i < VEC_SZ; i++) {
+		kvec[i].iov_len = PAGE_SIZE;
+		kvec[i].iov_base = NULL;
+		//if (! (kvec[i].iov_base = page_address(alloc_page(GFP_KERNEL))))
+		//	goto out;
+	}
+
+	sock_set_flag(sock->sk, SOCK_KERN_ZEROCOPY);
+	while (!kthread_should_stop()) {
+		struct kvec tkvec[VEC_SZ];
+                struct msghdr msg = { 0 };
+		int vec_len;
+
+		if ((rc = tcp_read_sock_zcopy_blocking(sock, kvec, VEC_SZ)) < 0) {
+			trace_printk("Error %d\n", rc);
+			goto out;
+		}
+		if (!rc) {
+			/* Adopt sk_wait_data*/
+			//schedule();
+			continue;
+		}
+		//trace_printk("RC = %d\n", rc);
+		bytes += rc;
+		vec_len = get_kvec_len(kvec, VEC_SZ);
+		//trace_printk("memcpy %lu * %d\n", sizeof(struct kvec), vec_len);
+		memcpy(tkvec, kvec, sizeof(struct kvec) * vec_len);
+		msg.msg_flags   |= MSG_ZEROCOPY;
+		//Need an additional put on the pages?
+		if ((rc = kernel_sendmsg(sock, &msg, tkvec,
+					vec_len, rc)) <= 0) {
+			trace_printk("ERROR: %s (%d)  %lu bytes\n", __FUNCTION__,
+					rc,  bytes);
+			goto out;
+		}
+
+		for (i = 0; i < VEC_SZ; i++) {
+			if (!kvec[i].iov_base)
+				break;
+			//trace_printk("Freeing %p [%lu]",virt_to_head_page(kvec[i].iov_base), kvec[i].iov_len);
+			put_page(virt_to_page(kvec[i].iov_base));
+			kvec[i].iov_base = NULL;
+		}
+
+	}
+out:
+#if 0
+	for (i = 0; i < VEC_SZ; i++)
+		free_page((unsigned long)(kvec[i].iov_base));
+#endif
+	trace_printk("C ya, cowboy...\n");
+	return rc;
+}
 static int start_new_connection_z(void *nsock)
 {
 	struct socket *sock = nsock;
@@ -561,7 +626,7 @@ out:
 	return rc;
 }
 
-static int split_server(void *unused)
+static int echo_server(void *unused)
 {
 	int rc = 0;
 	struct socket *sock = NULL;
@@ -580,7 +645,7 @@ static int split_server(void *unused)
 	if ((rc = kernel_listen(sock, 32)))
 		goto error;
 
-	trace_printk("(recv msg) accepting on port %d\n", PORT_SERVER);
+	trace_printk("(echo server) accepting on port %d\n", PORT_SERVER);
 	do {
 		struct socket *nsock;
 
@@ -588,7 +653,7 @@ static int split_server(void *unused)
 		if (unlikely(rc))
 			goto out;
 
-		kthread_run(start_new_connection, nsock, "server_%lx", (unsigned long)nsock);
+		kthread_run(echo_z, nsock, "echo_%lx", (unsigned long)nsock);
 
 	} while (!kthread_should_stop());
 
@@ -780,8 +845,8 @@ static __init int client_init(void)
 	pairs = kmem_cache_create("cbn_qp_mdata",
 					sizeof(struct sock_pair), 0, 0, NULL);
 
-	udp_client_task  = kthread_create(poll_thread, ((void *)0), "udp_client_thread");
-	tcp_client_task  = kthread_create(poll_thread, ((void *)1), "tcp_client_thread");
+	//udp_client_task  = kthread_create(poll_thread, ((void *)0), "udp_client_thread");
+	//tcp_client_task  = kthread_create(poll_thread, ((void *)1), "tcp_client_thread");
 
 	//pkthread_bind_mask(client_task, cpumask_of(0));
 
@@ -791,13 +856,13 @@ static __init int client_init(void)
 	wake_up_process(udp_client_task);
 	wake_up_process(tcp_client_task);
 
-	tcp_server[0] = kthread_run(split_server, NULL, "server_thread");
+	tcp_server[0] = kthread_run(echo_server, NULL, "server_thread");
 	tcp_server[1] = kthread_run(split_server_z, NULL, "server_thread_z");
 	tcp_server[2] = kthread_run(proxy_server, NULL, "proxy_thread");
 	tcp_server[3] = kthread_run(proxy_server_z, NULL, "proxy_thread_z");
 
-	if (!proc_create_data("udp_"procname, 0666, proc_dir, &client_fops, udp_client_task))
-		goto err;
+	//if (!proc_create_data("udp_"procname, 0666, proc_dir, &client_fops, udp_client_task))
+	//	goto err;
 	if (!proc_create_data("tcp_"procname, 0666, proc_dir, &client_fops, tcp_client_task))
 		goto err;
 
