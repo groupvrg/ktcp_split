@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
+use threads;
 use autodie;
 use Time::HiRes;
 use IO::Socket;
@@ -29,16 +30,9 @@ my ($datagram, $flags);
 #	my $ipaddr = $server->peerhost;
 #	print "received ", length($datagram), "bytes from $ipaddr\n";
 #}
-while (1) {
-	my $client = $server->accept();
 
-	#get information about a newly connected client
-
-	my $client_address = $client->peerhost();
-	my $client_port = $client->peerport();
-	print "connection from $client_address:$client_port\n";
-
-	#read up to 1024 characters from the connected client
+sub connection_handler {
+	my $client = shift;
 	my $data = "";
 	my $count = 0 ;
 	my $start_time = Time::HiRes::gettimeofday();
@@ -59,5 +53,19 @@ while (1) {
 	# notify client that response has been sent
 	printf("Bye...\n");
 	shutdown($client, 1);
+
+}
+
+while (1) {
+	my $client = $server->accept();
+
+	#get information about a newly connected client
+
+	my $client_address = $client->peerhost();
+	my $client_port = $client->peerport();
+	print "connection from $client_address:$client_port\n";
+
+	threads->create(\&connection_handler, $client);
+	#read up to 1024 characters from the connected client
 }
 $server->close();
