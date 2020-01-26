@@ -63,22 +63,24 @@ static ssize_t client_write(struct file *file, const char __user *buf,
                               size_t len, loff_t *ppos)
 {
 	char *kbuf = memdup_user_nul(buf, len);
-	unsigned long port;
+	int port[2];
+	unsigned long pport;
 
 	if (IS_ERR_OR_NULL(kbuf))
 		return PTR_ERR(kbuf);
 
-//is_zcopy = 0;
+	//is_zcopy = 1;
 //if (kbuf[0] == '0') {
 //	is_zcopy = 1;
 //	trace_printk("zero copy set...\n");
 //} else
-	get_options(kbuf, 1, (int *)&port);
-	trace_printk("Input... %s [%lu]\n", kbuf, port);
+	get_options(kbuf, 2, port);
+	pport = port[1];
+	trace_printk("Input... [%lu]\n", pport);
 	kfree(kbuf);
 
 	trace_printk("%s\n", __FUNCTION__);
-	kthread_run(poll_thread, ((void *)port), "tcp_client_thread");
+	kthread_run(poll_thread, ((void *)pport), "tcp_client_thread");
 //	tcp_client_task  =
 //	wake_up_process(file->private_data);
 	return len;
@@ -710,17 +712,21 @@ out:
 static inline void send_loop(struct socket *tx, struct msghdr *msg, struct kvec *vec)
 {
 	int rc, i = 0;
+	unsigned long bytes = 0;
 
 	for (i = 0; i < (1<<19); i++) {
 		struct kvec kvec[16];
 
 		memcpy(kvec, vec, sizeof(struct kvec) << 4);
 
-		while ((rc = trace_sendmsg(tx, msg, kvec, 16, (PAGE_SIZE << 6))) <= 0) {
+		if ((rc = trace_sendmsg(tx, msg, kvec, 16, (PAGE_SIZE << 6))) <= 0) {
 			trace_printk("Received an Err %d\n", rc);
-			schedule();
+			goto out;
 		}
+		bytes += rc;
 	}
+out:
+	trace_printk("Out %lluMb [%d]\n", bytes >> 17, rc);
 }
 
 #define virt_to_pfn(kaddr) (__pa(kaddr) >> PAGE_SHIFT)
