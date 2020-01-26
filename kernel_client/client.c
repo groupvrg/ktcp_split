@@ -63,19 +63,22 @@ static ssize_t client_write(struct file *file, const char __user *buf,
                               size_t len, loff_t *ppos)
 {
 	char *kbuf = memdup_user_nul(buf, len);
+	unsigned long port;
+
 	if (IS_ERR_OR_NULL(kbuf))
 		return PTR_ERR(kbuf);
 
-	is_zcopy = 0;
-	if (kbuf[0] == '0') {
-		is_zcopy = 1;
-		trace_printk("zero copy set...\n");
-	} else
-		trace_printk("Input... %c\n", kbuf[0]);
+//is_zcopy = 0;
+//if (kbuf[0] == '0') {
+//	is_zcopy = 1;
+//	trace_printk("zero copy set...\n");
+//} else
+	get_options(kbuf, 1, (int *)&port);
+	trace_printk("Input... %s [%lu]\n", kbuf, port);
 	kfree(kbuf);
 
 	trace_printk("%s\n", __FUNCTION__);
-	kthread_run(poll_thread, ((void *)1), "tcp_client_thread");
+	kthread_run(poll_thread, ((void *)port), "tcp_client_thread");
 //	tcp_client_task  =
 //	wake_up_process(file->private_data);
 	return len;
@@ -721,7 +724,7 @@ static inline void send_loop(struct socket *tx, struct msghdr *msg, struct kvec 
 }
 
 #define virt_to_pfn(kaddr) (__pa(kaddr) >> PAGE_SHIFT)
-static inline void tcp_client(void)
+static inline void tcp_client(unsigned long port)
 {
 	int rc, i = 0;
 	unsigned long cnt, max;
@@ -734,7 +737,7 @@ static inline void tcp_client(void)
 	cnt = max = 0;
         srv_addr.sin_family             = AF_INET;
         srv_addr.sin_addr.s_addr        = htonl(SERVER_ADDR);
-        srv_addr.sin_port               = htons(PORT_NEXT_HOP);
+        srv_addr.sin_port               = htons(port);
 
 	msg.msg_name 	= &srv_addr;
 	msg.msg_namelen = sizeof(struct sockaddr);
@@ -813,18 +816,19 @@ err:
 
 static int poll_thread(void *data)
 {
-	trace_printk("starting new send...\n");
-	while (!kthread_should_stop()) {
+	unsigned long port = ((unsigned long)data);
 
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule();
-		__set_current_state(TASK_RUNNING);
-
-		if (!kthread_should_stop()) {
-			trace_printk("Task %p\n", data);
-			tcp_client();
-		}
-	}
+	trace_printk("starting new send. <%lu>\n", port);
+//while (!kthread_should_stop()) {
+//
+//	set_current_state(TASK_INTERRUPTIBLE);
+//	schedule();
+//	__set_current_state(TASK_RUNNING);
+//
+//	if (!kthread_should_stop()) {
+		tcp_client(port);
+//	}
+//}
 	return 0;
 }
 
@@ -865,6 +869,8 @@ static __init int client_init(void)
 	//	goto err;
 	if (!proc_create_data("tcp_"procname, 0666, proc_dir, &client_fops, NULL))
 		goto err;
+	trace_printk("Next Hop Port %d\n", PORT_NEXT_HOP);
+	trace_printk("TCP Client echo <port> > /proc/io_client/tcp_client\n");
 
 	//trace_printk("TCP: %p\nUDP: %p\n", udp_client_task, tcp_client_task);
 	return 0;
