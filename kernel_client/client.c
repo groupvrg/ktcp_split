@@ -474,8 +474,8 @@ static int proxy_out_zero(void *arg)
 		goto err;
         }
 	pair->out = tx;
-	wake_up(&pair->wait);
 	trace_printk("starting  %p -> %p\n", pair->out, pair->in);
+	wake_up(&pair->wait);
 	half_duplex_zero(tx, pair->in);
 	return 0;
 err:
@@ -621,9 +621,9 @@ static int proxy_server_z(void *unused)
 		if (unlikely(rc))
 			goto out;
 
+		memset(pair, 0, sizeof(struct sock_pair));
 		pair->in = nsock;
 		init_waitqueue_head(&pair->wait);
-		memset(pair, 0, sizeof(struct sock_pair));
 
 		kthread_run(proxy_in_zero, pair, "proxy_in_%lx", (unsigned long)nsock);
 		kthread_run(proxy_out_zero, pair, "proxy_out_%lx", (unsigned long)nsock);
