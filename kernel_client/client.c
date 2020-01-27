@@ -29,7 +29,7 @@
 
 #define IP_HEX(a,b,c,d) ((a)<<24|(b)<<16|(c)<<8|(d))
 #define SERVER_ADDR	IP_HEX(10,128,0,5)
-#define PROXY_ADDR	IP_HEX(10,128,0,10)
+#define PROXY_ADDR	IP_HEX(10,128,0,5)
 //#define SERVER_ADDR (10<<24|154<<16|0<<8|21) /*10.154.0.21*/
 
 #define VEC_SZ 32
