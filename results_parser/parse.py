@@ -4,7 +4,7 @@ from matplotlib.ticker import FuncFormatter
 import matplotlib.pyplot as plt
 
 mhz=pow(2, 20)
-default_cycles = 2800.200*mhz
+default_cycles = 16*2800.200*mhz
 
 mem="mem"
 cpu_total="cpu_total"
@@ -76,50 +76,76 @@ def parse_results(results_dir=".", exclude=None, normalize_by=None, cycles=defau
         vmems = []
         vbytes = []
         vpackets = []
+        vbytes_pack = []
         tbytes = []
         tpackets = []
+        vcpu = []
         for ks, vs in s.items():
+            total_cpu = (sum(vs[cpu_total])/len(vs[cpu_total]))
             cpu = (sum(vs[cpu_total])/len(vs[cpu_total]))*cycles
             avg_bytes = ((sum(vs[tx_bytes]) + sum(vs[rx_bytes])) / len(vs[tx_bytes]))
             xbytes = cpu / avg_bytes
             avg_packets = ((sum(vs[tx_packets]) + sum(vs[rx_packets])) / len(vs[tx_packets]))
             xpackets = cpu / avg_packets
+            bytes_pack = avg_bytes/avg_packets
 
+            avg_bytes = avg_bytes/(1024.0 * 1024.0 * 256.0)
+            avg_packets = avg_packets/(1000 * 1000)
             xmem = sum(vs[mem]) / len(vs[mem])
-            graph_results[t][ks] = [xbytes, xpackets, xmem, avg_bytes, avg_packets]
+            xmem = xmem/(1024.0 * 1024)
+
+            graph_results[t][ks] = [xbytes, xpackets, xmem, avg_bytes, avg_packets, bytes_pack, total_cpu]
             systems.append(ks)
             vmems.append(xmem)
             vbytes.append(xbytes)
             vpackets.append(xpackets)
+            vbytes_pack.append(xpackets)
             tbytes.append(avg_bytes)
             tpackets.append(avg_packets)
+            vcpu.append(total_cpu)
 
 
             print(f"system:{ks}, averages bytes={avg_bytes:.2f}, packets={avg_packets:.2f}, mem={xmem:.2f}")
 
-
+        plt.grid(axis='y')
+        plt.bar(systems, vcpu)
+        plt.title("Cpu Util %")
+        plt.savefig(f"{t}-cpu.png")
+        plt.show()
+        plt.clf()
+        plt.grid(axis='y')
+        plt.bar(systems, vbytes_pack)
+        plt.title("Bytes/Packet")
+        plt.savefig(f"{t}-bytes-packet.png")
+        plt.show()
+        plt.clf()
+        plt.grid(axis='y')
         plt.bar(systems, vmems)
-        plt.title("Memory.")
+        plt.title("Memory GB.")
         plt.savefig(f"{t}-memory.png")
         plt.show()
         plt.clf()
+        plt.grid(axis='y')
         plt.bar(systems, vbytes)
         plt.title("Cycles / Bytes.")
         plt.savefig(f"{t}-cycles-bytes.png")
         plt.show()
         plt.clf()
+        plt.grid(axis='y')
         plt.bar(systems, vpackets)
         plt.title("Cycles / Packets.")
         plt.savefig(f"{t}-cycles-packets.png")
         plt.show()
         plt.clf()
+        plt.grid(axis='y')
         plt.bar(systems, tbytes)
-        plt.title("Bytes.")
+        plt.title("Gb/s.")
         plt.savefig(f"{t}-bytes.png")
         plt.show()
         plt.clf()
+        plt.grid(axis='y')
         plt.bar(systems, tpackets)
-        plt.title("Packets.")
+        plt.title("Mpps")
         plt.savefig(f"{t}-packets.png")
         plt.show()
         plt.clf()
@@ -131,10 +157,12 @@ def parse_results(results_dir=".", exclude=None, normalize_by=None, cycles=defau
                 nbytes = graph_results[t][normalize_by][3]
                 npackets = graph_results[t][normalize_by][4]
                 plt.bar(systems, [x/nbytes for x in tbytes])
+                plt.grid(axis='y')
                 plt.title(f"Bytes normalized by {normalize_by}.")
                 plt.savefig(f"{t}-bytes-normalized-by-{normalize_by}.png")
                 plt.show()
                 plt.clf()
+                plt.grid(axis='y')
                 plt.bar(systems, [x/npackets for x in tpackets])
                 plt.title(f"Packets normalized by {normalize_by}.")
                 plt.savefig(f"{t}-packets-normalized-by-{normalize_by}.png")
