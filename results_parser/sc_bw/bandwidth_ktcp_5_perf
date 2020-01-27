@@ -1,0 +1,744 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 71K of event 'cpu-clock'
+# Event count (approx.): 17887250000
+#
+# Overhead       Samples  Command          Shared Object     Symbol                                       
+# ........  ............  ...............  ................  .............................................
+#
+    50.66%         36246  swapper          [kernel.vmlinux]  [k] native_safe_halt
+            |
+            ---native_safe_halt
+               |          
+                --50.65%--default_idle
+                          arch_cpu_idle
+                          default_idle_call
+                          do_idle
+                          cpu_startup_entry
+                          |          
+                          |--48.98%--start_secondary
+                          |          0x2000d5
+                          |          
+                           --1.68%--rest_init
+                                     start_kernel
+                                     x86_64_start_reservations
+                                     x86_64_start_kernel
+                                     0x2000d5
+
+    28.59%         20453  proxy_in_ffff9a  [kernel.vmlinux]  [k] memcpy_erms
+            |
+            ---memcpy_erms
+               |          
+               |--14.63%--tcp_sendmsg_locked
+               |          tcp_sendmsg
+               |          inet_sendmsg
+               |          sock_sendmsg
+               |          trace_sendmsg
+               |          kernel_sendmsg
+               |          0xf54
+               |          0x11b8
+               |          kthread
+               |          ret_from_fork
+               |          
+                --13.85%--copy_page_to_iter
+                          skb_copy_datagram_iter
+                          tcp_recvmsg
+                          inet_recvmsg
+                          sock_recvmsg
+                          kernel_recvmsg
+                          0xfa0
+                          0x11b8
+                          kthread
+                          ret_from_fork
+
+     3.02%          2159  proxy_in_ffff9a  [kernel.vmlinux]  [k] __softirqentry_text_start
+            |
+            ---__softirqentry_text_start
+               |          
+                --3.01%--irq_exit
+                          |          
+                          |--2.09%--do_IRQ
+                          |          ret_from_intr
+                          |          |          
+                          |           --1.70%--memcpy_erms
+                          |                     |          
+                          |                     |--1.15%--tcp_sendmsg_locked
+                          |                     |          tcp_sendmsg
+                          |                     |          inet_sendmsg
+                          |                     |          sock_sendmsg
+                          |                     |          trace_sendmsg
+                          |                     |          kernel_sendmsg
+                          |                     |          0xf54
+                          |                     |          0x11b8
+                          |                     |          kthread
+                          |                     |          ret_from_fork
+                          |                     |          
+                          |                      --0.56%--copy_page_to_iter
+                          |                                skb_copy_datagram_iter
+                          |                                tcp_recvmsg
+                          |                                inet_recvmsg
+                          |                                sock_recvmsg
+                          |                                kernel_recvmsg
+                          |                                0xfa0
+                          |                                0x11b8
+                          |                                kthread
+                          |                                ret_from_fork
+                          |          
+                           --0.92%--smp_apic_timer_interrupt
+                                     apic_timer_interrupt
+                                     |          
+                                      --0.74%--memcpy_erms
+
+     1.84%          1318  swapper          [kernel.vmlinux]  [k] __softirqentry_text_start
+            |
+            ---__softirqentry_text_start
+               irq_exit
+               |          
+                --1.84%--do_IRQ
+                          ret_from_intr
+                          |          
+                           --1.79%--native_safe_halt
+                                     default_idle
+                                     arch_cpu_idle
+                                     default_idle_call
+                                     do_idle
+                                     cpu_startup_entry
+                                     start_secondary
+                                     0x2000d5
+
+     1.30%           929  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_sendmsg_locked
+            |
+            ---tcp_sendmsg_locked
+               |          
+                --1.29%--tcp_sendmsg
+                          inet_sendmsg
+                          sock_sendmsg
+                          trace_sendmsg
+                          kernel_sendmsg
+                          0xf54
+                          0x11b8
+                          kthread
+                          ret_from_fork
+
+     1.28%           914  proxy_in_ffff9a  [kernel.vmlinux]  [k] detach_buf
+            |
+            ---detach_buf
+               |          
+                --1.27%--virtqueue_get_buf_ctx
+                          |          
+                           --0.93%--virtqueue_get_buf
+                                     free_old_xmit_skbs.isra.32
+                                     start_xmit
+                                     dev_hard_start_xmit
+                                     sch_direct_xmit
+                                     __dev_queue_xmit
+                                     dev_queue_xmit
+                                     ip_finish_output2
+                                     ip_finish_output
+                                     ip_output
+                                     ip_local_out
+                                     ip_queue_xmit
+                                     __tcp_transmit_skb
+
+     0.57%           409  swapper          [virtio_net]      [k] receive_buf
+            |
+            ---receive_buf
+               |          
+                --0.57%--virtnet_poll
+                          net_rx_action
+                          __softirqentry_text_start
+                          irq_exit
+                          do_IRQ
+                          ret_from_intr
+                          |          
+                           --0.54%--native_safe_halt
+                                     default_idle
+                                     arch_cpu_idle
+                                     default_idle_call
+                                     do_idle
+                                     cpu_startup_entry
+                                     start_secondary
+                                     0x2000d5
+
+     0.55%           391  proxy_in_ffff9a  [kernel.vmlinux]  [k] virtqueue_get_buf_ctx
+            |
+            ---virtqueue_get_buf_ctx
+
+     0.53%           382  proxy_in_ffff9a  [virtio_net]      [k] receive_buf
+            |
+            ---receive_buf
+               virtnet_poll
+               net_rx_action
+               __softirqentry_text_start
+
+     0.53%           377  proxy_in_ffff9a  [kernel.vmlinux]  [k] __free_pages_ok
+            |
+            ---__free_pages_ok
+               |          
+                --0.52%--free_compound_page
+                          __put_compound_page
+                          __put_page
+
+     0.46%           329  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_wfree
+     0.36%           255  swapper          [kernel.vmlinux]  [k] detach_buf
+     0.33%           235  proxy_in_ffff9a  [kernel.vmlinux]  [k] get_page_from_freelist
+     0.29%           204  proxy_in_ffff9a  [kernel.vmlinux]  [k] ip_queue_xmit
+     0.28%           203  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_release_data
+     0.24%           171  proxy_in_ffff9a  [kernel.vmlinux]  [k] virtqueue_add_outbuf
+     0.23%           166  swapper          [kernel.vmlinux]  [k] _raw_spin_unlock_irqrestore
+     0.22%           158  swapper          [kernel.vmlinux]  [k] tick_nohz_idle_enter
+     0.21%           149  proxy_in_ffff9a  [kernel.vmlinux]  [k] __sock_wfree
+     0.20%           142  swapper          [kernel.vmlinux]  [k] finish_task_switch
+     0.20%           140  proxy_in_ffff9a  [virtio_net]      [k] try_fill_recv
+     0.18%           126  swapper          [kernel.vmlinux]  [k] virtqueue_get_buf_ctx
+     0.17%           119  swapper          [kernel.vmlinux]  [k] memcpy_erms
+     0.16%           116  proxy_in_ffff9a  [kernel.vmlinux]  [k] _raw_spin_unlock_irqrestore
+     0.15%           107  proxy_in_ffff9a  [kernel.vmlinux]  [k] iov_iter_advance
+     0.14%           100  proxy_in_ffff9a  [kernel.vmlinux]  [k] virtqueue_add_inbuf_ctx
+     0.14%            99  swapper          [virtio_net]      [k] try_fill_recv
+     0.12%            83  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_page_frag_refill
+     0.11%            82  proxy_in_ffff9a  [kernel.vmlinux]  [k] pvclock_clocksource_read
+     0.11%            81  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_ack
+     0.11%            80  swapper          [kernel.vmlinux]  [k] get_page_from_freelist
+     0.11%            76  proxy_in_ffff9a  [kernel.vmlinux]  [k] vring_use_dma_api
+     0.10%            74  proxy_in_ffff9a  [kernel.vmlinux]  [k] finish_task_switch
+     0.10%            71  proxy_in_ffff9a  [kernel.vmlinux]  [k] memset_erms
+     0.10%            69  proxy_in_ffff9a  [kernel.vmlinux]  [k] __tcp_transmit_skb
+     0.09%            66  swapper          [kernel.vmlinux]  [k] virtqueue_add_inbuf_ctx
+     0.09%            63  proxy_in_ffff9a  [ip_tables]       [k] ipt_do_table
+     0.08%            60  proxy_in_ffff9a  [kernel.vmlinux]  [k] _copy_from_iter_full
+     0.07%            49  proxy_in_ffff9a  [kernel.vmlinux]  [k] __virt_addr_valid
+     0.07%            49  proxy_in_ffff9a  [kernel.vmlinux]  [k] kmem_cache_alloc_node
+     0.07%            48  proxy_in_ffff9a  [kernel.vmlinux]  [k] ip_finish_output2
+     0.07%            47  proxy_in_ffff9a  [kernel.vmlinux]  [k] __raw_callee_save___pv_queued_spin_unlock
+     0.07%            47  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_write_xmit
+     0.07%            47  swapper          [kernel.vmlinux]  [k] tick_nohz_idle_exit
+     0.06%            46  proxy_in_ffff9a  [kernel.vmlinux]  [k] __skb_to_sgvec
+     0.06%            45  proxy_in_ffff9a  [kernel.vmlinux]  [k] __check_object_size
+     0.06%            42  proxy_in_ffff9a  [kernel.vmlinux]  [k] __dev_queue_xmit
+     0.06%            42  proxy_in_ffff9a  [kernel.vmlinux]  [k] copy_page_to_iter
+     0.06%            42  proxy_in_ffff9a  [kernel.vmlinux]  [k] vring_map_one_sg
+     0.06%            41  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_rcv_established
+     0.05%            39  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_rbtree_insert
+     0.05%            38  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_recvmsg
+     0.05%            38  swapper          [ip_tables]       [k] ipt_do_table
+     0.05%            38  swapper          [kernel.vmlinux]  [k] memset_erms
+     0.05%            37  proxy_in_ffff9a  [kernel.vmlinux]  [k] _raw_spin_lock
+     0.05%            36  proxy_in_ffff9a  [kernel.vmlinux]  [k] __alloc_skb
+     0.05%            36  swapper          [kernel.vmlinux]  [k] skb_page_frag_refill
+     0.05%            35  proxy_in_ffff9a  [kernel.vmlinux]  [k] avc_has_perm
+     0.05%            34  proxy_in_ffff9a  [kernel.vmlinux]  [k] __kmalloc_node_track_caller
+     0.05%            33  proxy_in_ffff9a  [kernel.vmlinux]  [k] __skb_clone
+     0.05%            33  swapper          [kernel.vmlinux]  [k] __free_pages_ok
+     0.04%            32  proxy_in_ffff9a  [kernel.vmlinux]  [k] __alloc_pages_nodemask
+     0.04%            32  swapper          [kernel.vmlinux]  [k] __inet_lookup_established
+     0.04%            32  swapper          [virtio_net]      [k] page_to_skb
+     0.04%            31  ksoftirqd/13     [virtio_net]      [k] receive_buf
+     0.04%            31  proxy_in_ffff9a  [kernel.vmlinux]  [k] _raw_spin_lock_bh
+     0.04%            31  proxy_in_ffff9a  [virtio_net]      [k] free_old_xmit_skbs.isra.32
+     0.04%            30  ksoftirqd/13     [kernel.vmlinux]  [k] detach_buf
+     0.04%            30  proxy_in_ffff9a  [kernel.vmlinux]  [k] ip_send_check
+     0.04%            29  proxy_in_ffff9a  [virtio_net]      [k] page_to_skb
+     0.04%            29  swapper          [kernel.vmlinux]  [k] pvclock_clocksource_read
+     0.04%            28  proxy_in_ffff9a  [kernel.vmlinux]  [k] ipv4_dst_check
+     0.04%            27  proxy_in_ffff9a  [kernel.vmlinux]  [k] prep_compound_page
+     0.04%            27  proxy_in_ffff9a  [kernel.vmlinux]  [k] selinux_ip_postroute_compat
+     0.04%            27  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_release_head_state
+     0.04%            26  proxy_in_ffff9a  [kernel.vmlinux]  [k] __netif_receive_skb_core
+     0.04%            26  proxy_in_ffff9a  [kernel.vmlinux]  [k] __pv_queued_spin_lock_slowpath
+     0.04%            26  proxy_in_ffff9a  [virtio_net]      [k] start_xmit
+     0.03%            25  proxy_in_ffff9a  [kernel.vmlinux]  [k] selinux_parse_skb.constprop.57
+     0.03%            25  swapper          [kernel.vmlinux]  [k] __netif_receive_skb_core
+     0.03%            24  proxy_in_ffff9a  [kernel.vmlinux]  [k] _copy_to_iter
+     0.03%            24  proxy_in_ffff9a  [kernel.vmlinux]  [k] ip_rcv
+     0.03%            23  proxy_in_ffff9a  [kernel.vmlinux]  [k] __zone_watermark_ok
+     0.03%            23  proxy_in_ffff9a  [kernel.vmlinux]  [k] dst_release
+     0.03%            23  proxy_in_ffff9a  [kernel.vmlinux]  [k] kfree
+     0.03%            23  proxy_in_ffff9a  [kernel.vmlinux]  [k] rb_first
+     0.03%            23  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_copy_datagram_iter
+     0.03%            23  swapper          [virtio_net]      [k] virtnet_poll
+     0.03%            22  proxy_in_ffff9a  [kernel.vmlinux]  [k] __cgroup_bpf_run_filter_skb
+     0.03%            22  proxy_in_ffff9a  [kernel.vmlinux]  [k] ip_finish_output
+     0.03%            22  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_established_options
+     0.03%            22  swapper          [kernel.vmlinux]  [k] inet_gro_receive
+     0.03%            21  ksoftirqd/13     [kernel.vmlinux]  [k] finish_task_switch
+     0.03%            21  proxy_in_ffff9a  [kernel.vmlinux]  [k] kmem_cache_free
+     0.03%            21  proxy_in_ffff9a  [kernel.vmlinux]  [k] vring_mapping_error
+     0.03%            21  swapper          [kernel.vmlinux]  [k] tcp_v4_rcv
+     0.03%            21  swapper          [kernel.vmlinux]  [k] vring_use_dma_api
+     0.03%            20  proxy_in_ffff9a  [kernel.vmlinux]  [k] PageHuge
+     0.03%            20  proxy_in_ffff9a  [kernel.vmlinux]  [k] ksize
+     0.03%            20  proxy_in_ffff9a  [kernel.vmlinux]  [k] nf_hook_slow
+     0.03%            20  proxy_in_ffff9a  [kernel.vmlinux]  [k] page_frag_free
+     0.03%            20  swapper          [kernel.vmlinux]  [k] sg_init_one
+     0.03%            19  proxy_in_ffff9a  [kernel.vmlinux]  [k] rb_insert_color
+     0.03%            19  proxy_in_ffff9a  [kernel.vmlinux]  [k] sock_has_perm
+     0.03%            19  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_rate_check_app_limited
+     0.03%            19  proxy_in_ffff9a  [virtio_net]      [k] virtnet_poll
+     0.03%            18  proxy_in_ffff9a  [kernel.vmlinux]  [k] sg_init_one
+     0.03%            18  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_try_coalesce
+     0.03%            18  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_current_mss
+     0.02%            17  proxy_in_ffff9a  [kernel.vmlinux]  [k] __slab_alloc
+     0.02%            17  proxy_in_ffff9a  [kernel.vmlinux]  [k] cmpxchg_double_slab.isra.53
+     0.02%            17  proxy_in_ffff9a  [kernel.vmlinux]  [k] mod_timer
+     0.02%            17  proxy_in_ffff9a  [kernel.vmlinux]  [k] prefetch_freepointer
+     0.02%            17  proxy_in_ffff9a  [kernel.vmlinux]  [k] selinux_ip_postroute
+     0.02%            17  swapper          [kernel.vmlinux]  [k] avc_has_perm
+     0.02%            17  swapper          [kernel.vmlinux]  [k] skb_release_data
+     0.02%            16  proxy_in_ffff9a  [kernel.vmlinux]  [k] __inet_lookup_established
+     0.02%            16  proxy_in_ffff9a  [kernel.vmlinux]  [k] __put_compound_page
+     0.02%            16  proxy_in_ffff9a  [kernel.vmlinux]  [k] rb_erase
+     0.02%            16  proxy_in_ffff9a  [kernel.vmlinux]  [k] selinux_socket_sock_rcv_skb
+     0.02%            16  proxy_in_ffff9a  [kernel.vmlinux]  [k] sk_stream_alloc_skb
+     0.02%            16  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_tso_segs
+     0.02%            16  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_v4_do_rcv
+     0.02%            16  proxy_in_ffff9a  [kernel.vmlinux]  [k] vring_unmap_one
+     0.02%            16  swapper          [kernel.vmlinux]  [k] ip_local_deliver
+     0.02%            16  swapper          [kernel.vmlinux]  [k] ip_rcv
+     0.02%            16  swapper          [kernel.vmlinux]  [k] ip_rcv_finish
+     0.02%            15  proxy_in_ffff9a  [kernel.vmlinux]  [k] __netdev_pick_tx
+     0.02%            15  proxy_in_ffff9a  [kernel.vmlinux]  [k] __pskb_trim_head
+     0.02%            15  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_try_coalesce
+     0.02%            15  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_v4_md5_lookup
+     0.02%            15  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_v4_rcv
+     0.02%            15  swapper          [kernel.vmlinux]  [k] tcp_ack
+     0.02%            14  ksoftirqd/13     [kernel.vmlinux]  [k] _raw_spin_unlock_irqrestore
+     0.02%            14  proxy_in_ffff9a  [kernel.vmlinux]  [k] bad_range
+     0.02%            14  proxy_in_ffff9a  [kernel.vmlinux]  [k] check_stack_object
+     0.02%            14  proxy_in_ffff9a  [kernel.vmlinux]  [k] free_compound_page
+     0.02%            14  proxy_in_ffff9a  [kernel.vmlinux]  [k] sg_init_table
+     0.02%            14  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_gro_receive
+     0.02%            14  swapper          [kernel.vmlinux]  [k] dev_gro_receive
+     0.02%            14  swapper          [kernel.vmlinux]  [k] selinux_socket_sock_rcv_skb
+     0.02%            14  swapper          [kernel.vmlinux]  [k] tcp_try_coalesce
+     0.02%            13  proxy_in_ffff9a  [kernel.vmlinux]  [k] __build_skb
+     0.02%            13  proxy_in_ffff9a  [kernel.vmlinux]  [k] __local_bh_enable_ip
+     0.02%            13  proxy_in_ffff9a  [kernel.vmlinux]  [k] alloc_pages_current
+     0.02%            13  proxy_in_ffff9a  [kernel.vmlinux]  [k] ip_output
+     0.02%            13  proxy_in_ffff9a  [kernel.vmlinux]  [k] ktime_get_with_offset
+     0.02%            13  proxy_in_ffff9a  [kernel.vmlinux]  [k] net_rx_action
+     0.02%            13  proxy_in_ffff9a  [kernel.vmlinux]  [k] release_sock
+     0.02%            13  swapper          [kernel.vmlinux]  [k] do_idle
+     0.02%            13  swapper          [kernel.vmlinux]  [k] tcp_rcv_established
+     0.02%            13  swapper          [kernel.vmlinux]  [k] tcp_v4_early_demux
+     0.02%            13  swapper          [kernel.vmlinux]  [k] vring_map_one_sg
+     0.02%            13  swapper          [kernel.vmlinux]  [k] vring_unmap_one
+     0.02%            12  ksoftirqd/13     [kernel.vmlinux]  [k] virtqueue_get_buf_ctx
+     0.02%            12  proxy_in_ffff9a  [kernel.vmlinux]  [k] __release_sock
+     0.02%            12  proxy_in_ffff9a  [kernel.vmlinux]  [k] dev_gro_receive
+     0.02%            12  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_trim_head
+     0.02%            12  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_v4_early_demux
+     0.02%            12  proxy_in_ffff9a  [kernel.vmlinux]  [k] virtqueue_kick_prepare
+     0.02%            12  swapper          [kernel.vmlinux]  [k] net_rx_action
+     0.02%            11  proxy_in_ffff9a  [kernel.vmlinux]  [k] inet_gro_receive
+     0.02%            11  proxy_in_ffff9a  [kernel.vmlinux]  [k] ipv4_mtu
+     0.02%            11  proxy_in_ffff9a  [kernel.vmlinux]  [k] kthread_should_stop
+     0.02%            11  proxy_in_ffff9a  [kernel.vmlinux]  [k] memcg_kmem_put_cache
+     0.02%            11  proxy_in_ffff9a  [kernel.vmlinux]  [k] security_socket_sendmsg
+     0.02%            11  proxy_in_ffff9a  [kernel.vmlinux]  [k] selinux_sock_rcv_skb_compat
+     0.02%            11  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_event_new_data_sent
+     0.02%            11  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_stream_memory_free
+     0.02%            11  swapper          [kernel.vmlinux]  [k] tcp_wfree
+     0.01%            10  proxy_in_ffff9a  [kernel.vmlinux]  [k] __put_page
+     0.01%            10  proxy_in_ffff9a  [kernel.vmlinux]  [k] netif_skb_features
+     0.01%            10  proxy_in_ffff9a  [kernel.vmlinux]  [k] rcu_all_qs
+     0.01%            10  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_entail
+     0.01%            10  proxy_in_ffff9a  [kernel.vmlinux]  [k] sock_def_readable
+     0.01%            10  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_schedule_loss_probe
+     0.01%            10  swapper          [iptable_filter]  [k] iptable_filter_hook
+     0.01%            10  swapper          [kernel.vmlinux]  [k] raw_local_deliver
+     0.01%            10  swapper          [kernel.vmlinux]  [k] tcp_gro_receive
+     0.01%             9  ksoftirqd/13     [kernel.vmlinux]  [k] memcpy_erms
+     0.01%             9  proxy_in_ffff9a  [kernel.vmlinux]  [k] __copy_skb_header
+     0.01%             9  proxy_in_ffff9a  [kernel.vmlinux]  [k] __page_cache_release
+     0.01%             9  proxy_in_ffff9a  [kernel.vmlinux]  [k] inet_recvmsg
+     0.01%             9  proxy_in_ffff9a  [kernel.vmlinux]  [k] inet_sendmsg
+     0.01%             9  proxy_in_ffff9a  [kernel.vmlinux]  [k] ip_rcv_finish
+     0.01%             9  proxy_in_ffff9a  [kernel.vmlinux]  [k] sched_clock_cpu
+     0.01%             9  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_network_protocol
+     0.01%             9  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_rearm_rto.part.62
+     0.01%             9  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_update_pacing_rate
+     0.01%             9  proxy_in_ffff9a  [kernel.vmlinux]  [k] validate_xmit_skb
+     0.01%             9  swapper          [kernel.vmlinux]  [k] _raw_spin_lock
+     0.01%             9  swapper          [kernel.vmlinux]  [k] ipv4_dst_check
+     0.01%             9  swapper          [kernel.vmlinux]  [k] selinux_sock_rcv_skb_compat
+     0.01%             9  swapper          [kernel.vmlinux]  [k] sg_init_table
+     0.01%             9  swapper          [kernel.vmlinux]  [k] skb_coalesce_rx_frag
+     0.01%             9  swapper          [kernel.vmlinux]  [k] skb_try_coalesce
+     0.01%             8  proxy_in_ffff9a  [iptable_filter]  [k] iptable_filter_hook
+     0.01%             8  proxy_in_ffff9a  [kernel.vmlinux]  [k] __kmalloc_reserve.isra.44
+     0.01%             8  proxy_in_ffff9a  [kernel.vmlinux]  [k] __sk_dst_check
+     0.01%             8  proxy_in_ffff9a  [kernel.vmlinux]  [k] __tcp_select_window
+     0.01%             8  proxy_in_ffff9a  [kernel.vmlinux]  [k] __tcp_v4_send_check
+     0.01%             8  proxy_in_ffff9a  [kernel.vmlinux]  [k] ip_copy_addrs
+     0.01%             8  proxy_in_ffff9a  [kernel.vmlinux]  [k] kfree_skbmem
+     0.01%             8  proxy_in_ffff9a  [kernel.vmlinux]  [k] kmem_cache_alloc
+     0.01%             8  proxy_in_ffff9a  [kernel.vmlinux]  [k] passthru_features_check
+     0.01%             8  proxy_in_ffff9a  [kernel.vmlinux]  [k] security_socket_recvmsg
+     0.01%             8  proxy_in_ffff9a  [kernel.vmlinux]  [k] sk_free
+     0.01%             8  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_to_sgvec
+     0.01%             8  proxy_in_ffff9a  [kernel.vmlinux]  [k] sock_put
+     0.01%             8  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_ack_update_rtt.isra.42
+     0.01%             8  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_cleanup_rbuf
+     0.01%             8  swapper          [kernel.vmlinux]  [k] __build_skb
+     0.01%             8  swapper          [kernel.vmlinux]  [k] kmem_cache_alloc
+     0.01%             8  swapper          [kernel.vmlinux]  [k] prefetch_freepointer
+     0.01%             8  swapper          [kernel.vmlinux]  [k] rb_erase
+     0.01%             8  swapper          [kernel.vmlinux]  [k] tcp_queue_rcv
+     0.01%             8  swapper          [kernel.vmlinux]  [k] vring_mapping_error
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] __tcp_ack_snd_check
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] __usecs_to_jiffies
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] _raw_spin_lock_irqsave
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] bictcp_cong_avoid
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] dev_hard_start_xmit
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] kvm_clock_get_cycles
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] pskb_expand_head
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] selinux_xfrm_postroute_last
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] sk_page_frag_refill
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] sock_recvmsg
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] sock_rfree
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_add_backlog
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_check_space
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_rate_skb_sent
+     0.01%             7  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_v4_send_check
+     0.01%             7  swapper          [kernel.vmlinux]  [k] __alloc_pages_nodemask
+     0.01%             7  swapper          [kernel.vmlinux]  [k] __cgroup_bpf_run_filter_skb
+     0.01%             7  swapper          [kernel.vmlinux]  [k] napi_complete_done
+     0.01%             7  swapper          [kernel.vmlinux]  [k] rb_first
+     0.01%             7  swapper          [kernel.vmlinux]  [k] selinux_parse_skb.constprop.57
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] __slab_free
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] inet_ehashfn
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] kernel_poison_pages
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] ktime_get_real_seconds
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] kvm_sched_clock_read
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] lock_timer_base
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] netdev_pick_tx
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] netlbl_enabled
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] policy_nodemask
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] schedule
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] security_sock_rcv_skb
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] selinux_ipv4_postroute
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_clone
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_coalesce_rx_frag
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] sock_sendmsg
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp4_gro_receive
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_rate_skb_delivered
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_rcv_space_adjust
+     0.01%             6  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_sacktag_write_queue
+     0.01%             6  swapper          [kernel.vmlinux]  [k] __raw_callee_save___pv_queued_spin_unlock
+     0.01%             6  swapper          [kernel.vmlinux]  [k] __zone_watermark_ok
+     0.01%             6  swapper          [kernel.vmlinux]  [k] bad_range
+     0.01%             6  swapper          [kernel.vmlinux]  [k] default_idle
+     0.01%             6  swapper          [kernel.vmlinux]  [k] inet_ehashfn
+     0.01%             6  swapper          [kernel.vmlinux]  [k] ip_local_deliver_finish
+     0.01%             6  swapper          [kernel.vmlinux]  [k] kvm_clock_get_cycles
+     0.01%             6  swapper          [kernel.vmlinux]  [k] prep_compound_page
+     0.01%             6  swapper          [kernel.vmlinux]  [k] tcp4_gro_receive
+     0.01%             6  swapper          [kernel.vmlinux]  [k] virtqueue_add_outbuf
+     0.01%             5  perf             [kernel.vmlinux]  [k] copy_user_enhanced_fast_string
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] __x86_indirect_thunk_rax
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] bictcp_acked
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] ip_local_deliver
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] ip_local_out
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] kmalloc_slab
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] mem_cgroup_uncharge
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] napi_complete_done
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] rb_next
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] sch_direct_xmit
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] sk_reset_timer
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_add_rx_frag
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_gso_transport_seglen
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_shift
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_send_ack
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_small_queue_check.isra.30
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] trace_sendmsg
+     0.01%             5  proxy_in_ffff9a  [kernel.vmlinux]  [k] validate_xmit_skb_list
+     0.01%             5  swapper          [kernel.vmlinux]  [k] __schedule
+     0.01%             5  swapper          [kernel.vmlinux]  [k] __wake_up_sync_key
+     0.01%             5  swapper          [kernel.vmlinux]  [k] arch_cpu_idle
+     0.01%             5  swapper          [kernel.vmlinux]  [k] page_frag_free
+     0.01%             5  swapper          [kernel.vmlinux]  [k] rcu_idle_exit
+     0.01%             5  swapper          [kernel.vmlinux]  [k] security_sock_rcv_skb
+     0.01%             5  swapper          [kernel.vmlinux]  [k] sk_filter_trim_cap
+     0.01%             5  swapper          [kernel.vmlinux]  [k] skb_add_rx_frag
+     0.01%             5  swapper          [kernel.vmlinux]  [k] skb_put
+     0.01%             5  swapper          [kernel.vmlinux]  [k] sock_def_readable
+     0.01%             5  swapper          [kernel.vmlinux]  [k] tcp_trim_head
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] __ip_local_out
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] __sk_flush_backlog
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] __x86_indirect_thunk_r8
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] _cond_resched
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] kernel_recvmsg
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] minmax_subwin_update
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] netif_receive_skb_internal
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] ns_to_timespec64
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] raw_local_deliver
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] selinux_ipv4_output
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] selinux_socket_sendmsg
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] sk_wait_data
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_gso_validate_mtu
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_push
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_release_all
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_event_data_recv
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_grow_window.isra.24
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_init_tso_segs
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_parse_md5sig_option
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_release_cb
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_sendmsg
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_urg
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_v4_fill_cb
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_validate_incoming
+     0.01%             4  proxy_in_ffff9a  [kernel.vmlinux]  [k] validate_xmit_xfrm
+     0.01%             4  swapper          [kernel.vmlinux]  [k] __pskb_trim_head
+     0.01%             4  swapper          [kernel.vmlinux]  [k] eth_type_trans
+     0.01%             4  swapper          [kernel.vmlinux]  [k] kfree_skbmem
+     0.01%             4  swapper          [kernel.vmlinux]  [k] kmem_cache_free
+     0.01%             4  swapper          [kernel.vmlinux]  [k] ktime_get_with_offset
+     0.01%             4  swapper          [kernel.vmlinux]  [k] napi_gro_receive
+     0.01%             4  swapper          [kernel.vmlinux]  [k] nf_hook_slow
+     0.01%             4  swapper          [kernel.vmlinux]  [k] selinux_netlbl_sock_rcv_skb
+     0.01%             4  swapper          [kernel.vmlinux]  [k] skb_defer_rx_timestamp
+     0.01%             4  swapper          [kernel.vmlinux]  [k] tcp_event_data_recv
+     0.01%             4  swapper          [kernel.vmlinux]  [k] tcp_send_delayed_ack
+     0.01%             4  swapper          [kernel.vmlinux]  [k] tcp_update_pacing_rate
+     0.01%             4  swapper          [kernel.vmlinux]  [k] tcp_v4_fill_cb
+     0.01%             4  swapper          [kernel.vmlinux]  [k] tcp_v4_inbound_md5_hash
+     0.01%             4  swapper          [kernel.vmlinux]  [k] virtqueue_enable_cb_prepare
+     0.00%             3  ksoftirqd/13     [kernel.vmlinux]  [k] inet_gro_receive
+     0.00%             3  ksoftirqd/13     [kernel.vmlinux]  [k] kmem_cache_free
+     0.00%             3  ksoftirqd/13     [kernel.vmlinux]  [k] skb_coalesce_rx_frag
+     0.00%             3  ksoftirqd/13     [kernel.vmlinux]  [k] tcp_v4_inbound_md5_hash
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] __dev_kfree_skb_any
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] __tcp_send_ack.part.41
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] __xfrm_policy_check2.constprop.33
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] get_task_policy.part.35
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] page_poisoning_enabled
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] sg_next
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] sk_filter_trim_cap
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_clone_tx_timestamp
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_data_queue
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_fastretrans_alert
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_parse_options
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_rate_gen
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_recv_timestamp
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_send_mss
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_v4_inbound_md5_hash
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] virtqueue_get_buf
+     0.00%             3  proxy_in_ffff9a  [kernel.vmlinux]  [k] wait_woken
+     0.00%             3  swapper          [kernel.vmlinux]  [k] __local_bh_enable_ip
+     0.00%             3  swapper          [kernel.vmlinux]  [k] __netif_receive_skb
+     0.00%             3  swapper          [kernel.vmlinux]  [k] __slab_free
+     0.00%             3  swapper          [kernel.vmlinux]  [k] __tcp_ack_snd_check
+     0.00%             3  swapper          [kernel.vmlinux]  [k] __tcp_select_window
+     0.00%             3  swapper          [kernel.vmlinux]  [k] __tcp_transmit_skb
+     0.00%             3  swapper          [kernel.vmlinux]  [k] __wake_up_common_lock
+     0.00%             3  swapper          [kernel.vmlinux]  [k] __xfrm_policy_check2.constprop.33
+     0.00%             3  swapper          [kernel.vmlinux]  [k] bictcp_acked
+     0.00%             3  swapper          [kernel.vmlinux]  [k] cmpxchg_double_slab.isra.53
+     0.00%             3  swapper          [kernel.vmlinux]  [k] ip_queue_xmit
+     0.00%             3  swapper          [kernel.vmlinux]  [k] kfree
+     0.00%             3  swapper          [kernel.vmlinux]  [k] ktime_get_real_seconds
+     0.00%             3  swapper          [kernel.vmlinux]  [k] pskb_expand_head
+     0.00%             3  swapper          [kernel.vmlinux]  [k] rcu_bh_qs
+     0.00%             3  swapper          [kernel.vmlinux]  [k] selinux_xfrm_sock_rcv_skb
+     0.00%             3  swapper          [kernel.vmlinux]  [k] set_cpu_sd_state_idle
+     0.00%             3  swapper          [kernel.vmlinux]  [k] sg_next
+     0.00%             3  swapper          [kernel.vmlinux]  [k] sk_reset_timer
+     0.00%             3  swapper          [kernel.vmlinux]  [k] skb_release_head_state
+     0.00%             3  swapper          [kernel.vmlinux]  [k] tcp_md5_do_lookup
+     0.00%             3  swapper          [kernel.vmlinux]  [k] tcp_rate_gen
+     0.00%             3  swapper          [kernel.vmlinux]  [k] tcp_rate_skb_delivered
+     0.00%             3  swapper          [kernel.vmlinux]  [k] tcp_sacktag_write_queue
+     0.00%             2  ksoftirqd/13     [kernel.vmlinux]  [k] rcu_all_qs
+     0.00%             2  ksoftirqd/13     [kernel.vmlinux]  [k] selinux_socket_sock_rcv_skb
+     0.00%             2  ksoftirqd/13     [kernel.vmlinux]  [k] tcp_try_coalesce
+     0.00%             2  ksoftirqd/13     [kernel.vmlinux]  [k] vring_use_dma_api
+     0.00%             2  perf             [kernel.vmlinux]  [k] __softirqentry_text_start
+     0.00%             2  perf             [kernel.vmlinux]  [k] _raw_spin_unlock_irqrestore
+     0.00%             2  perf             [kernel.vmlinux]  [k] ext4_es_lookup_extent
+     0.00%             2  proxy_in_ffff9a  [client]          [k] 0x0000000000000f79
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] __memcpy
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] __napi_alloc_skb
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] __schedule
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] __sk_mem_raise_allocated
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] _raw_spin_unlock_bh
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] add_wait_queue
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] eth_type_trans
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] ip_local_deliver_finish
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] jiffies_to_usecs
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] napi_gro_receive
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] page_frag_alloc
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] sched_clock
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] schedule_timeout
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] selinux_netlbl_sock_rcv_skb
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] sk_forced_mem_schedule
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_free_head
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_partial_csum_set
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_split
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_chrono_stop
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_cong_avoid_ai
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_queue_rcv
+     0.00%             2  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_sacktag_one
+     0.00%             2  swapper          [kernel.vmlinux]  [k] __napi_alloc_skb
+     0.00%             2  swapper          [kernel.vmlinux]  [k] __put_compound_page
+     0.00%             2  swapper          [kernel.vmlinux]  [k] __skb_clone
+     0.00%             2  swapper          [kernel.vmlinux]  [k] __usecs_to_jiffies
+     0.00%             2  swapper          [kernel.vmlinux]  [k] alloc_pages_current
+     0.00%             2  swapper          [kernel.vmlinux]  [k] default_idle_call
+     0.00%             2  swapper          [kernel.vmlinux]  [k] ip_send_check
+     0.00%             2  swapper          [kernel.vmlinux]  [k] kvm_sched_clock_read
+     0.00%             2  swapper          [kernel.vmlinux]  [k] minmax_subwin_update
+     0.00%             2  swapper          [kernel.vmlinux]  [k] netif_receive_skb_internal
+     0.00%             2  swapper          [kernel.vmlinux]  [k] netlbl_enabled
+     0.00%             2  swapper          [kernel.vmlinux]  [k] page_frag_alloc
+     0.00%             2  swapper          [kernel.vmlinux]  [k] sched_ttwu_pending
+     0.00%             2  swapper          [kernel.vmlinux]  [k] schedule_idle
+     0.00%             2  swapper          [kernel.vmlinux]  [k] skb_condense
+     0.00%             2  swapper          [kernel.vmlinux]  [k] skb_gro_reset_offset
+     0.00%             2  swapper          [kernel.vmlinux]  [k] tcp_add_backlog
+     0.00%             2  swapper          [kernel.vmlinux]  [k] tcp_grow_window.isra.24
+     0.00%             2  swapper          [kernel.vmlinux]  [k] tcp_parse_md5sig_option
+     0.00%             2  swapper          [kernel.vmlinux]  [k] tcp_parse_options
+     0.00%             2  swapper          [kernel.vmlinux]  [k] tcp_v4_do_rcv
+     0.00%             2  swapper          [kernel.vmlinux]  [k] virtqueue_poll
+     0.00%             1  ksoftirqd/13     [ip_tables]       [k] ipt_do_table
+     0.00%             1  ksoftirqd/13     [iptable_filter]  [k] iptable_filter_hook
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] __cgroup_bpf_run_filter_skb
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] __inet_lookup_established
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] __napi_alloc_skb
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] __softirqentry_text_start
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] _raw_spin_lock
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] avc_has_perm
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] get_page_from_freelist
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] ip_local_deliver
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] kmem_cache_alloc
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] ksoftirqd_should_run
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] kthread_should_stop
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] net_rx_action
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] page_frag_alloc
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] sched_clock_cpu
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] selinux_parse_skb.constprop.57
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] sg_init_table
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] skb_add_rx_frag
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] skb_try_coalesce
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] sock_put
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] tcp_gro_receive
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] tcp_v4_do_rcv
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] tcp_v4_early_demux
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] tcp_v4_fill_cb
+     0.00%             1  ksoftirqd/13     [kernel.vmlinux]  [k] vring_unmap_one
+     0.00%             1  ksoftirqd/13     [virtio_net]      [k] page_to_skb
+     0.00%             1  ksoftirqd/13     [virtio_net]      [k] virtnet_poll
+     0.00%             1  ksoftirqd/7      [kernel.vmlinux]  [k] __build_skb
+     0.00%             1  ksoftirqd/7      [kernel.vmlinux]  [k] __put_compound_page
+     0.00%             1  ksoftirqd/7      [kernel.vmlinux]  [k] __schedule
+     0.00%             1  ksoftirqd/7      [kernel.vmlinux]  [k] __tcp_v4_send_check
+     0.00%             1  ksoftirqd/7      [kernel.vmlinux]  [k] ksoftirqd_should_run
+     0.00%             1  ksoftirqd/7      [kernel.vmlinux]  [k] netif_receive_skb_internal
+     0.00%             1  ksoftirqd/7      [kernel.vmlinux]  [k] run_ksoftirqd
+     0.00%             1  ksoftirqd/7      [kernel.vmlinux]  [k] smpboot_thread_fn
+     0.00%             1  kworker/13:1     [kernel.vmlinux]  [k] refresh_cpu_vm_stats
+     0.00%             1  perf             [kernel.vmlinux]  [k] __do_page_fault
+     0.00%             1  perf             [kernel.vmlinux]  [k] _raw_spin_lock
+     0.00%             1  perf             [kernel.vmlinux]  [k] bad_range
+     0.00%             1  perf             [kernel.vmlinux]  [k] ext4_es_can_be_merged
+     0.00%             1  perf             [kernel.vmlinux]  [k] iov_iter_fault_in_readable
+     0.00%             1  perf             [kernel.vmlinux]  [k] memcpy_erms
+     0.00%             1  perf             [kernel.vmlinux]  [k] memset_erms
+     0.00%             1  perf             [kernel.vmlinux]  [k] page_counter_cancel
+     0.00%             1  perf             [kernel.vmlinux]  [k] rb_next
+     0.00%             1  perf             [kernel.vmlinux]  [k] smp_call_function_single
+     0.00%             1  perf             [kernel.vmlinux]  [k] up_read
+     0.00%             1  proxy_in_ffff9a  [client]          [k] 0x0000000000000f4f
+     0.00%             1  proxy_in_ffff9a  [client]          [k] 0x0000000000000f54
+     0.00%             1  proxy_in_ffff9a  [client]          [k] 0x0000000000000f56
+     0.00%             1  proxy_in_ffff9a  [client]          [k] 0x0000000000000fa2
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] __kfree_skb_flush
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] __napi_schedule
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] __tcp_push_pending_frames
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] consume_skb
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] do_softirq.part.17
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] iov_iter_kvec
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] iowrite16
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] kernel_sendmsg
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] lock_sock_nested
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] minmax_running_min
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] policy_node
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] rcu_bh_qs
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] rebalance_domains
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] run_timer_softirq
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] selinux_xfrm_sock_rcv_skb
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_condense
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_defer_rx_timestamp
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_prepare_for_shift
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] skb_put
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] sock_zerocopy_put
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_check_sack_reordering
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_options_write
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_push
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_push_one
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_rack_advance
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_rack_detect_loss
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_rack_mark_lost
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_rack_update_reo_wnd
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] tcp_sacktag_walk
+     0.00%             1  proxy_in_ffff9a  [kernel.vmlinux]  [k] virtqueue_enable_cb_prepare
+     0.00%             1  rcu_sched        [kernel.vmlinux]  [k] schedule
+     0.00%             1  sleep            [kernel.vmlinux]  [k] filemap_map_pages
+     0.00%             1  sleep            libc-2.27.so      [.] __close_nocancel
+     0.00%             1  swapper          [kernel.vmlinux]  [k] __bitmap_and
+     0.00%             1  swapper          [kernel.vmlinux]  [k] __kfree_skb_flush
+     0.00%             1  swapper          [kernel.vmlinux]  [k] __kmalloc_node_track_caller
+     0.00%             1  swapper          [kernel.vmlinux]  [k] __kmalloc_reserve.isra.44
+     0.00%             1  swapper          [kernel.vmlinux]  [k] __page_cache_release
+     0.00%             1  swapper          [kernel.vmlinux]  [k] __put_page
+     0.00%             1  swapper          [kernel.vmlinux]  [k] __skb_to_sgvec
+     0.00%             1  swapper          [kernel.vmlinux]  [k] __slab_alloc
+     0.00%             1  swapper          [kernel.vmlinux]  [k] __sock_wfree
+     0.00%             1  swapper          [kernel.vmlinux]  [k] __x86_indirect_thunk_rax
+     0.00%             1  swapper          [kernel.vmlinux]  [k] bictcp_cong_avoid
+     0.00%             1  swapper          [kernel.vmlinux]  [k] cpu_startup_entry
+     0.00%             1  swapper          [kernel.vmlinux]  [k] dev_hard_start_xmit
+     0.00%             1  swapper          [kernel.vmlinux]  [k] free_compound_page
+     0.00%             1  swapper          [kernel.vmlinux]  [k] iowrite16
+     0.00%             1  swapper          [kernel.vmlinux]  [k] ip_finish_output2
+     0.00%             1  swapper          [kernel.vmlinux]  [k] ip_output
+     0.00%             1  swapper          [kernel.vmlinux]  [k] ipv4_mtu
+     0.00%             1  swapper          [kernel.vmlinux]  [k] kmem_cache_alloc_node
+     0.00%             1  swapper          [kernel.vmlinux]  [k] lock_timer_base
+     0.00%             1  swapper          [kernel.vmlinux]  [k] mem_cgroup_uncharge
+     0.00%             1  swapper          [kernel.vmlinux]  [k] memcg_kmem_put_cache
+     0.00%             1  swapper          [kernel.vmlinux]  [k] mod_timer
+     0.00%             1  swapper          [kernel.vmlinux]  [k] rcu_cblist_dequeue
+     0.00%             1  swapper          [kernel.vmlinux]  [k] sch_direct_xmit
+     0.00%             1  swapper          [kernel.vmlinux]  [k] sched_clock
+     0.00%             1  swapper          [kernel.vmlinux]  [k] sched_clock_cpu
+     0.00%             1  swapper          [kernel.vmlinux]  [k] sk_stream_write_space
+     0.00%             1  swapper          [kernel.vmlinux]  [k] skb_network_protocol
+     0.00%             1  swapper          [kernel.vmlinux]  [k] skb_release_all
+     0.00%             1  swapper          [kernel.vmlinux]  [k] skb_shift
+     0.00%             1  swapper          [kernel.vmlinux]  [k] skb_split
+     0.00%             1  swapper          [kernel.vmlinux]  [k] sock_put
+     0.00%             1  swapper          [kernel.vmlinux]  [k] tcp_ack_update_rtt.isra.42
+     0.00%             1  swapper          [kernel.vmlinux]  [k] tcp_chrono_stop
+     0.00%             1  swapper          [kernel.vmlinux]  [k] tcp_data_queue
+     0.00%             1  swapper          [kernel.vmlinux]  [k] tcp_fragment
+     0.00%             1  swapper          [kernel.vmlinux]  [k] tcp_rack_detect_loss
+     0.00%             1  swapper          [kernel.vmlinux]  [k] tcp_rate_skb_sent
+     0.00%             1  swapper          [kernel.vmlinux]  [k] tcp_rearm_rto.part.62
+     0.00%             1  swapper          [kernel.vmlinux]  [k] tcp_schedule_loss_probe
+     0.00%             1  swapper          [kernel.vmlinux]  [k] tcp_tso_segs
+     0.00%             1  swapper          [kernel.vmlinux]  [k] tcp_urg
+     0.00%             1  swapper          [kernel.vmlinux]  [k] tcp_xmit_retransmit_queue.part.43
+     0.00%             1  swapper          [kernel.vmlinux]  [k] validate_xmit_skb_list
+     0.00%             1  swapper          [kernel.vmlinux]  [k] virtqueue_get_vring_size
+     0.00%             1  swapper          [kernel.vmlinux]  [k] virtqueue_kick_prepare
+     0.00%             1  swapper          [virtio_net]      [k] virtqueue_napi_complete
+
+
+#
+# (Tip: Use parent filter to see specific call path: perf report -p <regex>)
+#

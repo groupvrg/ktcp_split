@@ -1,0 +1,819 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 80K of event 'cpu-clock'
+# Event count (approx.): 20078500000
+#
+# Overhead       Samples  Command          Shared Object      Symbol                                       
+# ........  ............  ...............  .................  .............................................
+#
+    78.84%         63320  swapper          [kernel.kallsyms]  [k] native_safe_halt
+            |
+            ---native_safe_halt
+               |          
+                --78.83%--default_idle
+                          arch_cpu_idle
+                          default_idle_call
+                          do_idle
+                          cpu_startup_entry
+                          |          
+                          |--70.05%--start_secondary
+                          |          secondary_startup_64
+                          |          
+                           --8.78%--rest_init
+                                     arch_call_rest_init
+                                     start_kernel
+                                     x86_64_start_reservations
+                                     x86_64_start_kernel
+                                     secondary_startup_64
+
+     2.62%          2106  swapper          [kernel.kallsyms]  [k] detach_buf_split
+            |
+            ---detach_buf_split
+               |          
+                --2.61%--virtqueue_get_buf_ctx
+                          |          
+                          |--1.54%--receive_mergeable
+                          |          receive_buf
+                          |          virtnet_poll
+                          |          net_rx_action
+                          |          __softirqentry_text_start
+                          |          irq_exit
+                          |          do_IRQ
+                          |          ret_from_intr
+                          |          |          
+                          |           --1.53%--native_safe_halt
+                          |                     default_idle
+                          |                     arch_cpu_idle
+                          |                     default_idle_call
+                          |                     do_idle
+                          |                     cpu_startup_entry
+                          |                     start_secondary
+                          |                     secondary_startup_64
+                          |          
+                           --0.85%--virtqueue_get_buf
+                                     free_old_xmit_skbs
+                                     |          
+                                      --0.62%--virtnet_poll
+                                                net_rx_action
+                                                __softirqentry_text_start
+                                                irq_exit
+                                                do_IRQ
+                                                ret_from_intr
+                                                |          
+                                                 --0.62%--native_safe_halt
+                                                           default_idle
+                                                           arch_cpu_idle
+                                                           default_idle_call
+                                                           do_idle
+                                                           cpu_startup_entry
+                                                           start_secondary
+                                                           secondary_startup_64
+
+     1.78%          1426  swapper          [kernel.kallsyms]  [k] receive_mergeable
+            |
+            ---receive_mergeable
+               |          
+                --1.77%--receive_buf
+                          virtnet_poll
+                          net_rx_action
+                          __softirqentry_text_start
+                          irq_exit
+                          do_IRQ
+                          ret_from_intr
+                          |          
+                           --1.77%--native_safe_halt
+                                     default_idle
+                                     arch_cpu_idle
+                                     default_idle_call
+                                     do_idle
+                                     cpu_startup_entry
+                                     start_secondary
+                                     secondary_startup_64
+
+     1.02%           820  swapper          [kernel.kallsyms]  [k] __softirqentry_text_start
+            |
+            ---__softirqentry_text_start
+               irq_exit
+               |          
+                --0.99%--do_IRQ
+                          ret_from_intr
+                          |          
+                           --0.99%--native_safe_halt
+                                     default_idle
+                                     arch_cpu_idle
+                                     default_idle_call
+                                     do_idle
+                                     cpu_startup_entry
+                                     start_secondary
+                                     secondary_startup_64
+
+     0.74%           595  swapper          [kernel.kallsyms]  [k] virtqueue_get_buf_ctx
+            |
+            ---virtqueue_get_buf_ctx
+
+     0.57%           460  swapper          [kernel.kallsyms]  [k] virtqueue_add
+            |
+            ---virtqueue_add
+
+     0.55%           443  swapper          [kernel.kallsyms]  [k] try_fill_recv
+            |
+            ---try_fill_recv
+               |          
+                --0.55%--virtnet_poll
+                          net_rx_action
+                          __softirqentry_text_start
+                          irq_exit
+                          do_IRQ
+                          ret_from_intr
+                          |          
+                           --0.55%--native_safe_halt
+                                     default_idle
+                                     arch_cpu_idle
+                                     default_idle_call
+                                     do_idle
+                                     cpu_startup_entry
+                                     start_secondary
+                                     secondary_startup_64
+
+     0.54%           431  swapper          [kernel.kallsyms]  [k] virtqueue_kick_prepare
+            |
+            ---virtqueue_kick_prepare
+               |          
+                --0.53%--start_xmit
+                          dev_hard_start_xmit
+                          sch_direct_xmit
+                          |          
+                           --0.53%--__dev_queue_xmit
+                                     dev_queue_xmit
+                                     ip_finish_output2
+                                     ip_finish_output
+                                     ip_output
+                                     ip_local_out
+                                     __ip_queue_xmit
+                                     ip_queue_xmit
+                                     __tcp_transmit_skb
+                                     |          
+                                      --0.52%--__tcp_send_ack.part.44
+                                                tcp_send_ack
+                                                tcp_cleanup_rbuf
+                                                tcp_read_sock
+                                                strp_read_sock
+                                                strp_data_ready
+                                                sk_psock_strp_data_ready
+                                                tcp_rcv_established
+                                                tcp_v4_do_rcv
+                                                tcp_v4_rcv
+                                                ip_protocol_deliver_rcu
+                                                ip_local_deliver_finish
+                                                ip_local_deliver
+                                                ip_rcv_finish
+                                                ip_rcv
+                                                __netif_receive_skb_one_core
+                                                __netif_receive_skb
+                                                netif_receive_skb_internal
+                                                napi_gro_receive
+                                                receive_buf
+                                                virtnet_poll
+                                                net_rx_action
+                                                __softirqentry_text_start
+                                                irq_exit
+                                                do_IRQ
+                                                ret_from_intr
+                                                |          
+                                                 --0.52%--native_safe_halt
+                                                           default_idle
+                                                           arch_cpu_idle
+                                                           default_idle_call
+                                                           do_idle
+                                                           cpu_startup_entry
+                                                           start_secondary
+                                                           secondary_startup_64
+
+     0.46%           373  swapper          [kernel.kallsyms]  [k] memcpy_erms
+     0.43%           347  swapper          [kernel.kallsyms]  [k] get_page_from_freelist
+     0.43%           344  swapper          [kernel.kallsyms]  [k] ip_copy_addrs
+     0.33%           267  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_sendmsg_locked
+     0.30%           241  kworker/7:1-eve  [kernel.kallsyms]  [k] _raw_spin_unlock_irqrestore
+     0.29%           235  kworker/7:1-eve  [kernel.kallsyms]  [k] virtqueue_add
+     0.29%           235  swapper          [kernel.kallsyms]  [k] finish_task_switch
+     0.27%           220  kworker/7:1-eve  [kernel.kallsyms]  [k] detach_buf_split
+     0.27%           217  swapper          [kernel.kallsyms]  [k] queue_work_on
+     0.26%           209  swapper          [kernel.kallsyms]  [k] __free_pages_ok
+     0.22%           175  swapper          [kernel.kallsyms]  [k] memset_erms
+     0.20%           162  kworker/7:1-eve  [kernel.kallsyms]  [k] virtqueue_kick_prepare
+     0.19%           154  kworker/7:1-eve  [kernel.kallsyms]  [k] do_tcp_sendpages
+     0.19%           150  swapper          [kernel.kallsyms]  [k] __sock_wfree
+     0.18%           147  swapper          [kernel.kallsyms]  [k] tick_nohz_idle_exit
+     0.17%           136  kworker/7:1-eve  [kernel.kallsyms]  [k] finish_task_switch
+     0.17%           135  swapper          [kernel.kallsyms]  [k] ip_send_check
+     0.17%           133  kworker/7:1-eve  [kernel.kallsyms]  [k] virtqueue_get_buf_ctx
+     0.15%           118  swapper          [kernel.kallsyms]  [k] pvclock_clocksource_read
+     0.15%           117  ksoftirqd/7      [kernel.kallsyms]  [k] detach_buf_split
+     0.14%           116  swapper          [kernel.kallsyms]  [k] skb_page_frag_refill
+     0.14%           111  kworker/7:1-eve  [kernel.kallsyms]  [k] process_one_work
+     0.13%           104  kworker/7:1-eve  [kernel.kallsyms]  [k] __ip_queue_xmit
+     0.12%           100  swapper          [kernel.kallsyms]  [k] ipt_do_table
+     0.11%            92  kworker/7:1-eve  [kernel.kallsyms]  [k] queue_work_on
+     0.11%            90  swapper          [kernel.kallsyms]  [k] skb_release_data
+     0.09%            75  swapper          [kernel.kallsyms]  [k] __tcp_transmit_skb
+     0.09%            75  swapper          [kernel.kallsyms]  [k] _raw_spin_unlock_irqrestore
+     0.09%            69  swapper          [kernel.kallsyms]  [k] sg_init_one
+     0.09%            69  swapper          [kernel.kallsyms]  [k] sk_psock_strp_read
+     0.08%            67  kworker/7:1-eve  [kernel.kallsyms]  [k] __pv_queued_spin_lock_slowpath
+     0.08%            66  swapper          [kernel.kallsyms]  [k] tcp_v4_rcv
+     0.08%            65  kworker/7:1-eve  [kernel.kallsyms]  [k] _raw_spin_lock_bh
+     0.08%            62  swapper          [kernel.kallsyms]  [k] __raw_callee_save___pv_queued_spin_unlock
+     0.08%            61  kworker/7:1-eve  [kernel.kallsyms]  [k] ip_send_check
+     0.07%            60  swapper          [kernel.kallsyms]  [k] sg_init_table
+     0.07%            59  ksoftirqd/7      [kernel.kallsyms]  [k] receive_mergeable
+     0.07%            59  kworker/7:1-eve  [kernel.kallsyms]  [k] __raw_callee_save___pv_queued_spin_unlock
+     0.07%            59  swapper          [kernel.kallsyms]  [k] virtnet_poll
+     0.07%            58  kworker/7:1-eve  [kernel.kallsyms]  [k] __softirqentry_text_start
+     0.07%            55  kworker/7:1-eve  [kernel.kallsyms]  [k] run_timer_softirq
+     0.07%            54  swapper          [kernel.kallsyms]  [k] __inet_lookup_established
+     0.06%            51  swapper          [kernel.kallsyms]  [k] __build_skb
+     0.06%            51  swapper          [kernel.kallsyms]  [k] cancel_delayed_work
+     0.06%            50  swapper          [kernel.kallsyms]  [k] _raw_spin_lock
+     0.06%            49  swapper          [kernel.kallsyms]  [k] do_idle
+     0.06%            48  kworker/7:1-eve  [kernel.kallsyms]  [k] skb_send_sock_locked
+     0.06%            48  swapper          [kernel.kallsyms]  [k] tcp_rcv_established
+     0.06%            47  swapper          [kernel.kallsyms]  [k] __netif_receive_skb_core
+     0.06%            47  swapper          [kernel.kallsyms]  [k] ip_finish_output2
+     0.06%            47  swapper          [kernel.kallsyms]  [k] kmem_cache_alloc
+     0.06%            45  swapper          [kernel.kallsyms]  [k] __cgroup_bpf_run_filter_skb
+     0.06%            45  swapper          [kernel.kallsyms]  [k] dev_gro_receive
+     0.06%            45  swapper          [kernel.kallsyms]  [k] virtqueue_add_inbuf_ctx
+     0.05%            43  kworker/7:1-eve  [kernel.kallsyms]  [k] ipv4_mtu
+     0.05%            43  swapper          [kernel.kallsyms]  [k] page_to_skb
+     0.05%            42  swapper          [kernel.kallsyms]  [k] __netif_receive_skb_one_core
+     0.05%            42  swapper          [kernel.kallsyms]  [k] ip_local_deliver
+     0.05%            42  swapper          [kernel.kallsyms]  [k] receive_buf
+     0.05%            40  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_write_xmit
+     0.05%            39  swapper          [kernel.kallsyms]  [k] __kmalloc_node_track_caller
+     0.05%            39  swapper          [kernel.kallsyms]  [k] tcp_read_sock
+     0.05%            39  swapper          [kernel.kallsyms]  [k] tcp_v4_do_rcv
+     0.05%            38  kworker/7:1-eve  [kernel.kallsyms]  [k] skb_release_data
+     0.05%            38  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_rbtree_insert
+     0.05%            37  kworker/7:1-eve  [kernel.kallsyms]  [k] __tcp_transmit_skb
+     0.05%            37  swapper          [kernel.kallsyms]  [k] ip_rcv
+     0.05%            37  swapper          [kernel.kallsyms]  [k] kmem_cache_free
+     0.04%            36  kworker/7:1-eve  [kernel.kallsyms]  [k] skb_release_head_state
+     0.04%            35  kworker/7:1-eve  [kernel.kallsyms]  [k] __free_pages_ok
+     0.04%            35  swapper          [kernel.kallsyms]  [k] skb_set_owner_w
+     0.04%            35  swapper          [kernel.kallsyms]  [k] strp_read_sock
+     0.04%            34  kworker/7:1-eve  [kernel.kallsyms]  [k] __alloc_skb
+     0.04%            34  swapper          [kernel.kallsyms]  [k] __dev_queue_xmit
+     0.04%            34  swapper          [kernel.kallsyms]  [k] napi_gro_receive
+     0.04%            32  swapper          [kernel.kallsyms]  [k] ip_protocol_deliver_rcu
+     0.04%            32  swapper          [kernel.kallsyms]  [k] tcp_queue_rcv
+     0.04%            31  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_current_mss
+     0.04%            30  swapper          [kernel.kallsyms]  [k] __alloc_pages_nodemask
+     0.04%            30  swapper          [kernel.kallsyms]  [k] __strp_recv
+     0.04%            30  swapper          [kernel.kallsyms]  [k] netif_receive_skb_internal
+     0.04%            30  swapper          [kernel.kallsyms]  [k] start_xmit
+     0.04%            29  swapper          [kernel.kallsyms]  [k] free_old_xmit_skbs
+     0.04%            29  swapper          [kernel.kallsyms]  [k] ip_rcv_core.isra.20
+     0.04%            29  swapper          [kernel.kallsyms]  [k] ipv4_dst_check
+     0.03%            28  kworker/7:1-eve  [kernel.kallsyms]  [k] __skb_to_sgvec
+     0.03%            28  kworker/7:1-eve  [kernel.kallsyms]  [k] memcpy_erms
+     0.03%            28  kworker/7:1-eve  [kernel.kallsyms]  [k] receive_mergeable
+     0.03%            28  kworker/7:1-eve  [kernel.kallsyms]  [k] worker_thread
+     0.03%            28  swapper          [kernel.kallsyms]  [k] ip_rcv_finish
+     0.03%            28  swapper          [kernel.kallsyms]  [k] mod_timer
+     0.03%            28  swapper          [kernel.kallsyms]  [k] vring_map_one_sg
+     0.03%            27  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_rate_check_app_limited
+     0.03%            27  swapper          [kernel.kallsyms]  [k] skb_coalesce_rx_frag
+     0.03%            26  ksoftirqd/7      [kernel.kallsyms]  [k] virtqueue_get_buf_ctx
+     0.03%            26  swapper          [kernel.kallsyms]  [k] __skb_clone
+     0.03%            26  swapper          [kernel.kallsyms]  [k] inet_gro_receive
+     0.03%            26  swapper          [kernel.kallsyms]  [k] ksize
+     0.03%            26  swapper          [kernel.kallsyms]  [k] run_timer_softirq
+     0.03%            25  kworker/7:1-eve  [kernel.kallsyms]  [k] __skb_clone
+     0.03%            25  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_established_options
+     0.03%            25  swapper          [kernel.kallsyms]  [k] sk_psock_strp_data_ready
+     0.03%            24  ksoftirqd/7      [kernel.kallsyms]  [k] finish_task_switch
+     0.03%            24  kworker/7:1-eve  [kernel.kallsyms]  [k] _raw_spin_lock
+     0.03%            24  swapper          [kernel.kallsyms]  [k] __zone_watermark_ok
+     0.03%            24  swapper          [kernel.kallsyms]  [k] skb_release_head_state
+     0.03%            24  swapper          [kernel.kallsyms]  [k] tick_nohz_idle_enter
+     0.03%            23  kworker/7:1-eve  [kernel.kallsyms]  [k] sk_stream_wait_memory
+     0.03%            23  swapper          [kernel.kallsyms]  [k] __alloc_skb
+     0.03%            23  swapper          [kernel.kallsyms]  [k] ktime_get
+     0.03%            23  swapper          [kernel.kallsyms]  [k] nf_hook_slow
+     0.03%            23  swapper          [kernel.kallsyms]  [k] page_frag_free
+     0.03%            23  swapper          [kernel.kallsyms]  [k] skb_add_rx_frag
+     0.03%            23  swapper          [kernel.kallsyms]  [k] strp_data_ready
+     0.03%            22  swapper          [kernel.kallsyms]  [k] __local_bh_enable_ip
+     0.03%            22  swapper          [kernel.kallsyms]  [k] ip_local_deliver_finish
+     0.03%            22  swapper          [kernel.kallsyms]  [k] kfree
+     0.03%            22  swapper          [kernel.kallsyms]  [k] kmem_cache_alloc_node
+     0.03%            22  swapper          [kernel.kallsyms]  [k] virtqueue_enable_cb_delayed
+     0.03%            21  kworker/7:1-eve  [kernel.kallsyms]  [k] __dev_queue_xmit
+     0.03%            21  kworker/7:1-eve  [kernel.kallsyms]  [k] kmem_cache_alloc_node
+     0.03%            21  swapper          [kernel.kallsyms]  [k] __ip_queue_xmit
+     0.03%            21  swapper          [kernel.kallsyms]  [k] _raw_write_lock_bh
+     0.03%            21  swapper          [kernel.kallsyms]  [k] sock_rfree
+     0.03%            21  swapper          [kernel.kallsyms]  [k] tcp_gro_receive
+     0.02%            20  kworker/7:1-eve  [kernel.kallsyms]  [k] sock_wfree
+     0.02%            19  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_send_mss
+     0.02%            19  swapper          [kernel.kallsyms]  [k] __get_xps_queue_idx
+     0.02%            19  swapper          [kernel.kallsyms]  [k] net_rx_action
+     0.02%            18  kworker/7:1-eve  [kernel.kallsyms]  [k] ip_copy_addrs
+     0.02%            18  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_rearm_rto
+     0.02%            18  swapper          [kernel.kallsyms]  [k] __netif_receive_skb
+     0.02%            18  swapper          [kernel.kallsyms]  [k] __tcp_ack_snd_check
+     0.02%            18  swapper          [kernel.kallsyms]  [k] tcp_recv_skb
+     0.02%            17  ksoftirqd/7      [kernel.kallsyms]  [k] __free_pages_ok
+     0.02%            17  kworker/7:1-eve  [kernel.kallsyms]  [k] ip_finish_output2
+     0.02%            17  kworker/7:1-eve  [kernel.kallsyms]  [k] pvclock_clocksource_read
+     0.02%            17  kworker/7:1-eve  [kernel.kallsyms]  [k] skb_entail
+     0.02%            17  swapper          [kernel.kallsyms]  [k] ip_finish_output
+     0.02%            17  swapper          [kernel.kallsyms]  [k] rcu_idle_exit
+     0.02%            17  swapper          [kernel.kallsyms]  [k] sg_next
+     0.02%            16  ksoftirqd/7      [kernel.kallsyms]  [k] virtqueue_kick_prepare
+     0.02%            16  kworker/7:1-eve  [kernel.kallsyms]  [k] skb_page_frag_refill
+     0.02%            15  kworker/7:1-eve  [kernel.kallsyms]  [k] __kmalloc_node_track_caller
+     0.02%            15  kworker/7:1-eve  [kernel.kallsyms]  [k] __local_bh_enable_ip
+     0.02%            15  kworker/7:1-eve  [kernel.kallsyms]  [k] rb_insert_color
+     0.02%            15  kworker/7:1-eve  [kernel.kallsyms]  [k] sk_psock_backlog
+     0.02%            15  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_push
+     0.02%            15  swapper          [kernel.kallsyms]  [k] __copy_skb_header
+     0.02%            15  swapper          [kernel.kallsyms]  [k] __sk_dst_check
+     0.02%            15  swapper          [kernel.kallsyms]  [k] inet_ehashfn
+     0.02%            15  swapper          [kernel.kallsyms]  [k] tcp_rcv_space_adjust
+     0.02%            15  swapper          [kernel.kallsyms]  [k] tcp_v4_early_demux
+     0.02%            15  swapper          [kernel.kallsyms]  [k] validate_xmit_skb
+     0.02%            14  kworker/7:1-eve  [kernel.kallsyms]  [k] ipt_do_table
+     0.02%            14  kworker/7:1-eve  [kernel.kallsyms]  [k] ksize
+     0.02%            14  kworker/7:1-eve  [kernel.kallsyms]  [k] sk_stream_alloc_skb
+     0.02%            14  swapper          [kernel.kallsyms]  [k] __napi_alloc_skb
+     0.02%            14  swapper          [kernel.kallsyms]  [k] _raw_write_unlock_bh
+     0.02%            14  swapper          [kernel.kallsyms]  [k] ip_rcv_finish_core.isra.18
+     0.02%            14  swapper          [kernel.kallsyms]  [k] iptable_filter_hook
+     0.02%            14  swapper          [kernel.kallsyms]  [k] ktime_get_with_offset
+     0.02%            14  swapper          [kernel.kallsyms]  [k] page_frag_alloc
+     0.02%            14  swapper          [kernel.kallsyms]  [k] skb_push
+     0.02%            14  swapper          [kernel.kallsyms]  [k] tcp_wfree
+     0.02%            13  ksoftirqd/7      [kernel.kallsyms]  [k] memcpy_erms
+     0.02%            13  swapper          [kernel.kallsyms]  [k] __tcp_select_window
+     0.02%            13  swapper          [kernel.kallsyms]  [k] ip_output
+     0.02%            13  swapper          [kernel.kallsyms]  [k] sock_put
+     0.01%            12  ksoftirqd/7      [kernel.kallsyms]  [k] virtqueue_add
+     0.01%            12  kworker/7:1-eve  [kernel.kallsyms]  [k] __sock_wfree
+     0.01%            12  swapper          [kernel.kallsyms]  [k] __kmalloc_reserve.isra.54
+     0.01%            12  swapper          [kernel.kallsyms]  [k] eth_type_trans
+     0.01%            12  swapper          [kernel.kallsyms]  [k] netif_skb_features
+     0.01%            12  swapper          [kernel.kallsyms]  [k] strp_recv
+     0.01%            12  swapper          [kernel.kallsyms]  [k] tcp_cleanup_rbuf
+     0.01%            12  swapper          [kernel.kallsyms]  [k] tcp_event_data_recv
+     0.01%            11  ksoftirqd/7      [kernel.kallsyms]  [k] __sock_wfree
+     0.01%            11  kworker/7:1-eve  [kernel.kallsyms]  [k] __virt_addr_valid
+     0.01%            11  kworker/7:1-eve  [kernel.kallsyms]  [k] lock_sock_nested
+     0.01%            11  kworker/7:1-eve  [kernel.kallsyms]  [k] mod_timer
+     0.01%            11  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_release_cb
+     0.01%            11  swapper          [kernel.kallsyms]  [k] __skb_to_sgvec
+     0.01%            11  swapper          [kernel.kallsyms]  [k] __xfrm_policy_check2.constprop.41
+     0.01%            11  swapper          [kernel.kallsyms]  [k] default_idle
+     0.01%            11  swapper          [kernel.kallsyms]  [k] security_sock_rcv_skb
+     0.01%            11  swapper          [kernel.kallsyms]  [k] should_failslab
+     0.01%            11  swapper          [kernel.kallsyms]  [k] skb_put
+     0.01%            10  kworker/7:1-eve  [kernel.kallsyms]  [k] _raw_spin_lock_irqsave
+     0.01%            10  kworker/7:1-eve  [kernel.kallsyms]  [k] get_page_from_freelist
+     0.01%            10  kworker/7:1-eve  [kernel.kallsyms]  [k] kernel_sendmsg_locked
+     0.01%            10  kworker/7:1-eve  [kernel.kallsyms]  [k] page_frag_free
+     0.01%            10  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_tx_timestamp
+     0.01%            10  kworker/7:1-eve  [kernel.kallsyms]  [k] virtqueue_enable_cb_delayed
+     0.01%            10  swapper          [kernel.kallsyms]  [k] alloc_pages_current
+     0.01%            10  swapper          [kernel.kallsyms]  [k] apparmor_socket_sock_rcv_skb
+     0.01%            10  swapper          [kernel.kallsyms]  [k] dev_hard_start_xmit
+     0.01%            10  swapper          [kernel.kallsyms]  [k] ipv4_mtu
+     0.01%            10  swapper          [kernel.kallsyms]  [k] kmem_cache_free_bulk
+     0.01%            10  swapper          [kernel.kallsyms]  [k] mem_cgroup_uncharge
+     0.01%            10  swapper          [kernel.kallsyms]  [k] sch_direct_xmit
+     0.01%            10  swapper          [kernel.kallsyms]  [k] sk_psock_strp_parse
+     0.01%            10  swapper          [kernel.kallsyms]  [k] skb_free_head
+     0.01%             9  ksoftirqd/7      [kernel.kallsyms]  [k] ip_copy_addrs
+     0.01%             9  ksoftirqd/7      [kernel.kallsyms]  [k] pvclock_clocksource_read
+     0.01%             9  kworker/7:1-eve  [kernel.kallsyms]  [k] __check_object_size
+     0.01%             9  kworker/7:1-eve  [kernel.kallsyms]  [k] __schedule
+     0.01%             9  kworker/7:1-eve  [kernel.kallsyms]  [k] memset_erms
+     0.01%             9  kworker/7:1-eve  [kernel.kallsyms]  [k] rb_first
+     0.01%             9  kworker/7:1-eve  [kernel.kallsyms]  [k] release_sock
+     0.01%             9  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_event_new_data_sent
+     0.01%             9  kworker/7:1-eve  [kernel.kallsyms]  [k] vring_map_one_sg
+     0.01%             9  swapper          [kernel.kallsyms]  [k] __ip_local_out
+     0.01%             9  swapper          [kernel.kallsyms]  [k] __qdisc_run
+     0.01%             9  swapper          [kernel.kallsyms]  [k] _raw_spin_trylock
+     0.01%             9  swapper          [kernel.kallsyms]  [k] bpf_sk_redirect_map
+     0.01%             9  swapper          [kernel.kallsyms]  [k] raw_local_deliver
+     0.01%             9  swapper          [kernel.kallsyms]  [k] schedule_idle
+     0.01%             9  swapper          [kernel.kallsyms]  [k] sk_psock_strp_read_done
+     0.01%             9  swapper          [kernel.kallsyms]  [k] skb_clone
+     0.01%             9  swapper          [kernel.kallsyms]  [k] tcp_established_options
+     0.01%             9  swapper          [kernel.kallsyms]  [k] tcp_mstamp_refresh
+     0.01%             8  kworker/7:1-eve  [kernel.kallsyms]  [k] sk_stream_write_space
+     0.01%             8  kworker/7:1-eve  [kernel.kallsyms]  [k] start_xmit
+     0.01%             8  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_stream_memory_free
+     0.01%             8  swapper          [kernel.kallsyms]  [k] _raw_spin_lock_irqsave
+     0.01%             8  swapper          [kernel.kallsyms]  [k] arch_cpu_idle
+     0.01%             8  swapper          [kernel.kallsyms]  [k] fq_codel_dequeue
+     0.01%             8  swapper          [kernel.kallsyms]  [k] kmalloc_slab
+     0.01%             8  swapper          [kernel.kallsyms]  [k] kvm_clock_get_cycles
+     0.01%             8  swapper          [kernel.kallsyms]  [k] napi_complete_done
+     0.01%             8  swapper          [kernel.kallsyms]  [k] tcp_grow_window.isra.39
+     0.01%             8  swapper          [kernel.kallsyms]  [k] tcp_v4_fill_cb
+     0.01%             8  swapper          [kernel.kallsyms]  [k] 0x00007fffc063781a
+     0.01%             7  ksoftirqd/7      [kernel.kallsyms]  [k] __softirqentry_text_start
+     0.01%             7  kworker/7:1-eve  [kernel.kallsyms]  [k] __slab_alloc
+     0.01%             7  kworker/7:1-eve  [kernel.kallsyms]  [k] fq_codel_dequeue
+     0.01%             7  kworker/7:1-eve  [kernel.kallsyms]  [k] ktime_get
+     0.01%             7  kworker/7:1-eve  [kernel.kallsyms]  [k] kvm_clock_get_cycles
+     0.01%             7  kworker/7:1-eve  [kernel.kallsyms]  [k] rcu_all_qs
+     0.01%             7  kworker/7:1-eve  [kernel.kallsyms]  [k] sk_psock_write_space
+     0.01%             7  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_ack
+     0.01%             7  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_clean_rtx_queue
+     0.01%             7  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_schedule_loss_probe
+     0.01%             7  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_sendpage_locked
+     0.01%             7  swapper          [kernel.kallsyms]  [k] __schedule
+     0.01%             7  swapper          [kernel.kallsyms]  [k] __slab_free
+     0.01%             7  swapper          [kernel.kallsyms]  [k] default_idle_call
+     0.01%             7  swapper          [kernel.kallsyms]  [k] kfree_skbmem
+     0.01%             7  swapper          [kernel.kallsyms]  [k] skb_gro_reset_offset
+     0.01%             7  swapper          [kernel.kallsyms]  [k] skb_to_sgvec
+     0.01%             6  ksoftirqd/7      [kernel.kallsyms]  [k] dev_gro_receive
+     0.01%             6  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_v4_do_rcv
+     0.01%             6  ksoftirqd/7      [kernel.kallsyms]  [k] virtnet_poll
+     0.01%             6  kworker/7:1-eve  [kernel.kallsyms]  [k] __copy_skb_header
+     0.01%             6  kworker/7:1-eve  [kernel.kallsyms]  [k] __usecs_to_jiffies
+     0.01%             6  kworker/7:1-eve  [kernel.kallsyms]  [k] _copy_from_iter_full
+     0.01%             6  kworker/7:1-eve  [kernel.kallsyms]  [k] _raw_spin_lock_irq
+     0.01%             6  kworker/7:1-eve  [kernel.kallsyms]  [k] do_softirq.part.21
+     0.01%             6  kworker/7:1-eve  [kernel.kallsyms]  [k] free_old_xmit_skbs
+     0.01%             6  kworker/7:1-eve  [kernel.kallsyms]  [k] kmem_cache_free
+     0.01%             6  kworker/7:1-eve  [kernel.kallsyms]  [k] rb_erase
+     0.01%             6  kworker/7:1-eve  [kernel.kallsyms]  [k] sk_reset_timer
+     0.01%             6  kworker/7:1-eve  [kernel.kallsyms]  [k] skb_dequeue
+     0.01%             6  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_tasklet_func
+     0.01%             6  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_wfree
+     0.01%             6  kworker/7:1-eve  [kernel.kallsyms]  [k] try_fill_recv
+     0.01%             6  kworker/7:1-eve  [kernel.kallsyms]  [k] validate_xmit_skb
+     0.01%             6  swapper          [kernel.kallsyms]  [k] PageHuge
+     0.01%             6  swapper          [kernel.kallsyms]  [k] __put_compound_page
+     0.01%             6  swapper          [kernel.kallsyms]  [k] __x86_indirect_thunk_rax
+     0.01%             6  swapper          [kernel.kallsyms]  [k] kfree_skb
+     0.01%             6  swapper          [kernel.kallsyms]  [k] ktime_get_seconds
+     0.01%             6  swapper          [kernel.kallsyms]  [k] netif_tx_wake_queue
+     0.01%             6  swapper          [kernel.kallsyms]  [k] policy_nodemask
+     0.01%             6  swapper          [kernel.kallsyms]  [k] sk_free
+     0.01%             6  swapper          [kernel.kallsyms]  [k] skb_network_protocol
+     0.01%             6  swapper          [kernel.kallsyms]  [k] skb_partial_csum_set
+     0.01%             6  swapper          [kernel.kallsyms]  [k] skb_release_all
+     0.01%             6  swapper          [kernel.kallsyms]  [k] tcp_ack
+     0.01%             6  swapper          [kernel.kallsyms]  [k] tcp_v4_inbound_md5_hash
+     0.01%             6  swapper          [kernel.kallsyms]  [k] tcp_v4_send_check
+     0.01%             6  swapper          [kernel.kallsyms]  [k] validate_xmit_xfrm
+     0.01%             6  swapper          [kernel.kallsyms]  [k] virtqueue_get_buf
+     0.01%             5  ksoftirqd/7      [kernel.kallsyms]  [k] __build_skb
+     0.01%             5  ksoftirqd/7      [kernel.kallsyms]  [k] kmem_cache_alloc
+     0.01%             5  ksoftirqd/7      [kernel.kallsyms]  [k] napi_gro_receive
+     0.01%             5  ksoftirqd/7      [kernel.kallsyms]  [k] receive_buf
+     0.01%             5  ksoftirqd/7      [kernel.kallsyms]  [k] smpboot_thread_fn
+     0.01%             5  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_current_mss
+     0.01%             5  kworker/7:1-eve  [kernel.kallsyms]  [k] ip_output
+     0.01%             5  kworker/7:1-eve  [kernel.kallsyms]  [k] kernel_sendpage_locked
+     0.01%             5  kworker/7:1-eve  [kernel.kallsyms]  [k] lock_timer_base
+     0.01%             5  kworker/7:1-eve  [kernel.kallsyms]  [k] netdev_pick_tx
+     0.01%             5  kworker/7:1-eve  [kernel.kallsyms]  [k] sg_init_table
+     0.01%             5  kworker/7:1-eve  [kernel.kallsyms]  [k] skb_clone
+     0.01%             5  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_rcv_established
+     0.01%             5  swapper          [kernel.kallsyms]  [k] consume_skb
+     0.01%             5  swapper          [kernel.kallsyms]  [k] ip_queue_xmit
+     0.01%             5  swapper          [kernel.kallsyms]  [k] netdev_pick_tx
+     0.01%             5  swapper          [kernel.kallsyms]  [k] rb_erase
+     0.01%             5  swapper          [kernel.kallsyms]  [k] sk_filter_trim_cap
+     0.01%             5  swapper          [kernel.kallsyms]  [k] skb_defer_rx_timestamp
+     0.01%             5  swapper          [kernel.kallsyms]  [k] tcp4_gro_receive
+     0.01%             5  swapper          [kernel.kallsyms]  [k] try_to_grab_pending
+     0.01%             5  swapper          [kernel.kallsyms]  [k] validate_xmit_skb_list
+     0.01%             5  swapper          [kernel.kallsyms]  [k] virtqueue_add_outbuf
+     0.00%             4  ksoftirqd/7      [kernel.kallsyms]  [k] __inet_lookup_established
+     0.00%             4  ksoftirqd/7      [kernel.kallsyms]  [k] __netif_receive_skb_one_core
+     0.00%             4  ksoftirqd/7      [kernel.kallsyms]  [k] __raw_callee_save___pv_queued_spin_unlock
+     0.00%             4  ksoftirqd/7      [kernel.kallsyms]  [k] __tcp_transmit_skb
+     0.00%             4  ksoftirqd/7      [kernel.kallsyms]  [k] _raw_spin_lock
+     0.00%             4  ksoftirqd/7      [kernel.kallsyms]  [k] cancel_delayed_work
+     0.00%             4  ksoftirqd/7      [kernel.kallsyms]  [k] dev_hard_start_xmit
+     0.00%             4  ksoftirqd/7      [kernel.kallsyms]  [k] ipv4_dst_check
+     0.00%             4  ksoftirqd/7      [kernel.kallsyms]  [k] mod_timer
+     0.00%             4  kworker/7:1-eve  [kernel.kallsyms]  [k] __cgroup_bpf_run_filter_skb
+     0.00%             4  kworker/7:1-eve  [kernel.kallsyms]  [k] __ip_local_out
+     0.00%             4  kworker/7:1-eve  [kernel.kallsyms]  [k] __netdev_pick_tx
+     0.00%             4  kworker/7:1-eve  [kernel.kallsyms]  [k] __qdisc_run
+     0.00%             4  kworker/7:1-eve  [kernel.kallsyms]  [k] __tcp_select_window
+     0.00%             4  kworker/7:1-eve  [kernel.kallsyms]  [k] dev_hard_start_xmit
+     0.00%             4  kworker/7:1-eve  [kernel.kallsyms]  [k] ipv4_dst_check
+     0.00%             4  kworker/7:1-eve  [kernel.kallsyms]  [k] kfree_skb
+     0.00%             4  kworker/7:1-eve  [kernel.kallsyms]  [k] schedule
+     0.00%             4  kworker/7:1-eve  [kernel.kallsyms]  [k] skb_free_head
+     0.00%             4  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_v4_rcv
+     0.00%             4  kworker/7:1-eve  [kernel.kallsyms]  [k] validate_xmit_skb_list
+     0.00%             4  swapper          [kernel.kallsyms]  [k] __netdev_pick_tx
+     0.00%             4  swapper          [kernel.kallsyms]  [k] __page_cache_release
+     0.00%             4  swapper          [kernel.kallsyms]  [k] __pv_queued_spin_lock_slowpath
+     0.00%             4  swapper          [kernel.kallsyms]  [k] __tcp_send_ack.part.44
+     0.00%             4  swapper          [kernel.kallsyms]  [k] dev_queue_xmit
+     0.00%             4  swapper          [kernel.kallsyms]  [k] ip_local_out
+     0.00%             4  swapper          [kernel.kallsyms]  [k] memcg_kmem_put_cache
+     0.00%             4  swapper          [kernel.kallsyms]  [k] napi_consume_skb
+     0.00%             4  swapper          [kernel.kallsyms]  [k] policy_node
+     0.00%             4  swapper          [kernel.kallsyms]  [k] sched_ttwu_pending
+     0.00%             4  swapper          [kernel.kallsyms]  [k] sk_reset_timer
+     0.00%             4  swapper          [kernel.kallsyms]  [k] skb_csum_hwoffload_help
+     0.00%             4  swapper          [kernel.kallsyms]  [k] tcp_send_delayed_ack
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] __cgroup_bpf_run_filter_skb
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] __dev_queue_xmit
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] __pv_queued_spin_lock_slowpath
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] inet_ehashfn
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] ipt_do_table
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] kmem_cache_alloc_node
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] kmem_cache_free
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] skb_coalesce_rx_frag
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] skb_release_data
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] start_xmit
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] tasklet_action_common.isra.23
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_rcv_established
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_v4_rcv
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_write_xmit
+     0.00%             3  ksoftirqd/7      [kernel.kallsyms]  [k] validate_xmit_skb
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] __build_skb
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] __page_cache_release
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] __pskb_trim_head
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] __release_sock
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] __x86_indirect_thunk_rax
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] _cond_resched
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] add_wait_queue
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] check_stack_object
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] iov_iter_advance
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] iov_iter_kvec
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] ip_local_deliver
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] ip_rcv
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] jiffies_to_usecs
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] kfree_skbmem
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] kmem_cache_alloc
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] napi_consume_skb
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] sch_direct_xmit
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] skb_add_rx_frag
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_chrono_stop
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_push_one
+     0.00%             3  kworker/7:1-eve  [kernel.kallsyms]  [k] virtqueue_get_buf
+     0.00%             3  swapper          [kernel.kallsyms]  [k] __kfree_skb_flush
+     0.00%             3  swapper          [kernel.kallsyms]  [k] __pskb_trim_head
+     0.00%             3  swapper          [kernel.kallsyms]  [k] __put_page
+     0.00%             3  swapper          [kernel.kallsyms]  [k] lock_timer_base
+     0.00%             3  swapper          [kernel.kallsyms]  [k] tcp_clean_rtx_queue
+     0.00%             3  swapper          [kernel.kallsyms]  [k] tcp_options_write
+     0.00%             3  swapper          [kernel.kallsyms]  [k] tcp_parse_md5sig_option
+     0.00%             3  swapper          [kernel.kallsyms]  [k] virtqueue_enable_cb_prepare
+     0.00%             3  swapper          [kernel.kallsyms]  [k] virtqueue_poll
+     0.00%             3  swapper          [kernel.kallsyms]  [k] 0x00007fffc0637819
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] __alloc_skb
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] __get_xps_queue_idx
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] __ip_local_out
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] __kmalloc_node_track_caller
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] __napi_alloc_skb
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] ip_finish_output2
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] ip_rcv
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] ktime_get_with_offset
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] page_frag_free
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] sg_init_table
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] sk_psock_strp_read
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] skb_push
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] skb_release_head_state
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] strp_data_ready
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] strp_read_sock
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] strp_recv
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_read_sock
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_tasklet_func
+     0.00%             2  ksoftirqd/7      [kernel.kallsyms]  [k] virtqueue_enable_cb_delayed
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] __dev_kfree_skb_any
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] __slab_free
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] __tcp_v4_send_check
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] __zone_watermark_ok
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] dev_gro_receive
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] ip_finish_output
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] ip_local_out
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] ip_queue_xmit
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] ip_rcv_finish
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] kfree
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] memset
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] net_rx_action
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] netif_skb_features
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] raw_local_deliver
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] receive_buf
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] remove_wait_queue
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] run_rebalance_domains
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] sg_next
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] should_failslab
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] sk_free
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] sk_page_frag_refill
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] skb_release_all
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] skb_to_sgvec
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] tasklet_action
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] tasklet_action_common.isra.23
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_rate_gen
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_rate_skb_sent
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_small_queue_check.isra.32
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_trim_head
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_update_pacing_rate
+     0.00%             2  kworker/7:1-eve  [kernel.kallsyms]  [k] validate_xmit_xfrm
+     0.00%             2  perf             [kernel.kallsyms]  [k] copy_user_enhanced_fast_string
+     0.00%             2  swapper          [kernel.kallsyms]  [k] __dev_kfree_skb_any
+     0.00%             2  swapper          [kernel.kallsyms]  [k] __kfree_skb
+     0.00%             2  swapper          [kernel.kallsyms]  [k] __slab_alloc
+     0.00%             2  swapper          [kernel.kallsyms]  [k] __tcp_v4_send_check
+     0.00%             2  swapper          [kernel.kallsyms]  [k] cpu_startup_entry
+     0.00%             2  swapper          [kernel.kallsyms]  [k] free_compound_page
+     0.00%             2  swapper          [kernel.kallsyms]  [k] memcpy
+     0.00%             2  swapper          [kernel.kallsyms]  [k] page_poisoning_enabled
+     0.00%             2  swapper          [kernel.kallsyms]  [k] passthru_features_check
+     0.00%             2  swapper          [kernel.kallsyms]  [k] should_fail_alloc_page
+     0.00%             2  swapper          [kernel.kallsyms]  [k] skb_queue_tail
+     0.00%             2  swapper          [kernel.kallsyms]  [k] 0x00007fffc0639773
+     0.00%             2  swapper          [kernel.kallsyms]  [k] 0x00007fffc06397a0
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] __copy_skb_header
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] __ip_queue_xmit
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] __kfree_skb
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] __local_bh_enable_ip
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] __netif_receive_skb
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] __netif_receive_skb_core
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] __qdisc_run
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] __schedule
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] __skb_clone
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] __strp_recv
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] __tcp_select_window
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] __tcp_send_ack.part.44
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] __tcp_v4_send_check
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] __x86_indirect_thunk_rax
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] _raw_spin_unlock_irqrestore
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] _raw_write_lock_bh
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] free_compound_page
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] free_old_xmit_skbs
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] inet_gro_receive
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] ip_finish_output
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] ip_output
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] ip_rcv_core.isra.20
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] ip_rcv_finish
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] ip_rcv_finish_core.isra.18
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] ip_send_check
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] ipv4_mtu
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] kfree
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] kfree_skbmem
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] kmem_cache_free_bulk
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] ksoftirqd_should_run
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] kthread_should_park
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] kvm_clock_get_cycles
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] memset_erms
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] netif_receive_skb_internal
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] nf_hook_slow
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] page_to_skb
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] sch_direct_xmit
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] security_sock_rcv_skb
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] should_failslab
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] sk_filter_trim_cap
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] sk_free
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] sk_psock_strp_parse
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] skb_add_rx_frag
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] skb_gro_reset_offset
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] skb_to_sgvec
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] tasklet_action
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_cleanup_rbuf
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_established_options
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_gro_receive
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_mstamp_refresh
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_queue_rcv
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_rcv_space_adjust
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_send_delayed_ack
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] tcp_tsq_write.part.47
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] try_fill_recv
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] virtqueue_add_outbuf
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] xfrm_dev_backlog
+     0.00%             1  ksoftirqd/7      [kernel.kallsyms]  [k] 0x00007fffc0637819
+     0.00%             1  kworker/0:1H-kb  [kernel.kallsyms]  [k] iowrite16
+     0.00%             1  kworker/0:1H-kb  [kernel.kallsyms]  [k] worker_thread
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] __check_heap_object
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] __inet_lookup_established
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] __kmalloc_reserve.isra.54
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] __napi_alloc_skb
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] __netif_receive_skb
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] __netif_receive_skb_one_core
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] __put_page
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] __sk_dst_check
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] __strp_recv
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] __tcp_ack_snd_check
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] __xfrm_policy_check2.constprop.41
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] _raw_spin_trylock
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] _raw_write_unlock_bh
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] alloc_pages_current
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] apparmor_socket_sock_rcv_skb
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] dev_queue_xmit
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] eth_type_trans
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] free_compound_page
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] inet_gro_receive
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] ip_protocol_deliver_rcu
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] ip_rcv_core.isra.20
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] ip_rcv_finish_core.isra.18
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] iptable_filter_hook
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] kmalloc_slab
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] mem_cgroup_uncharge
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] memcg_kmem_put_cache
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] memcpy
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] napi_complete_done
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] netif_receive_skb_internal
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] nf_hook_slow
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] page_to_skb
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] passthru_features_check
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] policy_node
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] security_sock_rcv_skb
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] sk_filter_trim_cap
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] sk_psock_strp_read_done
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] sk_stream_error
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] skb_csum_hwoffload_help
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] skb_gso_validate_network_len
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] skb_network_protocol
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] strp_data_ready
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_ack_update_rtt.isra.47
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_check_space
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_chrono_start
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_mstamp_refresh
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_options_write
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_queue_rcv
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_rack_advance
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_rate_skb_delivered
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_read_sock
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_tsq_handler
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_tsq_write.part.47
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_update_skb_after_send
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_urg
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_v4_do_rcv
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_v4_inbound_md5_hash
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] tcp_v4_send_check
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] update_blocked_averages
+     0.00%             1  kworker/7:1-eve  [kernel.kallsyms]  [k] virtnet_poll
+     0.00%             1  kworker/u32:1-e  [kernel.kallsyms]  [k] __test_set_page_writeback
+     0.00%             1  kworker/u32:1-e  [kernel.kallsyms]  [k] blk_rq_map_sg
+     0.00%             1  kworker/u32:1-e  [kernel.kallsyms]  [k] ext4_bio_write_page
+     0.00%             1  kworker/u32:1-e  [kernel.kallsyms]  [k] page_vma_mapped_walk
+     0.00%             1  perf             [kernel.kallsyms]  [k] __fdget
+     0.00%             1  perf             [kernel.kallsyms]  [k] crypto_shash_update
+     0.00%             1  perf             [kernel.kallsyms]  [k] ext4_inode_csum.isra.63
+     0.00%             1  perf             [kernel.kallsyms]  [k] free_unref_page_list
+     0.00%             1  perf             [kernel.kallsyms]  [k] page_add_file_rmap
+     0.00%             1  perf             perf               [.] perf_mmap__push
+     0.00%             1  rcu_sched        [kernel.kallsyms]  [k] _raw_spin_unlock_irqrestore
+     0.00%             1  sleep            [kernel.kallsyms]  [k] clear_page_erms
+     0.00%             1  sleep            ld-2.27.so         [.] get_common_indeces.constprop.1
+     0.00%             1  swapper          [kernel.kallsyms]  [k] __netif_schedule
+     0.00%             1  swapper          [kernel.kallsyms]  [k] __usecs_to_jiffies
+     0.00%             1  swapper          [kernel.kallsyms]  [k] arch_cpu_idle_exit
+     0.00%             1  swapper          [kernel.kallsyms]  [k] bictcp_acked
+     0.00%             1  swapper          [kernel.kallsyms]  [k] iowrite16
+     0.00%             1  swapper          [kernel.kallsyms]  [k] jiffies_to_usecs
+     0.00%             1  swapper          [kernel.kallsyms]  [k] kernel_poison_pages
+     0.00%             1  swapper          [kernel.kallsyms]  [k] memset
+     0.00%             1  swapper          [kernel.kallsyms]  [k] pskb_expand_head
+     0.00%             1  swapper          [kernel.kallsyms]  [k] rb_first
+     0.00%             1  swapper          [kernel.kallsyms]  [k] rb_insert_color
+     0.00%             1  swapper          [kernel.kallsyms]  [k] rb_next
+     0.00%             1  swapper          [kernel.kallsyms]  [k] rcu_cblist_dequeue
+     0.00%             1  swapper          [kernel.kallsyms]  [k] skb_clone_tx_timestamp
+     0.00%             1  swapper          [kernel.kallsyms]  [k] tasklet_action_common.isra.23
+     0.00%             1  swapper          [kernel.kallsyms]  [k] tcp_ack_update_rtt.isra.47
+     0.00%             1  swapper          [kernel.kallsyms]  [k] tcp_data_queue
+     0.00%             1  swapper          [kernel.kallsyms]  [k] tcp_schedule_loss_probe
+     0.00%             1  swapper          [kernel.kallsyms]  [k] tcp_send_ack
+     0.00%             1  swapper          [kernel.kallsyms]  [k] tcp_tasklet_func
+     0.00%             1  swapper          [kernel.kallsyms]  [k] tcp_trim_head
+     0.00%             1  swapper          [kernel.kallsyms]  [k] tcp_tsq_write.part.47
+     0.00%             1  swapper          [kernel.kallsyms]  [k] tcp_update_pacing_rate
+     0.00%             1  swapper          [kernel.kallsyms]  [k] tcp_update_skb_after_send
+     0.00%             1  swapper          [kernel.kallsyms]  [k] tcp_urg
+     0.00%             1  swapper          [kernel.kallsyms]  [k] tcp_validate_incoming
+     0.00%             1  swapper          [kernel.kallsyms]  [k] tcp_write_xmit
+     0.00%             1  swapper          [kernel.kallsyms]  [k] update_blocked_averages
+     0.00%             1  swapper          [kernel.kallsyms]  [k] update_sd_lb_stats
+     0.00%             1  swapper          [kernel.kallsyms]  [k] virtqueue_get_vring_size
+     0.00%             1  swapper          [kernel.kallsyms]  [k] virtqueue_napi_complete
+     0.00%             1  swapper          [kernel.kallsyms]  [k] 0x00007fffc0637825
+     0.00%             1  swapper          [kernel.kallsyms]  [k] 0x00007fffc0637831
+     0.00%             1  swapper          [kernel.kallsyms]  [k] 0x00007fffc0639774
+     0.00%             1  swapper          [kernel.kallsyms]  [k] 0x00007fffc063977e
+     0.00%             1  swapper          [kernel.kallsyms]  [k] 0x00007fffc063977f
+     0.00%             1  swapper          [kernel.kallsyms]  [k] 0x00007fffc06397a6
+
+
+#
+# (Tip: For a higher level overview, try: perf report --sort comm,dso)
+#
