@@ -721,7 +721,7 @@ static inline void send_loop(struct socket *tx, struct msghdr *msg, struct kvec 
 	int rc, i = 0;
 	unsigned long bytes = 0;
 
-	for (i = 0; i < (1<<19); i++) {
+	for (i = 0; i < (1<<25); i++) {
 		struct kvec kvec[16];
 
 		memcpy(kvec, vec, sizeof(struct kvec) << 4);
