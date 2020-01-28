@@ -725,7 +725,8 @@ static inline void send_loop(struct socket *tx, struct msghdr *msg, struct kvec 
 		struct kvec kvec[16];
 
 		memcpy(kvec, vec, sizeof(struct kvec) << 4);
-		if ((rc = trace_sendmsg(tx, msg, kvec, 16, (PAGE_SIZE << 6))) <= 0) {
+		kvec->iov_len = 64;
+		if ((rc = trace_sendmsg(tx, msg, kvec, 1, 64)) <= 0) {
 			trace_printk("Received an Err %d\n", rc);
 			goto out;
 		}
