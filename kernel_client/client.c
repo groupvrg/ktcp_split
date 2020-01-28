@@ -70,7 +70,7 @@ static ssize_t client_write(struct file *file, const char __user *buf,
 	if (IS_ERR_OR_NULL(kbuf))
 		return PTR_ERR(kbuf);
 
-	//is_zcopy = 1;
+	is_zcopy = 1;
 //if (kbuf[0] == '0') {
 //	is_zcopy = 1;
 //	trace_printk("zero copy set...\n");
