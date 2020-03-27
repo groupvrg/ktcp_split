@@ -750,7 +750,7 @@ static int start_new_connection(void *arg)
 		goto create_fail;
 
 	line = __LINE__;
-	if ((rc = kernel_getpeername(rx, (struct sockaddr *)&cli_addr, &size))) {
+	if ((rc = kernel_getpeername(rx, (struct sockaddr *)&cli_addr))) {
 		TRACE_ERROR("error (%d)\n", rc);
 		goto create_fail;
 	}
