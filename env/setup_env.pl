@@ -96,7 +96,8 @@ sub prep_link {
 	print $fh "SRC=$src\nPREV=$prv\n";
 	close $fh;
 	my $out = qx($dir/cp_files.sh $key $local $tid);
-	printf "config $local\nssh -i $key $local ~/ENV/setup_link.sh $debug\n";
+	printf "config $local\n";
+	printf "$ssh $local ~/ENV/setup_link.sh $debug\n";
 	$out = qx($ssh $local ~/ENV/setup_link.sh $debug);
 	print "$out\n";
 	$out = qx($ssh $local ~/ENV/setup_ktcp.sh);

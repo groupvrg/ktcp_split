@@ -13,16 +13,14 @@ source `dirname $0`/params.txt
 grep -q "12 to_tun" /etc/iproute2/rt_tables
 [ "$?" -eq  1 ]  && sudo bash -c 'echo 12 to_tun >> /etc/iproute2/rt_tables'
 
-scripts=~/ENV/cbn-agents/scripts/utils
+scripts=~/ENV/utils
 gue_port=5555
 
 sudo $scripts/disable_rpfilter.sh
 
 sudo $scripts/enable_ipforwarding.sh
 
-cd ~/ENV/cbn-agents/agents/datapath/fou/
-make clean
-make
+cd ~/ENV/fou/
 ./load.sh
 
 cd $KTCP
