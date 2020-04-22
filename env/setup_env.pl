@@ -7,9 +7,10 @@ use Regexp::Common qw /net number /;
 use File::Basename;
 use Getopt::Std;
 
-my $key = '~/CBN_GCP_MASTER_KEY';
+my $key = '/home/xlr8vgn/CBN_GCP_MASTER_KEY';
+die "NO such file $key\n" unless -e $key;
 my $dir = dirname $0;
-
+my $ssh = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $key ";
 my @links = ();
 my $sink = undef;
 my $src = undef;
@@ -32,12 +33,12 @@ sub show_help {
 
 sub reboot_vms {
 	printf "rebooting $src\n";
-	qx(ssh -i $key $src sudo reboot);
+	qx($ssh $src sudo reboot);
 	printf "rebooting $sink\n";
-	qx(ssh -i $key $sink sudo reboot);
+	qx($ssh $sink sudo reboot);
 	foreach (@links) {
 		printf "rebooting $_\n";
-		qx(ssh -i $key $_ sudo reboot);
+		qx($ssh  $_ sudo reboot);
 	}
 	sleep (60);
 }
@@ -81,8 +82,8 @@ sub prep_edge {
 	print $fh "SINK=$sink\nNEXT=$link\nLOCAL=$src\n";
 	close $fh;
 	my $out = qx($dir/cp_files.sh $key $src $tid);
-	printf("ssh -i $key $src ~/ENV/setup_edge.sh\n");
-	$out = qx(ssh -i $key $src ~/ENV/setup_edge.sh);
+	printf("$ssh $src ~/ENV/setup_edge.sh\n");
+	$out = qx($ssh $src ~/ENV/setup_edge.sh);
 	qx(rm -rf "$dir/params_$tid.txt");
 }
 
@@ -96,9 +97,9 @@ sub prep_link {
 	close $fh;
 	my $out = qx($dir/cp_files.sh $key $local $tid);
 	printf "config $local\nssh -i $key $local ~/ENV/setup_link.sh $debug\n";
-	$out = qx(ssh -i $key $local ~/ENV/setup_link.sh $debug);
+	$out = qx($ssh $local ~/ENV/setup_link.sh $debug);
 	print "$out\n";
-	$out = qx(ssh -i $key $local ~/ENV/setup_ktcp.sh);
+	$out = qx($ssh $local ~/ENV/setup_ktcp.sh);
 	qx(rm -rf "$dir/params_$tid.txt");
 }
 
