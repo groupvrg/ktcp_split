@@ -1,19 +1,28 @@
 #!/bin/bash
 
+GIT='https://github.com/groupvrg/ktcp_split.git'
+
+function error {
+	echo "No such dir $KTCP";
+	exit -1;
+}
+
+sudo apt-get update
+sudo apt-get install git build-essential fakeroot libncurses5-dev libssl-dev ccache libelf-dev -y
+
 ktcp_dev=~/ktcp_split/tcpsplit
 
+[ -d "$ktcp_dev" ] || git clone $GIT ~/ktcp_split
 [ -d "$ktcp_dev" ] && KTCP="$ktcp_dev"
 [ -z "$1" ] || KTCP="$1"/ktcp_split/tcpsplit
-[ -z "$KTCP" ] && KTCP=~/ENV/cbn-agents/agents/ktcp/tcpsplit/
-
-sudo apt-get install git build-essential fakeroot libncurses5-dev libssl-dev ccache libelf-dev -y
+[ -z "$KTCP" ] && error
 
 source `dirname $0`/params.txt
 
 grep -q "12 to_tun" /etc/iproute2/rt_tables
 [ "$?" -eq  1 ]  && sudo bash -c 'echo 12 to_tun >> /etc/iproute2/rt_tables'
 
-scripts=~/ENV/utils
+scripts=~/ENV/
 gue_port=5555
 
 sudo $scripts/disable_rpfilter.sh

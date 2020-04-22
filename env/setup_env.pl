@@ -5,8 +5,10 @@ use threads;
 use autodie;
 use Regexp::Common qw /net number /;
 use File::Basename;
+use Term::ANSIColor qw(:constants);
 use Getopt::Std;
 
+my $KTCP = 'https://github.com/groupvrg/ktcp_split.git';
 my $key = '/home/xlr8vgn/CBN_GCP_MASTER_KEY';
 die "NO such file $key\n" unless -e $key;
 my $dir = dirname $0;
@@ -38,9 +40,12 @@ sub reboot_vms {
 	qx($ssh $sink sudo reboot);
 	foreach (@links) {
 		printf "rebooting $_\n";
-		qx($ssh  $_ sudo reboot);
+		qx($ssh  $_ sudo reboot --force);
 	}
-	sleep (60);
+	my $str =  "\nDue to long reboot times currenlty on GCP, ".
+			"please rerun comand w/o -r, once the VMs are up\n\n";
+	print UNDERLINE, BOLD, BRIGHT_BLUE, "$str", RESET;
+	die "C ya...\n";
 }
 
 sub parse_line {

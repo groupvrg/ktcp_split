@@ -1,5 +1,6 @@
 #!/bin/bash
 
+sudo apt-get update
 sudo apt-get install git build-essential fakeroot libncurses5-dev libssl-dev ccache libelf-dev -y
 
 source `dirname $0`/params.txt
