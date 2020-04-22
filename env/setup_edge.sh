@@ -7,14 +7,13 @@ source `dirname $0`/params.txt
 grep -q "12 to_tun" /etc/iproute2/rt_tables
 [ "$?" -eq  1 ]  && sudo bash -c 'echo 12 to_tun >> /etc/iproute2/rt_tables'
 
-scripts=~/ENV/cbn-agents/scripts/utils
+scripts='~/ENV'
 gue_port=5555
 #dip=10.154.0.6
 #sip=10.154.0.4
 #dest=10.154.0.7
 
-cd ~/ENV/cbn-agents/agents/datapath/fou/
-make
+cd ~/ENV/fou/
 ./load.sh
 
 sudo $scripts/disable_rpfilter.sh
