@@ -1,11 +1,11 @@
-#include <stdio.h> 
-#include <stdlib.h> 
-#include <errno.h> 
-#include <string.h> 
-#include <netdb.h> 
-#include <sys/types.h> 
-#include <netinet/in.h> 
-#include <sys/socket.h> 
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #define PORT 8085    /* the port client will be connecting to */
@@ -18,7 +18,7 @@ char buf[MAXDATASIZE];
 
 int main(int argc, char *argv[])
 {
-    int sockfd, numbytes;  
+    int sockfd, numbytes;
     int one = 1;
     int cnt = (1<<25);
     struct sockaddr_in their_addr; /* connector's address information */
@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 //if ((numbytes=recv(sockfd, buf, MAXDATASIZE, 0)) == -1) {
 //		perror("recv");
 //		exit(1);
-//}	
+//}
 //
 //    buf[numbytes] = '\0';
 //
