@@ -1,0 +1,11 @@
+### link machine  + source
+sudo ip route add 10.154.0.7/32 dev gueleft table to_tun
+sudo ip route add 11.0.0.0/8 dev gueleft table to_tun
+
+### Edge machine
+sudo ~/ENV/cbn-agents/scripts/utils/disable_rpfilter.sh
+sudo ~/ENV/cbn-agents/scripts/utils/enable_ipforwarding.sh
+sudo iptables -A PREROUTING -t mangle -s 10.154.0.7 -j MARK --set-mark 2
+sudo iptables -A PREROUTING -t nat -d 11.0.0.0/8 -j DNAT --to 10.154.0.7
+sudo iptables -A POSTROUTING -t nat -s 10.154.0.13 -o ens4 -j SNAT --to 10.154.0.4
+
