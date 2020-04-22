@@ -122,7 +122,7 @@ static struct pool_elem *kthread_pool_alloc(struct kthread_pool *cbn_pool)
 	return elem;
 }
 
-struct pool_elem *__kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(void *), void *data, const struct cpumask * mask)
+static struct pool_elem *__kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(void *), void *data, const struct cpumask * mask)
 {
 	struct pool_elem *elem = kthread_pool_alloc(cbn_pool);
 	if (unlikely(!elem)) {
@@ -150,11 +150,13 @@ struct pool_elem *kthread_pool_run_cpu(struct kthread_pool *cbn_pool,
 {
 	return __kthread_pool_run(cbn_pool, func, data, cpumask_of(cpu));
 }
+EXPORT_SYMBOL(kthread_pool_run_cpu);
 
 struct pool_elem *kthread_pool_run(struct kthread_pool *cbn_pool, int (*func)(void *), void *data)
 {
 	return __kthread_pool_run(cbn_pool, func, data, cpu_possible_mask);
 }
+EXPORT_SYMBOL(kthread_pool_run);
 
 int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool)
 {
@@ -172,6 +174,7 @@ int __init cbn_kthread_pool_init(struct kthread_pool *cbn_pool)
 	//set_user_nice(cbn_pool->refil, MAX_NICE);
 	return 0;
 }
+EXPORT_SYMBOL(cbn_kthread_pool_init);
 
 void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool)
 {
@@ -199,4 +202,5 @@ void __exit cbn_kthread_pool_clean(struct kthread_pool *cbn_pool)
 	kmem_cache_destroy(cbn_pool->pool_slab);
 	TRACE_PRINT("stopping: elements freed");
 }
+EXPORT_SYMBOL(cbn_kthread_pool_clean);
 

@@ -1,0 +1,68 @@
+From 04d483e311a86f80d778086fd3481cdbf6b7ece4 Mon Sep 17 00:00:00 2001
+From: Build VM <build@example.com>
+Date: Mon, 16 Dec 2019 12:05:28 +0000
+Subject: [PATCH 07/24] Erric patch
+
+---
+ kernel/softirq.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/softirq.c b/kernel/softirq.c
+index 484654b54..c949680ac 100644
+--- a/kernel/softirq.c
++++ b/kernel/softirq.c
+@@ -56,6 +56,7 @@ EXPORT_SYMBOL(irq_stat);
+ static struct softirq_action softirq_vec[NR_SOFTIRQS] __cacheline_aligned_in_smp;
+ 
+ DEFINE_PER_CPU(struct task_struct *, ksoftirqd);
++DEFINE_PER_CPU(bool, ksoftirqd_scheduled);
+ 
+ const char * const softirq_to_name[NR_SOFTIRQS] = {
+ 	"HI", "TIMER", "NET_TX", "NET_RX", "BLOCK", "IRQ_POLL",
+@@ -73,8 +74,10 @@ static void wakeup_softirqd(void)
+ 	/* Interrupts are disabled: no need to stop preemption */
+ 	struct task_struct *tsk = __this_cpu_read(ksoftirqd);
+ 
+-	if (tsk && tsk->state != TASK_RUNNING)
++	if (tsk && tsk->state != TASK_RUNNING) {
++		__this_cpu_write(ksoftirqd_scheduled, true);
+ 		wake_up_process(tsk);
++	}
+ }
+ 
+ /*
+@@ -182,7 +185,9 @@ void __local_bh_enable_ip(unsigned long ip, unsigned int cnt)
+ 	 */
+ 	preempt_count_sub(cnt - 1);
+ 
+-	if (unlikely(!in_interrupt() && local_softirq_pending())) {
++	if (unlikely(!in_interrupt() &&
++			local_softirq_pending() &&
++			!__this_cpu_read(ksoftirqd_scheduled))) {
+ 		/*
+ 		 * Run softirq if any pending. And do it in its own stack
+ 		 * as we may be calling this deep in a task call stack already.
+@@ -363,7 +368,11 @@ static inline void invoke_softirq(void)
+ 	if (ksoftirqd_running(local_softirq_pending()))
+ 		return;
+ 
++	if (__this_cpu_read(ksoftirqd_scheduled))
++		return;
++
+ 	if (!force_irqthreads) {
++		WARN_ON_ONCE(1);
+ #ifdef CONFIG_HAVE_IRQ_EXIT_ON_IRQ_STACK
+ 		/*
+ 		 * We can safely execute softirq on the current stack if
+@@ -672,6 +681,8 @@ static void run_ksoftirqd(unsigned int cpu)
+ 		 * in the task stack here.
+ 		 */
+ 		__do_softirq();
++		if (!local_softirq_pending())
++			__this_cpu_write(ksoftirqd_scheduled, false);
+ 		local_irq_enable();
+ 		cond_resched_rcu_qs();
+ 		return;
+-- 
+2.17.1
+

@@ -33,7 +33,7 @@ static struct kmem_cache *preconn_slab;
 
 //This is shared between tennats.
 static struct rb_root preconn_root = RB_ROOT;
-rwlock_t preconn_root_lock;
+static rwlock_t preconn_root_lock;
 
 static int prealloc_connection(void *arg);
 static int prealloc_connection_pool(void *arg)
@@ -200,7 +200,7 @@ static int prealloc_connection(void *arg)
 	int rc, optval = 1;
 	int line;
 	long ip = (long) arg;
-	struct addresses addresses_s = {0};
+	struct addresses addresses_s = {{0}};
 	struct addresses *addresses = &addresses_s;
 	struct cbn_qp *qp;
 	struct socket *tx;

@@ -16,7 +16,7 @@ sub get_params {
 
 my $serverport = 5557;
 #my $serverport = 9216;
-my $size = (64 * 1024) - 28;
+my $size = (64 * 1024);
 get_params();
 
 my $server = IO::Socket::INET->new(LocalPort=>$serverport, Proto=>"tcp",

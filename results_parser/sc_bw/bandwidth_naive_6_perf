@@ -1,0 +1,675 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 81K of event 'cpu-clock'
+# Event count (approx.): 20386000000
+#
+# Overhead       Samples  Command          Shared Object             Symbol                                       
+# ........  ............  ...............  ........................  .............................................
+#
+    55.07%         44905  swapper          [kernel.kallsyms]         [k] native_safe_halt
+            |
+            ---native_safe_halt
+               |          
+                --55.07%--default_idle
+                          arch_cpu_idle
+                          default_idle_call
+                          do_idle
+                          cpu_startup_entry
+                          |          
+                          |--54.21%--start_secondary
+                          |          secondary_startup_64
+                          |          
+                           --0.86%--rest_init
+                                     arch_call_rest_init
+                                     start_kernel
+                                     x86_64_start_reservations
+                                     x86_64_start_kernel
+                                     secondary_startup_64
+
+    25.45%         20751  echo-naive-prox  [kernel.kallsyms]         [k] copy_user_enhanced_fast_string
+            |
+            ---copy_user_enhanced_fast_string
+               |          
+               |--14.79%--_copy_from_iter_full
+               |          tcp_sendmsg_locked
+               |          tcp_sendmsg
+               |          inet_sendmsg
+               |          sock_sendmsg
+               |          __sys_sendto
+               |          __x64_sys_sendto
+               |          do_syscall_64
+               |          entry_SYSCALL_64_after_hwframe
+               |          __libc_send
+               |          
+                --10.65%--_copy_to_iter
+                          simple_copy_to_iter
+                          __skb_datagram_iter
+                          skb_copy_datagram_iter
+                          tcp_recvmsg
+                          inet_recvmsg
+                          sock_recvmsg
+                          __sys_recvfrom
+                          __x64_sys_recvfrom
+                          do_syscall_64
+                          entry_SYSCALL_64_after_hwframe
+                          __libc_recv
+
+     1.69%          1375  echo-naive-prox  [kernel.kallsyms]         [k] detach_buf_split
+            |
+            ---detach_buf_split
+               |          
+                --1.68%--virtqueue_get_buf_ctx
+                          |          
+                          |--1.04%--virtqueue_get_buf
+                          |          free_old_xmit_skbs
+                          |          |          
+                          |           --1.01%--start_xmit
+                          |                     dev_hard_start_xmit
+                          |                     sch_direct_xmit
+                          |                     __dev_queue_xmit
+                          |                     dev_queue_xmit
+                          |                     ip_finish_output2
+                          |                     ip_finish_output
+                          |                     ip_output
+                          |                     ip_local_out
+                          |                     __ip_queue_xmit
+                          |                     ip_queue_xmit
+                          |                     __tcp_transmit_skb
+                          |                     |          
+                          |                      --0.59%--tcp_write_xmit
+                          |                                |          
+                          |                                 --0.55%--tcp_push_one
+                          |                                           tcp_sendmsg_locked
+                          |                                           tcp_sendmsg
+                          |                                           inet_sendmsg
+                          |                                           sock_sendmsg
+                          |                                           __sys_sendto
+                          |                                           __x64_sys_sendto
+                          |                                           do_syscall_64
+                          |                                           entry_SYSCALL_64_after_hwframe
+                          |                                           __libc_send
+                          |          
+                           --0.58%--receive_mergeable
+                                     receive_buf
+                                     virtnet_poll
+                                     net_rx_action
+                                     __softirqentry_text_start
+                                     |          
+                                      --0.52%--irq_exit
+                                                |          
+                                                 --0.52%--do_IRQ
+                                                           ret_from_intr
+
+     1.32%          1075  echo-naive-prox  [kernel.kallsyms]         [k] tcp_sendmsg_locked
+            |
+            ---tcp_sendmsg_locked
+               |          
+                --1.31%--tcp_sendmsg
+                          inet_sendmsg
+                          sock_sendmsg
+                          __sys_sendto
+                          __x64_sys_sendto
+                          do_syscall_64
+                          entry_SYSCALL_64_after_hwframe
+                          __libc_send
+
+     1.20%           976  echo-naive-prox  [kernel.kallsyms]         [k] virtqueue_get_buf_ctx
+            |
+            ---virtqueue_get_buf_ctx
+               |          
+                --0.95%--virtqueue_get_buf
+                          free_old_xmit_skbs
+                          |          
+                           --0.89%--start_xmit
+                                     dev_hard_start_xmit
+                                     sch_direct_xmit
+                                     |          
+                                      --0.89%--__dev_queue_xmit
+                                                dev_queue_xmit
+                                                ip_finish_output2
+                                                ip_finish_output
+                                                ip_output
+                                                ip_local_out
+                                                __ip_queue_xmit
+                                                ip_queue_xmit
+                                                __tcp_transmit_skb
+                                                |          
+                                                 --0.52%--tcp_write_xmit
+
+     1.09%           891  echo-naive-prox  [kernel.kallsyms]         [k] __softirqentry_text_start
+            |
+            ---__softirqentry_text_start
+               |          
+                --1.07%--irq_exit
+                          |          
+                           --0.84%--do_IRQ
+                                     ret_from_intr
+                                     |          
+                                      --0.72%--copy_user_enhanced_fast_string
+
+     0.85%           697  echo-naive-prox  [kernel.kallsyms]         [k] receive_mergeable
+            |
+            ---receive_mergeable
+               |          
+                --0.85%--receive_buf
+                          virtnet_poll
+                          net_rx_action
+                          __softirqentry_text_start
+                          |          
+                           --0.79%--irq_exit
+                                     |          
+                                      --0.79%--do_IRQ
+                                                ret_from_intr
+                                                |          
+                                                 --0.61%--copy_user_enhanced_fast_string
+
+     0.59%           478  echo-naive-prox  [kernel.kallsyms]         [k] virtqueue_kick_prepare
+            |
+            ---virtqueue_kick_prepare
+               |          
+                --0.58%--start_xmit
+                          dev_hard_start_xmit
+                          sch_direct_xmit
+                          |          
+                           --0.58%--__dev_queue_xmit
+                                     dev_queue_xmit
+                                     ip_finish_output2
+                                     ip_finish_output
+                                     ip_output
+                                     ip_local_out
+                                     __ip_queue_xmit
+                                     ip_queue_xmit
+                                     __tcp_transmit_skb
+
+     0.57%           461  echo-naive-prox  [kernel.kallsyms]         [k] virtqueue_add
+            |
+            ---virtqueue_add
+
+     0.50%           409  echo-naive-prox  [kernel.kallsyms]         [k] _raw_spin_unlock_irqrestore
+            |
+            ---_raw_spin_unlock_irqrestore
+
+     0.49%           403  echo-naive-prox  [kernel.kallsyms]         [k] __free_pages_ok
+     0.43%           349  echo-naive-prox  [kernel.kallsyms]         [k] get_page_from_freelist
+     0.32%           262  echo-naive-prox  [kernel.kallsyms]         [k] __tcp_transmit_skb
+     0.32%           260  echo-naive-prox  [kernel.kallsyms]         [k] skb_release_head_state
+     0.28%           225  echo-naive-prox  [kernel.kallsyms]         [k] ip_send_check
+     0.27%           218  echo-naive-prox  [kernel.kallsyms]         [k] try_fill_recv
+     0.18%           149  echo-naive-prox  [kernel.kallsyms]         [k] skb_release_data
+     0.17%           142  echo-naive-prox  [kernel.kallsyms]         [k] __check_object_size
+     0.17%           141  echo-naive-prox  libpthread-2.27.so        [.] __libc_send
+     0.17%           140  echo-naive-prox  [kernel.kallsyms]         [k] pvclock_clocksource_read
+     0.17%           135  echo-naive-prox  [kernel.kallsyms]         [k] skb_page_frag_refill
+     0.17%           135  echo-naive-prox  libpthread-2.27.so        [.] __libc_recv
+     0.17%           135  swapper          [kernel.kallsyms]         [k] detach_buf_split
+     0.16%           130  echo-naive-prox  [kernel.kallsyms]         [k] __sock_wfree
+     0.16%           128  echo-naive-prox  [kernel.kallsyms]         [k] __pv_queued_spin_lock_slowpath
+     0.16%           128  swapper          [kernel.kallsyms]         [k] receive_mergeable
+     0.15%           124  echo-naive-prox  [kernel.kallsyms]         [k] __ip_queue_xmit
+     0.15%           122  swapper          [kernel.kallsyms]         [k] finish_task_switch
+     0.15%           121  echo-naive-prox  [kernel.kallsyms]         [k] memset_erms
+     0.15%           119  echo-naive-prox  [kernel.kallsyms]         [k] __skb_datagram_iter
+     0.14%           112  echo-naive-prox  [kernel.kallsyms]         [k] ipt_do_table
+     0.13%           102  swapper          [kernel.kallsyms]         [k] __softirqentry_text_start
+     0.12%            99  swapper          [kernel.kallsyms]         [k] _raw_spin_unlock_irqrestore
+     0.10%            85  echo-naive-prox  [kernel.kallsyms]         [k] copyin
+     0.10%            84  echo-naive-prox  [kernel.kallsyms]         [k] tcp_write_xmit
+     0.10%            82  echo-naive-prox  [kernel.kallsyms]         [k] memcpy_erms
+     0.10%            81  echo-naive-prox  [kernel.kallsyms]         [k] __raw_callee_save___pv_queued_spin_unlock
+     0.10%            81  echo-naive-prox  [kernel.kallsyms]         [k] __virt_addr_valid
+     0.08%            69  echo-naive-prox  [kernel.kallsyms]         [k] start_xmit
+     0.08%            64  echo-naive-prox  [kernel.kallsyms]         [k] _raw_spin_lock
+     0.08%            62  echo-naive-prox  [kernel.kallsyms]         [k] __kmalloc_node_track_caller
+     0.08%            62  echo-naive-prox  [kernel.kallsyms]         [k] _copy_from_iter_full
+     0.07%            61  echo-naive-prox  [kernel.kallsyms]         [k] __alloc_pages_nodemask
+     0.07%            61  echo-naive-prox  [kernel.kallsyms]         [k] _copy_to_iter
+     0.07%            60  echo-naive-prox  [kernel.kallsyms]         [k] ip_finish_output2
+     0.07%            59  echo-naive-prox  [kernel.kallsyms]         [k] sg_init_table
+     0.07%            59  echo-naive-prox  [kernel.kallsyms]         [k] tcp_recvmsg
+     0.07%            58  echo-naive-prox  [kernel.kallsyms]         [k] ipv4_dst_check
+     0.07%            56  echo-naive-prox  [kernel.kallsyms]         [k] do_syscall_64
+     0.07%            56  echo-naive-prox  [kernel.kallsyms]         [k] vring_map_one_sg
+     0.07%            55  echo-naive-prox  [kernel.kallsyms]         [k] kmem_cache_alloc_node
+     0.07%            54  echo-naive-prox  [kernel.kallsyms]         [k] copy_user_generic_unrolled
+     0.07%            54  echo-naive-prox  [kernel.kallsyms]         [k] skb_add_rx_frag
+     0.06%            53  echo-naive-prox  [kernel.kallsyms]         [k] __dev_queue_xmit
+     0.06%            52  echo-naive-prox  [kernel.kallsyms]         [k] finish_task_switch
+     0.06%            52  echo-naive-prox  [kernel.kallsyms]         [k] iov_iter_advance
+     0.06%            49  echo-naive-prox  [kernel.kallsyms]         [k] kmem_cache_free
+     0.06%            48  echo-naive-prox  [kernel.kallsyms]         [k] __cgroup_bpf_run_filter_skb
+     0.06%            47  echo-naive-prox  [kernel.kallsyms]         [k] sg_init_one
+     0.06%            47  echo-naive-prox  [kernel.kallsyms]         [k] tcp_wfree
+     0.06%            46  echo-naive-prox  [kernel.kallsyms]         [k] __alloc_skb
+     0.06%            46  echo-naive-prox  [kernel.kallsyms]         [k] tcp_clean_rtx_queue
+     0.06%            45  echo-naive-prox  [kernel.kallsyms]         [k] virtqueue_add_inbuf_ctx
+     0.05%            44  swapper          [kernel.kallsyms]         [k] memcpy_erms
+     0.05%            40  echo-naive-prox  [kernel.kallsyms]         [k] skb_try_coalesce
+     0.05%            39  echo-naive-prox  [kernel.kallsyms]         [k] tcp_rbtree_insert
+     0.05%            39  echo-naive-prox  [kernel.kallsyms]         [k] tcp_rcv_established
+     0.05%            38  echo-naive-prox  [kernel.kallsyms]         [k] simple_copy_to_iter
+     0.05%            37  echo-naive-prox  [kernel.kallsyms]         [k] __skb_to_sgvec
+     0.05%            37  swapper          [kernel.kallsyms]         [k] virtqueue_get_buf_ctx
+     0.04%            36  echo-naive-prox  [kernel.kallsyms]         [k] __local_bh_enable_ip
+     0.04%            36  echo-naive-prox  [kernel.kallsyms]         [k] rb_first
+     0.04%            35  echo-naive-prox  [kernel.kallsyms]         [k] __skb_clone
+     0.04%            35  echo-naive-prox  [kernel.kallsyms]         [k] _raw_spin_lock_bh
+     0.04%            35  echo-naive-prox  [kernel.kallsyms]         [k] check_stack_object
+     0.04%            35  echo-naive-prox  [kernel.kallsyms]         [k] kvm_clock_get_cycles
+     0.04%            35  echo-naive-prox  [kernel.kallsyms]         [k] tcp_v4_rcv
+     0.04%            34  echo-naive-prox  [kernel.kallsyms]         [k] mod_timer
+     0.04%            34  echo-naive-prox  [kernel.kallsyms]         [k] page_to_skb
+     0.04%            34  echo-naive-prox  [kernel.kallsyms]         [k] tcp_ack
+     0.04%            32  swapper          [kernel.kallsyms]         [k] get_page_from_freelist
+     0.04%            31  swapper          [kernel.kallsyms]         [k] tick_nohz_idle_exit
+     0.04%            30  echo-naive-prox  [kernel.kallsyms]         [k] __netif_receive_skb_core
+     0.04%            30  echo-naive-prox  [kernel.kallsyms]         [k] __zone_watermark_ok
+     0.04%            30  echo-naive-prox  [kernel.kallsyms]         [k] tcp_rearm_rto
+     0.04%            29  echo-naive-prox  [kernel.kallsyms]         [k] _cond_resched
+     0.04%            29  echo-naive-prox  [kernel.kallsyms]         [k] rb_insert_color
+     0.03%            28  echo-naive-prox  [kernel.kallsyms]         [k] __fget
+     0.03%            27  echo-naive-prox  [kernel.kallsyms]         [k] PageHuge
+     0.03%            27  echo-naive-prox  [kernel.kallsyms]         [k] __inet_lookup_established
+     0.03%            27  echo-naive-prox  [kernel.kallsyms]         [k] alloc_pages_current
+     0.03%            27  echo-naive-prox  [kernel.kallsyms]         [k] tcp_release_cb
+     0.03%            27  echo-naive-prox  [kernel.kallsyms]         [k] tcp_try_coalesce
+     0.03%            26  echo-naive-prox  [kernel.kallsyms]         [k] ipv4_mtu
+     0.03%            26  echo-naive-prox  [kernel.kallsyms]         [k] ksize
+     0.03%            26  echo-naive-prox  [kernel.kallsyms]         [k] nf_hook_slow
+     0.03%            26  echo-naive-prox  [kernel.kallsyms]         [k] virtnet_poll
+     0.03%            26  swapper          [kernel.kallsyms]         [k] virtqueue_add
+     0.03%            25  echo-naive-prox  [kernel.kallsyms]         [k] iptable_filter_hook
+     0.03%            25  echo-naive-prox  [kernel.kallsyms]         [k] page_frag_free
+     0.03%            24  echo-naive-prox  [kernel.kallsyms]         [k] free_old_xmit_skbs
+     0.03%            24  echo-naive-prox  [kernel.kallsyms]         [k] ktime_get
+     0.03%            24  echo-naive-prox  [kernel.kallsyms]         [k] sk_page_frag_refill
+     0.03%            24  echo-naive-prox  [kernel.kallsyms]         [k] virtqueue_enable_cb_delayed
+     0.03%            24  swapper          [kernel.kallsyms]         [k] try_fill_recv
+     0.03%            23  echo-naive-prox  [kernel.kallsyms]         [k] ip_output
+     0.03%            23  echo-naive-prox  [kernel.kallsyms]         [k] kmalloc_slab
+     0.03%            23  echo-naive-prox  [kernel.kallsyms]         [k] rcu_all_qs
+     0.03%            23  echo-naive-prox  [kernel.kallsyms]         [k] sch_direct_xmit
+     0.03%            22  echo-naive-prox  [kernel.kallsyms]         [k] kmem_cache_alloc
+     0.03%            22  echo-naive-prox  [kernel.kallsyms]         [k] net_rx_action
+     0.03%            22  echo-naive-prox  [kernel.kallsyms]         [k] netdev_pick_tx
+     0.03%            22  echo-naive-prox  [kernel.kallsyms]         [k] run_timer_softirq
+     0.03%            22  echo-naive-prox  [kernel.kallsyms]         [k] tcp_event_new_data_sent
+     0.03%            21  echo-naive-prox  [kernel.kallsyms]         [k] copyout
+     0.03%            21  echo-naive-prox  [kernel.kallsyms]         [k] ip_copy_addrs
+     0.03%            21  echo-naive-prox  [kernel.kallsyms]         [k] ip_rcv_core.isra.20
+     0.02%            20  echo-naive-prox  [kernel.kallsyms]         [k] __page_cache_release
+     0.02%            20  echo-naive-prox  [kernel.kallsyms]         [k] __slab_free
+     0.02%            20  echo-naive-prox  [kernel.kallsyms]         [k] __sys_recvfrom
+     0.02%            20  echo-naive-prox  [kernel.kallsyms]         [k] inet_gro_receive
+     0.02%            20  echo-naive-prox  [kernel.kallsyms]         [k] sk_stream_alloc_skb
+     0.02%            20  echo-naive-prox  [kernel.kallsyms]         [k] skb_entail
+     0.02%            20  echo-naive-prox  [kernel.kallsyms]         [k] tcp_v4_early_demux
+     0.02%            19  echo-naive-prox  [kernel.kallsyms]         [k] __sk_dst_check
+     0.02%            19  echo-naive-prox  [kernel.kallsyms]         [k] sg_next
+     0.02%            18  echo-naive-prox  [kernel.kallsyms]         [k] __tcp_select_window
+     0.02%            18  echo-naive-prox  [kernel.kallsyms]         [k] _raw_spin_lock_irqsave
+     0.02%            18  echo-naive-prox  [kernel.kallsyms]         [k] aa_sk_perm
+     0.02%            18  echo-naive-prox  [kernel.kallsyms]         [k] dev_gro_receive
+     0.02%            18  echo-naive-prox  [kernel.kallsyms]         [k] ip_queue_xmit
+     0.02%            18  echo-naive-prox  [kernel.kallsyms]         [k] release_sock
+     0.02%            17  echo-naive-prox  [kernel.kallsyms]         [k] do_softirq.part.21
+     0.02%            17  echo-naive-prox  [kernel.kallsyms]         [k] inet_recvmsg
+     0.02%            17  echo-naive-prox  [kernel.kallsyms]         [k] ip_finish_output
+     0.02%            17  echo-naive-prox  [kernel.kallsyms]         [k] kfree
+     0.02%            17  echo-naive-prox  [kernel.kallsyms]         [k] skb_network_protocol
+     0.02%            17  echo-naive-prox  [kernel.kallsyms]         [k] tcp_current_mss
+     0.02%            17  echo-naive-prox  [kernel.kallsyms]         [k] tcp_stream_memory_free
+     0.02%            17  echo-naive-prox  [kernel.kallsyms]         [k] tcp_v4_do_rcv
+     0.02%            17  echo-naive-prox  [kernel.kallsyms]         [k] validate_xmit_xfrm
+     0.02%            16  echo-naive-prox  [kernel.kallsyms]         [k] fput
+     0.02%            16  echo-naive-prox  [kernel.kallsyms]         [k] kfree_skbmem
+     0.02%            16  echo-naive-prox  [kernel.kallsyms]         [k] netif_skb_features
+     0.02%            16  echo-naive-prox  [kernel.kallsyms]         [k] receive_buf
+     0.02%            16  echo-naive-prox  [kernel.kallsyms]         [k] skb_copy_datagram_iter
+     0.02%            16  echo-naive-prox  [kernel.kallsyms]         [k] tcp_event_data_recv
+     0.02%            16  echo-naive-prox  [kernel.kallsyms]         [k] tcp_mstamp_refresh
+     0.02%            15  echo-naive-prox  [kernel.kallsyms]         [k] __qdisc_run
+     0.02%            15  echo-naive-prox  [kernel.kallsyms]         [k] __sys_sendto
+     0.02%            15  echo-naive-prox  [kernel.kallsyms]         [k] memcg_kmem_put_cache
+     0.02%            15  echo-naive-prox  [kernel.kallsyms]         [k] passthru_features_check
+     0.02%            15  echo-naive-prox  [kernel.kallsyms]         [k] rb_erase
+     0.02%            15  echo-naive-prox  [kernel.kallsyms]         [k] tcp_add_backlog
+     0.02%            15  echo-naive-prox  [kernel.kallsyms]         [k] tcp_tasklet_func
+     0.02%            15  echo-naive-prox  [kernel.kallsyms]         [k] validate_xmit_skb
+     0.02%            15  swapper          [kernel.kallsyms]         [k] memset_erms
+     0.02%            14  echo-naive-prox  [kernel.kallsyms]         [k] __put_page
+     0.02%            14  echo-naive-prox  [kernel.kallsyms]         [k] __usecs_to_jiffies
+     0.02%            14  echo-naive-prox  [kernel.kallsyms]         [k] eth_type_trans
+     0.02%            14  echo-naive-prox  [kernel.kallsyms]         [k] fq_codel_dequeue
+     0.02%            14  echo-naive-prox  [kernel.kallsyms]         [k] inet_sendmsg
+     0.02%            14  echo-naive-prox  [kernel.kallsyms]         [k] ip_rcv_finish_core.isra.18
+     0.02%            14  echo-naive-prox  [kernel.kallsyms]         [k] jiffies_to_usecs
+     0.02%            14  echo-naive-prox  [kernel.kallsyms]         [k] ktime_get_with_offset
+     0.02%            14  echo-naive-prox  [kernel.kallsyms]         [k] should_failslab
+     0.02%            14  echo-naive-prox  [kernel.kallsyms]         [k] skb_clone
+     0.02%            14  echo-naive-prox  [kernel.kallsyms]         [k] sock_rfree
+     0.02%            14  echo-naive-prox  [kernel.kallsyms]         [k] tcp_cleanup_rbuf
+     0.02%            14  echo-naive-prox  libpthread-2.27.so        [.] __pthread_enable_asynccancel
+     0.02%            13  echo-naive-prox  [kernel.kallsyms]         [k] __dev_kfree_skb_any
+     0.02%            13  echo-naive-prox  [kernel.kallsyms]         [k] __slab_alloc
+     0.02%            13  echo-naive-prox  [kernel.kallsyms]         [k] free_compound_page
+     0.02%            13  echo-naive-prox  [kernel.kallsyms]         [k] sk_free
+     0.02%            13  echo-naive-prox  [kernel.kallsyms]         [k] sock_def_readable
+     0.02%            13  echo-naive-prox  [kernel.kallsyms]         [k] tcp_queue_rcv
+     0.02%            13  echo-naive-prox  [kernel.kallsyms]         [k] tcp_schedule_loss_probe
+     0.01%            12  echo-naive-prox  [kernel.kallsyms]         [k] __copy_skb_header
+     0.01%            12  echo-naive-prox  [kernel.kallsyms]         [k] dev_hard_start_xmit
+     0.01%            12  echo-naive-prox  [kernel.kallsyms]         [k] ip_local_out
+     0.01%            12  echo-naive-prox  [kernel.kallsyms]         [k] kernel_poison_pages
+     0.01%            12  echo-naive-prox  [kernel.kallsyms]         [k] security_socket_recvmsg
+     0.01%            12  echo-naive-prox  [kernel.kallsyms]         [k] tasklet_action_common.isra.23
+     0.01%            12  echo-naive-prox  [kernel.kallsyms]         [k] tcp_rcv_space_adjust
+     0.01%            12  echo-naive-prox  libpthread-2.27.so        [.] __pthread_disable_asynccancel
+     0.01%            12  swapper          [kernel.kallsyms]         [k] do_idle
+     0.01%            11  echo-naive-prox  [kernel.kallsyms]         [k] __build_skb
+     0.01%            11  echo-naive-prox  [kernel.kallsyms]         [k] __ip_local_out
+     0.01%            11  echo-naive-prox  [kernel.kallsyms]         [k] __netdev_pick_tx
+     0.01%            11  echo-naive-prox  [kernel.kallsyms]         [k] __pskb_trim_head
+     0.01%            11  echo-naive-prox  [kernel.kallsyms]         [k] __tcp_ack_snd_check
+     0.01%            11  echo-naive-prox  [kernel.kallsyms]         [k] consume_skb
+     0.01%            11  echo-naive-prox  [kernel.kallsyms]         [k] inet_ehashfn
+     0.01%            11  echo-naive-prox  [kernel.kallsyms]         [k] ip_local_deliver
+     0.01%            11  echo-naive-prox  [kernel.kallsyms]         [k] ip_rcv_finish
+     0.01%            11  echo-naive-prox  [kernel.kallsyms]         [k] lock_timer_base
+     0.01%            11  echo-naive-prox  [kernel.kallsyms]         [k] skb_coalesce_rx_frag
+     0.01%            11  echo-naive-prox  [kernel.kallsyms]         [k] tcp_established_options
+     0.01%            11  echo-naive-prox  [kernel.kallsyms]         [k] tcp_rate_skb_sent
+     0.01%            11  echo-naive-prox  [kernel.kallsyms]         [k] tcp_send_delayed_ack
+     0.01%            10  echo-naive-prox  [kernel.kallsyms]         [k] __release_sock
+     0.01%            10  echo-naive-prox  [kernel.kallsyms]         [k] mem_cgroup_uncharge
+     0.01%            10  echo-naive-prox  [kernel.kallsyms]         [k] skb_gso_validate_network_len
+     0.01%            10  swapper          [kernel.kallsyms]         [k] kmem_cache_free
+     0.01%            10  swapper          [kernel.kallsyms]         [k] receive_buf
+     0.01%            10  swapper          [kernel.kallsyms]         [k] skb_page_frag_refill
+     0.01%            10  swapper          [kernel.kallsyms]         [k] tcp_v4_rcv
+     0.01%             9  echo-naive-prox  [kernel.kallsyms]         [k] __fget_light
+     0.01%             9  echo-naive-prox  [kernel.kallsyms]         [k] __netif_receive_skb_one_core
+     0.01%             9  echo-naive-prox  [kernel.kallsyms]         [k] __xfrm_policy_check2.constprop.41
+     0.01%             9  echo-naive-prox  [kernel.kallsyms]         [k] ip_protocol_deliver_rcu
+     0.01%             9  echo-naive-prox  [kernel.kallsyms]         [k] ip_rcv
+     0.01%             9  echo-naive-prox  [kernel.kallsyms]         [k] lock_sock_nested
+     0.01%             9  echo-naive-prox  [kernel.kallsyms]         [k] page_frag_alloc
+     0.01%             9  echo-naive-prox  [kernel.kallsyms]         [k] security_sock_rcv_skb
+     0.01%             9  echo-naive-prox  [kernel.kallsyms]         [k] should_fail_alloc_page
+     0.01%             9  echo-naive-prox  [kernel.kallsyms]         [k] sock_sendmsg
+     0.01%             9  echo-naive-prox  [kernel.kallsyms]         [k] tcp_update_pacing_rate
+     0.01%             9  echo-naive-prox  [kernel.kallsyms]         [k] tcp_update_skb_after_send
+     0.01%             9  echo-naive-prox  [kernel.kallsyms]         [k] validate_xmit_skb_list
+     0.01%             9  swapper          [kernel.kallsyms]         [k] __inet_lookup_established
+     0.01%             9  swapper          [kernel.kallsyms]         [k] ipt_do_table
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] __get_xps_queue_idx
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] __kmalloc_reserve.isra.54
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] __tcp_send_ack.part.44
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] __x86_indirect_thunk_rax
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] bictcp_acked
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] napi_complete_done
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] netif_receive_skb_internal
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] sk_filter_trim_cap
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] sk_reset_timer
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] skb_csum_hwoffload_help
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] sock_put
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] sock_recvmsg
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] tcp_ack_update_rtt.isra.47
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] tcp_push
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] tcp_rack_advance
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] tcp_send_ack
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] tcp_v4_inbound_md5_hash
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] tcp_v4_send_check
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] virtqueue_add_outbuf
+     0.01%             8  echo-naive-prox  [kernel.kallsyms]         [k] virtqueue_get_buf
+     0.01%             8  swapper          [kernel.kallsyms]         [k] page_to_skb
+     0.01%             8  swapper          [kernel.kallsyms]         [k] skb_try_coalesce
+     0.01%             8  swapper          [kernel.kallsyms]         [k] tcp_try_coalesce
+     0.01%             8  swapper          [kernel.kallsyms]         [k] tick_nohz_idle_enter
+     0.01%             7  echo-naive-prox  [kernel.kallsyms]         [k] _raw_spin_trylock
+     0.01%             7  echo-naive-prox  [kernel.kallsyms]         [k] dev_queue_xmit
+     0.01%             7  echo-naive-prox  [kernel.kallsyms]         [k] iov_iter_init
+     0.01%             7  echo-naive-prox  [kernel.kallsyms]         [k] memset
+     0.01%             7  echo-naive-prox  [kernel.kallsyms]         [k] skb_push
+     0.01%             7  echo-naive-prox  [kernel.kallsyms]         [k] tcp_gro_receive
+     0.01%             7  echo-naive-prox  [kernel.kallsyms]         [k] tcp_grow_window.isra.39
+     0.01%             7  echo-naive-prox  [kernel.kallsyms]         [k] tcp_options_write
+     0.01%             7  echo-naive-prox  [kernel.kallsyms]         [k] tcp_rate_check_app_limited
+     0.01%             7  echo-naive-prox  [kernel.kallsyms]         [k] tcp_sendmsg
+     0.01%             7  echo-naive-prox  [kernel.kallsyms]         [k] tcp_v4_fill_cb
+     0.01%             7  echo-naive-prox  echo-naive-proxy          [.] main
+     0.01%             6  echo-naive-prox  [kernel.kallsyms]         [k] __napi_alloc_skb
+     0.01%             6  echo-naive-prox  [kernel.kallsyms]         [k] __put_compound_page
+     0.01%             6  echo-naive-prox  [kernel.kallsyms]         [k] __x64_sys_recvfrom
+     0.01%             6  echo-naive-prox  [kernel.kallsyms]         [k] aa_sock_msg_perm
+     0.01%             6  echo-naive-prox  [kernel.kallsyms]         [k] raw_local_deliver
+     0.01%             6  echo-naive-prox  [kernel.kallsyms]         [k] security_socket_sendmsg
+     0.01%             6  echo-naive-prox  [kernel.kallsyms]         [k] skb_partial_csum_set
+     0.01%             6  echo-naive-prox  [kernel.kallsyms]         [k] tcp4_gro_receive
+     0.01%             6  echo-naive-prox  [kernel.kallsyms]         [k] tcp_push_one
+     0.01%             6  echo-naive-prox  [kernel.kallsyms]         [k] tcp_rate_skb_delivered
+     0.01%             6  swapper          [kernel.kallsyms]         [k] __build_skb
+     0.01%             6  swapper          [kernel.kallsyms]         [k] __free_pages_ok
+     0.01%             6  swapper          [kernel.kallsyms]         [k] __netif_receive_skb_core
+     0.01%             6  swapper          [kernel.kallsyms]         [k] __tcp_transmit_skb
+     0.01%             6  swapper          [kernel.kallsyms]         [k] ip_send_check
+     0.01%             6  swapper          [kernel.kallsyms]         [k] tcp_rcv_established
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] __kfree_skb_flush
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] __tcp_v4_send_check
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] __x64_sys_sendto
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] apparmor_socket_recvmsg
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] apparmor_socket_sendmsg
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] kfree_skb_partial
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] page_poisoning_enabled
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] policy_node
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] schedule
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] schedule_timeout
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] skb_clone_tx_timestamp
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] skb_free_head
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] sockfd_lookup_light
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] tcp_check_space
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] tcp_chrono_stop
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] tcp_data_queue
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] tcp_trim_head
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] tcp_tx_timestamp
+     0.01%             5  echo-naive-prox  [kernel.kallsyms]         [k] wait_woken
+     0.01%             5  swapper          [kernel.kallsyms]         [k] __cgroup_bpf_run_filter_skb
+     0.01%             5  swapper          [kernel.kallsyms]         [k] __sock_wfree
+     0.01%             5  swapper          [kernel.kallsyms]         [k] inet_gro_receive
+     0.01%             5  swapper          [kernel.kallsyms]         [k] pvclock_clocksource_read
+     0.01%             5  swapper          [kernel.kallsyms]         [k] sg_init_one
+     0.01%             5  swapper          [kernel.kallsyms]         [k] sg_init_table
+     0.01%             5  swapper          [kernel.kallsyms]         [k] skb_coalesce_rx_frag
+     0.01%             5  swapper          [kernel.kallsyms]         [k] skb_release_head_state
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] __sk_flush_backlog
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] _raw_spin_unlock_bh
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] apparmor_socket_sock_rcv_skb
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] get_task_policy.part.32
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] minmax_subwin_update
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] netif_tx_wake_queue
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] ns_to_timespec
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] policy_nodemask
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] rb_next
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] rebalance_domains
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] skb_release_all
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] tcp_newly_delivered
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] tcp_small_queue_check.isra.32
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] tcp_tsq_write.part.47
+     0.00%             4  echo-naive-prox  [kernel.kallsyms]         [k] tcp_urg
+     0.00%             4  ksoftirqd/8      [kernel.kallsyms]         [k] receive_mergeable
+     0.00%             4  swapper          [kernel.kallsyms]         [k] __raw_callee_save___pv_queued_spin_unlock
+     0.00%             4  swapper          [kernel.kallsyms]         [k] __zone_watermark_ok
+     0.00%             4  swapper          [kernel.kallsyms]         [k] default_idle
+     0.00%             4  swapper          [kernel.kallsyms]         [k] dev_gro_receive
+     0.00%             4  swapper          [kernel.kallsyms]         [k] ip_local_deliver
+     0.00%             4  swapper          [kernel.kallsyms]         [k] ipv4_dst_check
+     0.00%             4  swapper          [kernel.kallsyms]         [k] rcu_idle_exit
+     0.00%             4  swapper          [kernel.kallsyms]         [k] start_xmit
+     0.00%             4  swapper          [kernel.kallsyms]         [k] tcp_ack
+     0.00%             3  echo-naive-prox  [kernel.kallsyms]         [k] import_single_range
+     0.00%             3  echo-naive-prox  [kernel.kallsyms]         [k] ktime_get_seconds
+     0.00%             3  echo-naive-prox  [kernel.kallsyms]         [k] minmax_running_min
+     0.00%             3  echo-naive-prox  [kernel.kallsyms]         [k] run_rebalance_domains
+     0.00%             3  echo-naive-prox  [kernel.kallsyms]         [k] skb_defer_rx_timestamp
+     0.00%             3  echo-naive-prox  [kernel.kallsyms]         [k] skb_gro_reset_offset
+     0.00%             3  echo-naive-prox  [kernel.kallsyms]         [k] skb_gso_transport_seglen
+     0.00%             3  echo-naive-prox  [kernel.kallsyms]         [k] skb_to_sgvec
+     0.00%             3  echo-naive-prox  [kernel.kallsyms]         [k] tasklet_action
+     0.00%             3  echo-naive-prox  [kernel.kallsyms]         [k] tcp_rate_gen
+     0.00%             3  echo-naive-prox  [kernel.kallsyms]         [k] tcp_send_mss
+     0.00%             3  echo-naive-prox  [kernel.kallsyms]         [k] tcp_validate_incoming
+     0.00%             3  echo-naive-prox  [kernel.kallsyms]         [k] update_blocked_averages
+     0.00%             3  echo-naive-prox  [kernel.kallsyms]         [k] virtqueue_get_vring_size
+     0.00%             3  ksoftirqd/8      [kernel.kallsyms]         [k] detach_buf_split
+     0.00%             3  ksoftirqd/8      [kernel.kallsyms]         [k] finish_task_switch
+     0.00%             3  swapper          [kernel.kallsyms]         [k] __local_bh_enable_ip
+     0.00%             3  swapper          [kernel.kallsyms]         [k] default_idle_call
+     0.00%             3  swapper          [kernel.kallsyms]         [k] iptable_filter_hook
+     0.00%             3  swapper          [kernel.kallsyms]         [k] sched_ttwu_pending
+     0.00%             3  swapper          [kernel.kallsyms]         [k] security_sock_rcv_skb
+     0.00%             3  swapper          [kernel.kallsyms]         [k] skb_add_rx_frag
+     0.00%             3  swapper          [kernel.kallsyms]         [k] skb_put
+     0.00%             3  swapper          [kernel.kallsyms]         [k] tcp_mstamp_refresh
+     0.00%             3  swapper          [kernel.kallsyms]         [k] tcp_queue_rcv
+     0.00%             3  swapper          [kernel.kallsyms]         [k] tcp_v4_early_demux
+     0.00%             3  swapper          [kernel.kallsyms]         [k] virtqueue_kick_prepare
+     0.00%             3  swapper          [kernel.kallsyms]         [k] vring_map_one_sg
+     0.00%             2  echo-naive-prox  [kernel.kallsyms]         [k] __fdget
+     0.00%             2  echo-naive-prox  [kernel.kallsyms]         [k] __kfree_skb
+     0.00%             2  echo-naive-prox  [kernel.kallsyms]         [k] __netif_receive_skb
+     0.00%             2  echo-naive-prox  [kernel.kallsyms]         [k] __schedule
+     0.00%             2  echo-naive-prox  [kernel.kallsyms]         [k] _raw_spin_lock_irq
+     0.00%             2  echo-naive-prox  [kernel.kallsyms]         [k] ip_local_deliver_finish
+     0.00%             2  echo-naive-prox  [kernel.kallsyms]         [k] napi_gro_receive
+     0.00%             2  echo-naive-prox  [kernel.kallsyms]         [k] sk_wait_data
+     0.00%             2  echo-naive-prox  [kernel.kallsyms]         [k] skb_put
+     0.00%             2  echo-naive-prox  [kernel.kallsyms]         [k] virtqueue_enable_cb_prepare
+     0.00%             2  echo-naive-prox  [kernel.kallsyms]         [k] virtqueue_napi_complete
+     0.00%             2  echo-naive-prox  [kernel.kallsyms]         [k] virtqueue_poll
+     0.00%             2  ksoftirqd/8      [kernel.kallsyms]         [k] virtqueue_get_buf_ctx
+     0.00%             2  perf             [kernel.kallsyms]         [k] __block_commit_write.isra.37
+     0.00%             2  swapper          [kernel.kallsyms]         [k] PageHuge
+     0.00%             2  swapper          [kernel.kallsyms]         [k] __alloc_pages_nodemask
+     0.00%             2  swapper          [kernel.kallsyms]         [k] __kfree_skb_flush
+     0.00%             2  swapper          [kernel.kallsyms]         [k] __netif_receive_skb_one_core
+     0.00%             2  swapper          [kernel.kallsyms]         [k] __schedule
+     0.00%             2  swapper          [kernel.kallsyms]         [k] __slab_free
+     0.00%             2  swapper          [kernel.kallsyms]         [k] __tcp_ack_snd_check
+     0.00%             2  swapper          [kernel.kallsyms]         [k] __tcp_select_window
+     0.00%             2  swapper          [kernel.kallsyms]         [k] _raw_spin_lock
+     0.00%             2  swapper          [kernel.kallsyms]         [k] fq_codel_dequeue
+     0.00%             2  swapper          [kernel.kallsyms]         [k] inet_ehashfn
+     0.00%             2  swapper          [kernel.kallsyms]         [k] ip_finish_output2
+     0.00%             2  swapper          [kernel.kallsyms]         [k] ip_rcv
+     0.00%             2  swapper          [kernel.kallsyms]         [k] ip_rcv_core.isra.20
+     0.00%             2  swapper          [kernel.kallsyms]         [k] ip_rcv_finish_core.isra.18
+     0.00%             2  swapper          [kernel.kallsyms]         [k] kfree
+     0.00%             2  swapper          [kernel.kallsyms]         [k] ktime_get
+     0.00%             2  swapper          [kernel.kallsyms]         [k] ktime_get_seconds
+     0.00%             2  swapper          [kernel.kallsyms]         [k] mod_timer
+     0.00%             2  swapper          [kernel.kallsyms]         [k] net_rx_action
+     0.00%             2  swapper          [kernel.kallsyms]         [k] netif_receive_skb_internal
+     0.00%             2  swapper          [kernel.kallsyms]         [k] nf_hook_slow
+     0.00%             2  swapper          [kernel.kallsyms]         [k] raw_local_deliver
+     0.00%             2  swapper          [kernel.kallsyms]         [k] rcu_process_callbacks
+     0.00%             2  swapper          [kernel.kallsyms]         [k] run_timer_softirq
+     0.00%             2  swapper          [kernel.kallsyms]         [k] schedule_idle
+     0.00%             2  swapper          [kernel.kallsyms]         [k] sk_filter_trim_cap
+     0.00%             2  swapper          [kernel.kallsyms]         [k] skb_defer_rx_timestamp
+     0.00%             2  swapper          [kernel.kallsyms]         [k] skb_release_data
+     0.00%             2  swapper          [kernel.kallsyms]         [k] sock_def_readable
+     0.00%             2  swapper          [kernel.kallsyms]         [k] tcp_event_data_recv
+     0.00%             2  swapper          [kernel.kallsyms]         [k] tcp_v4_inbound_md5_hash
+     0.00%             2  swapper          [kernel.kallsyms]         [k] virtnet_poll
+     0.00%             2  swapper          [kernel.kallsyms]         [k] virtqueue_add_inbuf_ctx
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] __x86_indirect_thunk_rdx
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] bictcp_cong_avoid
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] fq_codel_enqueue
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] kmem_cache_free_bulk
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] memcmp
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] memcpy
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] napi_consume_skb
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] napi_gro_complete
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] new_slab
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] remove_wait_queue
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] skb_condense
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] sock_zerocopy_put
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] tcp_chrono_start
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] tcp_parse_md5sig_option
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] tcp_rack_update_reo_wnd
+     0.00%             1  echo-naive-prox  [kernel.kallsyms]         [k] tcp_tsq_handler
+     0.00%             1  journalctl       libsystemd-shared-237.so  [.] 0x00000000000bad3a
+     0.00%             1  ksoftirqd/8      [kernel.kallsyms]         [k] kmem_cache_free
+     0.00%             1  ksoftirqd/8      [kernel.kallsyms]         [k] net_rx_action
+     0.00%             1  ksoftirqd/8      [kernel.kallsyms]         [k] raw_local_deliver
+     0.00%             1  ksoftirqd/8      [kernel.kallsyms]         [k] rcu_softirq_qs
+     0.00%             1  ksoftirqd/8      [kernel.kallsyms]         [k] skb_release_head_state
+     0.00%             1  ksoftirqd/9      [kernel.kallsyms]         [k] tcp_rearm_rto
+     0.00%             1  ksoftirqd/9      [kernel.kallsyms]         [k] virtqueue_enable_cb_delayed
+     0.00%             1  migration/14     [kernel.kallsyms]         [k] kthread_should_stop
+     0.00%             1  perf             [kernel.kallsyms]         [k] __do_page_fault
+     0.00%             1  perf             [kernel.kallsyms]         [k] kmem_cache_free
+     0.00%             1  perf             [kernel.kallsyms]         [k] native_write_msr
+     0.00%             1  rcu_sched        [kernel.kallsyms]         [k] rcu_gp_kthread
+     0.00%             1  sleep            [kernel.kallsyms]         [k] _atomic_dec_and_lock
+     0.00%             1  sleep            [kernel.kallsyms]         [k] filemap_map_pages
+     0.00%             1  sleep            ld-2.27.so                [.] do_lookup_x
+     0.00%             1  swapper          [kernel.kallsyms]         [k] __dev_queue_xmit
+     0.00%             1  swapper          [kernel.kallsyms]         [k] __get_xps_queue_idx
+     0.00%             1  swapper          [kernel.kallsyms]         [k] __pskb_trim_head
+     0.00%             1  swapper          [kernel.kallsyms]         [k] __put_page
+     0.00%             1  swapper          [kernel.kallsyms]         [k] __pv_queued_spin_lock_slowpath
+     0.00%             1  swapper          [kernel.kallsyms]         [k] __qdisc_run
+     0.00%             1  swapper          [kernel.kallsyms]         [k] __skb_to_sgvec
+     0.00%             1  swapper          [kernel.kallsyms]         [k] __slab_alloc
+     0.00%             1  swapper          [kernel.kallsyms]         [k] __tcp_send_ack.part.44
+     0.00%             1  swapper          [kernel.kallsyms]         [k] __tcp_v4_send_check
+     0.00%             1  swapper          [kernel.kallsyms]         [k] __usecs_to_jiffies
+     0.00%             1  swapper          [kernel.kallsyms]         [k] __wake_up_common_lock
+     0.00%             1  swapper          [kernel.kallsyms]         [k] __wake_up_sync_key
+     0.00%             1  swapper          [kernel.kallsyms]         [k] __xfrm_policy_check2.constprop.41
+     0.00%             1  swapper          [kernel.kallsyms]         [k] _raw_spin_trylock
+     0.00%             1  swapper          [kernel.kallsyms]         [k] apparmor_socket_sock_rcv_skb
+     0.00%             1  swapper          [kernel.kallsyms]         [k] file_free_rcu
+     0.00%             1  swapper          [kernel.kallsyms]         [k] free_old_xmit_skbs
+     0.00%             1  swapper          [kernel.kallsyms]         [k] ip_local_deliver_finish
+     0.00%             1  swapper          [kernel.kallsyms]         [k] ip_local_out
+     0.00%             1  swapper          [kernel.kallsyms]         [k] ip_rcv_finish
+     0.00%             1  swapper          [kernel.kallsyms]         [k] ipv4_mtu
+     0.00%             1  swapper          [kernel.kallsyms]         [k] kmem_cache_alloc
+     0.00%             1  swapper          [kernel.kallsyms]         [k] kmem_cache_alloc_node
+     0.00%             1  swapper          [kernel.kallsyms]         [k] kmem_cache_free_bulk
+     0.00%             1  swapper          [kernel.kallsyms]         [k] memset
+     0.00%             1  swapper          [kernel.kallsyms]         [k] napi_complete_done
+     0.00%             1  swapper          [kernel.kallsyms]         [k] napi_gro_receive
+     0.00%             1  swapper          [kernel.kallsyms]         [k] rb_erase
+     0.00%             1  swapper          [kernel.kallsyms]         [k] rb_first
+     0.00%             1  swapper          [kernel.kallsyms]         [k] rcu_cblist_dequeue
+     0.00%             1  swapper          [kernel.kallsyms]         [k] sg_next
+     0.00%             1  swapper          [kernel.kallsyms]         [k] should_failslab
+     0.00%             1  swapper          [kernel.kallsyms]         [k] skb_clone_tx_timestamp
+     0.00%             1  swapper          [kernel.kallsyms]         [k] skb_condense
+     0.00%             1  swapper          [kernel.kallsyms]         [k] skb_free_head
+     0.00%             1  swapper          [kernel.kallsyms]         [k] skb_to_sgvec
+     0.00%             1  swapper          [kernel.kallsyms]         [k] tcp4_gro_receive
+     0.00%             1  swapper          [kernel.kallsyms]         [k] tcp_event_new_data_sent
+     0.00%             1  swapper          [kernel.kallsyms]         [k] tcp_gro_receive
+     0.00%             1  swapper          [kernel.kallsyms]         [k] tcp_grow_window.isra.39
+     0.00%             1  swapper          [kernel.kallsyms]         [k] tcp_rate_skb_delivered
+     0.00%             1  swapper          [kernel.kallsyms]         [k] tcp_rate_skb_sent
+     0.00%             1  swapper          [kernel.kallsyms]         [k] tcp_send_ack
+     0.00%             1  swapper          [kernel.kallsyms]         [k] tcp_trim_head
+     0.00%             1  swapper          [kernel.kallsyms]         [k] tcp_v4_do_rcv
+     0.00%             1  swapper          [kernel.kallsyms]         [k] tcp_v4_fill_cb
+     0.00%             1  swapper          [kernel.kallsyms]         [k] tcp_write_xmit
+     0.00%             1  swapper          [kernel.kallsyms]         [k] update_sd_lb_stats
+     0.00%             1  swapper          [kernel.kallsyms]         [k] virtqueue_add_outbuf
+     0.00%             1  swapper          [kernel.kallsyms]         [k] virtqueue_enable_cb_prepare
+     0.00%             1  swapper          [kernel.kallsyms]         [k] virtqueue_get_buf
+
+
+#
+# (Tip: Profiling branch (mis)predictions with: perf record -b / perf report)
+#

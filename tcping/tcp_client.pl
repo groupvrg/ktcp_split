@@ -7,8 +7,9 @@ use Time::HiRes;
 use Regexp::Common qw/ net number /;
 $| = 1; #?
 
-my $serverip = '127.0.0.1';
-my $serverport = 5556;
+#my $serverip = '127.0.0.1';
+my $serverip = '10.154.0.21';
+my $serverport = 8080;
 my $size = 1024;
 
 sub parse_size {

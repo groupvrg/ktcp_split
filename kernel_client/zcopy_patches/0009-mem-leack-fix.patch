@@ -1,0 +1,34 @@
+From 6a968caeb98878c8c76407f6dc944b0f679619ab Mon Sep 17 00:00:00 2001
+From: Build VM <build@example.com>
+Date: Wed, 25 Dec 2019 10:43:57 +0000
+Subject: [PATCH 09/24] mem leack fix
+
+---
+ net/core/skbuff.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/net/core/skbuff.c b/net/core/skbuff.c
+index e8ce51109..5c27bc758 100644
+--- a/net/core/skbuff.c
++++ b/net/core/skbuff.c
+@@ -1040,13 +1040,16 @@ static bool skb_zerocopy_notify_extend(struct sk_buff *skb, u32 lo, u16 len)
+ void sock_kern_zerocopy_cb(struct ubuf_info *uarg, bool success)
+ {
+ 	struct sk_buff *tail, *skb = skb_from_uarg(uarg);
++	struct sock *sk = skb->sk;
+ 	int i, num_frags = skb_shinfo(skb)->nr_frags;
+ 
+-	trace_printk("%s freeing pages...\n", __FUNCTION__);
++	trace_printk("%s freeing pages[%d]...\n", __FUNCTION__, num_frags);
+ 	for (i = 0; i < num_frags; i++) {
+ 		skb_frag_t *f = &skb_shinfo(skb)->frags[i];
+ 		put_page(f->page.p); // ? put_page?
+ 	}
++	consume_skb(skb);
++	sock_put(sk);
+ }
+ EXPORT_SYMBOL(sock_kern_zerocopy_cb);
+ 
+-- 
+2.17.1
+
